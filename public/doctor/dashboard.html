@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doctor Dashboard — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div id="welcome-block" style="margin-bottom: var(--space-5);"><div class="skeleton" style="height:32px; width:280px;"></div></div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
+      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-top: var(--space-5); align-items:start;">
+      <div class="card">
+        <div class="card-header"><h3>Today's appointments</h3><a href="/doctor/appointments.html" class="text-sm">View all</a></div>
+        <div id="today-appts"><div class="skeleton" style="height:80px;"></div></div>
+      </div>
+      <div class="card">
+        <h3>Appointments — last 14 days</h3>
+        <canvas id="trend-chart" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-5); align-items:start;">
+      <div class="card">
+        <div class="card-header"><h3>Upcoming</h3></div>
+        <div id="upcoming-appts"><div class="skeleton" style="height:80px;"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Recent consultations</h3></div>
+        <div id="recent-consults"><div class="skeleton" style="height:80px;"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+  document.addEventListener('mb:auth-ready', async (e) => {
+    const user = e.detail;
+    MB_LAYOUT.renderDashboardShell('doctor', 'Doctor Dashboard');
+    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    document.getElementById('welcome-block').innerHTML = `<h2 style="margin-bottom:2px;">Welcome back, ${user.fullName}</h2><p class="text-muted">Here's your schedule and practice overview.</p>`;
+
+    try {
+      const data = await api.get('/dashboard/doctor');
+      renderStats(data.counts, data.todayAppointments.length);
+      renderList('today-appts', data.todayAppointments, true);
+      renderList('upcoming-appts', data.upcomingAppointments, false);
+      renderConsults(data.recentConsultations);
+      renderTrend(data.trend);
+    } catch (err) { toast.error('Could not load dashboard.'); }
+  });
+
+  function renderStats(counts, todayCount) {
+    document.getElementById('stat-grid').innerHTML = `
+      <div class="card stat-card"><div class="value">${todayCount}</div><div class="label">Today's appointments</div></div>
+      <div class="card stat-card"><div class="value">${counts.total_patients || 0}</div><div class="label">Total patients</div></div>
+      <div class="card stat-card"><div class="value">${counts.completed || 0}</div><div class="label">Completed</div></div>
+      <div class="card stat-card"><div class="value">${counts.cancelled || 0}</div><div class="label">Cancelled</div></div>
+    `;
+  }
+
+  function renderList(elId, list, showActions) {
+    const el = document.getElementById(elId);
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm">Nothing here.</p>'; return; }
+    el.innerHTML = list.map((a) => `
+      <div class="flex justify-between items-center" style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+        <div><strong class="text-sm">${a.patient_name}</strong><div class="text-sm text-muted">${a.appointment_date} at ${a.start_time.slice(0,5)}</div></div>
+        <div class="flex gap-2 items-center">
+          <span class="badge status-${a.status}">${a.status}</span>
+          ${showActions && a.status === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="confirmAppt(${a.id})">Confirm</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function renderConsults(list) {
+    const el = document.getElementById('recent-consults');
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm">No consultations recorded yet.</p>'; return; }
+    el.innerHTML = list.map((c) => `
+      <div style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+        <strong class="text-sm">${c.diagnosis}</strong><div class="text-sm text-muted">${c.patient_name} &#8226; ${c.record_date}</div>
+      </div>
+    `).join('');
+  }
+
+  function renderTrend(trend) {
+    const labels = []; const data = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      labels.push(iso.slice(5));
+      const match = trend.find((t) => t.date === iso);
+      data.push(match ? match.count : 0);
+    }
+    new Chart(document.getElementById('trend-chart'), {
+      type: 'bar',
+      data: { labels, datasets: [{ label: 'Appointments', data, backgroundColor: '#0d9488' }] },
+      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+  }
+
+  async function confirmAppt(id) {
+    try { await api.patch(`/appointments/${id}/status`, { status: 'confirmed' }); toast.success('Confirmed.'); location.reload(); }
+    catch (e) { toast.error(e.message); }
+  }
+</script>
+</body>
+</html>

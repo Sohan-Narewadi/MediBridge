@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Doctors — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header">
+      <h2 class="mb-0">Doctors</h2>
+      <div class="flex gap-2">
+        <input type="text" id="search" placeholder="Search name or specialization" style="max-width:240px;">
+        <button class="btn btn-primary btn-sm" id="add-doctor-btn">+ Add doctor</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Specialization</th><th>Experience</th><th>Fee</th><th>Rating</th><th>Status</th><th>Verified</th><th></th></tr></thead>
+        <tbody id="d-body"><tr><td colspan="8"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination flex gap-2" id="pagination" style="margin-top:var(--space-4); justify-content:center;"></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  let page = 1;
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('admin', 'Doctors');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+  document.getElementById('search').addEventListener('input', () => { page = 1; load(); });
+
+  async function load() {
+    const body = document.getElementById('d-body');
+    const q = document.getElementById('search').value.trim();
+    const { doctors, total, pageSize } = await api.get(`/admin/doctors?page=${page}&pageSize=10${q ? '&q=' + encodeURIComponent(q) : ''}`);
+    if (!doctors.length) { body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No doctors found.</td></tr>'; document.getElementById('pagination').innerHTML=''; return; }
+    body.innerHTML = doctors.map((d) => `
+      <tr>
+        <td><strong>${d.full_name}</strong></td>
+        <td>${d.specialization}</td>
+        <td>${d.experience_years} yrs</td>
+        <td>&#8377;${d.consultation_fee}</td>
+        <td>&#9733; ${Number(d.rating_avg).toFixed(1)} (${d.rating_count})</td>
+        <td><span class="badge ${d.is_active ? 'badge-success' : 'badge-danger'}">${d.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>${d.is_verified ? '<span class="badge badge-info">Verified</span>' : `<button class="btn btn-sm btn-outline" onclick="verify(${d.id})">Verify</button>`}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="toggleStatus(${d.id}, ${d.is_active ? 0 : 1})">${d.is_active ? 'Deactivate' : 'Activate'}</button></td>
+      </tr>
+    `).join('');
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const pag = document.getElementById('pagination');
+    pag.innerHTML = '';
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm ' + (i === page ? 'btn-primary' : 'btn-outline');
+      btn.textContent = i;
+      btn.addEventListener('click', () => { page = i; load(); });
+      pag.appendChild(btn);
+    }
+  }
+
+  async function toggleStatus(id, isActive) { try { await api.patch(`/admin/users/${id}/status`, { isActive: !!isActive }); toast.success('Updated.'); load(); } catch (e) { toast.error(e.message); } }
+  async function verify(id) { try { await api.patch(`/admin/doctors/${id}/verify`); toast.success('Doctor verified.'); load(); } catch (e) { toast.error(e.message); } }
+
+  document.getElementById('add-doctor-btn').addEventListener('click', async () => {
+    const { specializations } = await api.get('/specializations');
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="add-backdrop">
+        <div class="modal" style="max-width:560px;">
+          <div class="modal-header"><h3 class="mb-0">Add doctor</h3><button class="modal-close" id="add-close">&times;</button></div>
+          <div class="form-row">
+            <div class="field"><label for="nd-name">Full name</label><input id="nd-name" required></div>
+            <div class="field"><label for="nd-email">Email</label><input type="email" id="nd-email" required></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label for="nd-pass">Temporary password</label><input id="nd-pass" required></div>
+            <div class="field"><label for="nd-spec">Specialization</label><select id="nd-spec">${specializations.map((s) => `<option value="${s.id}">${s.name}</option>`).join('')}</select></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label for="nd-exp">Experience (years)</label><input type="number" id="nd-exp" value="5"></div>
+            <div class="field"><label for="nd-fee">Consultation fee</label><input type="number" id="nd-fee" value="500"></div>
+          </div>
+          <div class="field"><label for="nd-qual">Qualifications</label><input id="nd-qual" placeholder="e.g. MBBS, MD"></div>
+          <div id="add-alert"></div>
+          <button class="btn btn-primary btn-block" id="add-submit">Create doctor account</button>
+        </div>
+      </div>`;
+    document.getElementById('add-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('add-submit').addEventListener('click', async () => {
+      try {
+        await api.post('/doctors', {
+          fullName: document.getElementById('nd-name').value.trim(),
+          email: document.getElementById('nd-email').value.trim(),
+          password: document.getElementById('nd-pass').value,
+          specializationId: Number(document.getElementById('nd-spec').value),
+          experienceYears: Number(document.getElementById('nd-exp').value) || 0,
+          consultationFee: Number(document.getElementById('nd-fee').value) || 0,
+          qualifications: document.getElementById('nd-qual').value.trim(),
+        });
+        toast.success('Doctor account created.');
+        document.getElementById('modal-root').innerHTML = '';
+        load();
+      } catch (e) { document.getElementById('add-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  });
+</script>
+</body>
+</html>

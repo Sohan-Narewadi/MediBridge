@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prescriptions — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>Prescriptions</h2>
+    <p class="text-muted">Every medicine a doctor has prescribed you, with the option to turn it into a tracked reminder.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Medicine</th><th>Dosage / Frequency</th><th>Prescribed by</th><th>Date</th><th>Diagnosis</th><th></th></tr></thead>
+        <tbody id="rx-body"><tr><td colspan="6"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Prescriptions');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    const body = document.getElementById('rx-body');
+    try {
+      const { prescriptions } = await api.get('/prescriptions');
+      if (!prescriptions.length) { body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No prescriptions yet.</td></tr>'; return; }
+      body.innerHTML = prescriptions.map((p) => `
+        <tr>
+          <td><strong>${p.medicine_name}</strong></td>
+          <td>${p.dosage}, ${p.frequency}${p.duration_days ? ` (${p.duration_days}d)` : ''}</td>
+          <td>${p.doctor_name}</td>
+          <td>${p.record_date}</td>
+          <td>${p.diagnosis}</td>
+          <td>${p.already_tracked ? '<span class="badge badge-success">Tracked</span>' : `<button class="btn btn-outline btn-sm" onclick="track(${p.id}, '${p.medicine_name.replace(/'/g, "\\'")}', '${p.dosage.replace(/'/g, "\\'")}', '${p.frequency.replace(/'/g, "\\'")}', ${p.duration_days || 7})">Add reminder</button>`}</td>
+        </tr>
+      `).join('');
+    } catch (e) { body.innerHTML = '<tr><td colspan="6" class="text-center"><div class="alert alert-danger">Could not load prescriptions.</div></td></tr>'; }
+  }
+
+  async function track(id, name, dosage, frequency, durationDays) {
+    const start = new Date();
+    const end = new Date(start); end.setDate(end.getDate() + durationDays);
+    try {
+      await api.post('/medications', {
+        prescriptionId: id, medicineName: name, dosage, frequency,
+        startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10),
+      });
+      toast.success('Added to your medication reminders.');
+      load();
+    } catch (e) { toast.error(e.message); }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doctor profile — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+  #clinic-map { height: 220px; border-radius: var(--radius-md); margin-top: var(--space-3); z-index: 0; }
+  .profile-layout { display:grid; grid-template-columns: 1fr 340px; gap: var(--space-6); align-items:start; }
+  @media (max-width: 900px) { .profile-layout { grid-template-columns: 1fr; } }
+  .profile-head { display:flex; gap: var(--space-5); align-items:flex-start; flex-wrap:wrap; }
+  .profile-photo { width:96px; height:96px; border-radius: var(--radius-lg); background: var(--color-primary-100); color: var(--color-primary-700); display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:800; flex-shrink:0; }
+  .slot-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
+  .slot-btn { padding: 0.5rem; border-radius: var(--radius-sm); border: 1.5px solid var(--color-ink-200); background: var(--color-surface); cursor:pointer; font-size:0.82rem; font-weight:600; }
+  .slot-btn.selected { background: var(--color-primary-600); color:#fff; border-color: var(--color-primary-600); }
+  .review-item { border-bottom: 1px solid var(--color-ink-100); padding: var(--space-3) 0; }
+  .review-item:last-child { border-bottom:none; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<div class="container section-tight" id="page-content">
+  <div class="card skeleton" style="height:200px;"></div>
+</div>
+
+<div id="site-footer"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  const doctorId = new URLSearchParams(window.location.search).get('id');
+  let selectedSlot = null;
+  let isLoggedInPatient = false;
+
+  function initials(name) { return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase(); }
+  const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+  async function checkSession() {
+    try {
+      const { user } = await api.get('/auth/me');
+      isLoggedInPatient = user.role === 'patient';
+    } catch (e) { isLoggedInPatient = false; }
+  }
+
+  async function loadDoctor() {
+    if (!doctorId) {
+      document.getElementById('page-content').innerHTML = '<div class="empty-state"><h4>No doctor specified</h4><a href="/doctors.html" class="btn btn-outline">Back to search</a></div>';
+      return;
+    }
+    await checkSession();
+    try {
+      const { doctor, reviews, availability } = await api.get(`/doctors/${doctorId}`);
+      render(doctor, reviews, availability);
+    } catch (e) {
+      document.getElementById('page-content').innerHTML = `<div class="alert alert-danger">Doctor not found.</div><a href="/doctors.html" class="btn btn-outline">Back to search</a>`;
+    }
+  }
+
+  function render(doctor, reviews, availability) {
+    const scheduleSummary = availability.length
+      ? [...new Set(availability.map((a) => DAY_NAMES[a.day_of_week]))].join(', ')
+      : 'No availability set';
+
+    document.getElementById('page-content').innerHTML = `
+      <div class="profile-layout">
+        <div>
+          <div class="card">
+            <div class="profile-head">
+              <div class="profile-photo">${initials(doctor.full_name)}</div>
+              <div style="flex:1; min-width:200px;">
+                <h2 style="margin-bottom:2px;">${doctor.full_name}</h2>
+                <p class="text-muted" style="margin-bottom:6px;">${doctor.specialization} &#8226; ${doctor.qualifications || ''}</p>
+                <div class="flex gap-3 text-sm text-muted" style="flex-wrap:wrap;">
+                  <span class="rating">&#9733; ${Number(doctor.rating_avg).toFixed(1)} (${doctor.rating_count} reviews)</span>
+                  <span>&#127891; ${doctor.experience_years} years experience</span>
+                  <span>&#8377;${doctor.consultation_fee} per visit</span>
+                </div>
+              </div>
+            </div>
+            <hr class="divider">
+            <h4>About</h4>
+            <p>${doctor.bio || 'No bio provided yet.'}</p>
+            <div class="form-row">
+              <div>
+                <h4>Clinic</h4>
+                <p class="text-sm mb-0">${doctor.clinic_name || '—'}</p>
+                <p class="text-sm text-muted">${doctor.clinic_address || ''}${doctor.city ? ', ' + doctor.city : ''}</p>
+                ${doctor.latitude ? '<div id="clinic-map"></div>' : ''}
+              </div>
+              <div>
+                <h4>Details</h4>
+                <p class="text-sm mb-0">Languages: ${doctor.languages}</p>
+                <p class="text-sm mb-0">Consultation: ${doctor.consultation_modes.split(',').join(', ')}</p>
+                <p class="text-sm text-muted">Available: ${scheduleSummary}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: var(--space-5);">
+            <h4>Patient reviews</h4>
+            ${reviews.length ? reviews.map((r) => `
+              <div class="review-item">
+                <div class="flex justify-between"><strong class="text-sm">${r.patient_name}</strong><span class="rating">${'&#9733;'.repeat(r.rating)}</span></div>
+                ${r.comment ? `<p class="text-sm mb-0">${r.comment}</p>` : ''}
+              </div>
+            `).join('') : '<p class="text-muted text-sm">No reviews yet.</p>'}
+          </div>
+        </div>
+
+        <div class="card" style="position:sticky; top: calc(var(--header-height) + 16px);">
+          <h4>Book an appointment</h4>
+          <div class="field">
+            <label for="book-date">Select date</label>
+            <input type="date" id="book-date" min="${new Date().toISOString().slice(0,10)}">
+          </div>
+          <div id="slots-wrap">
+            <p class="text-muted text-sm">Choose a date to see open slots.</p>
+          </div>
+          <div class="field" style="margin-top: var(--space-4);">
+            <label for="book-mode">Consultation type</label>
+            <select id="book-mode">
+              ${doctor.consultation_modes.includes('in_person') ? '<option value="in_person">In-person</option>' : ''}
+              ${doctor.consultation_modes.includes('video') ? '<option value="video">Video</option>' : ''}
+            </select>
+          </div>
+          <div class="field">
+            <label for="book-reason">Reason for visit (optional)</label>
+            <textarea id="book-reason" rows="2" placeholder="Briefly describe your concern"></textarea>
+          </div>
+          <div id="book-alert"></div>
+          <button class="btn btn-primary btn-block" id="book-btn" disabled>Select a slot to continue</button>
+        </div>
+      </div>
+    `;
+
+    document.getElementById('book-date').addEventListener('change', loadSlots);
+    document.getElementById('book-btn').addEventListener('click', bookAppointment);
+
+    if (doctor.latitude && window.L) {
+      const map = L.map('clinic-map', { zoomControl: false, attributionControl: false }).setView([doctor.latitude, doctor.longitude], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+      L.marker([doctor.latitude, doctor.longitude]).addTo(map).bindPopup(doctor.clinic_name || doctor.full_name);
+    }
+  }
+
+  async function loadSlots() {
+    const date = document.getElementById('book-date').value;
+    const wrap = document.getElementById('slots-wrap');
+    selectedSlot = null;
+    updateBookButton();
+    if (!date) return;
+    wrap.innerHTML = '<div class="skeleton" style="height:90px;"></div>';
+    try {
+      const { slots } = await api.get(`/doctors/${doctorId}/slots?date=${date}`);
+      if (!slots.length) {
+        wrap.innerHTML = '<p class="text-muted text-sm">No open slots on this date. Try another day.</p>';
+        return;
+      }
+      wrap.innerHTML = `<div class="slot-grid">${slots.map((s) => `<button type="button" class="slot-btn" data-start="${s.startTime}">${s.startTime.slice(0,5)}</button>`).join('')}</div>`;
+      wrap.querySelectorAll('.slot-btn').forEach((btn) => btn.addEventListener('click', () => {
+        wrap.querySelectorAll('.slot-btn').forEach((b) => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedSlot = btn.dataset.start;
+        updateBookButton();
+      }));
+    } catch (e) {
+      wrap.innerHTML = '<p class="text-muted text-sm">Could not load slots.</p>';
+    }
+  }
+
+  function updateBookButton() {
+    const btn = document.getElementById('book-btn');
+    btn.disabled = !selectedSlot;
+    btn.textContent = selectedSlot ? 'Request appointment' : 'Select a slot to continue';
+  }
+
+  async function bookAppointment() {
+    const alertBox = document.getElementById('book-alert');
+    alertBox.innerHTML = '';
+    if (!isLoggedInPatient) {
+      alertBox.innerHTML = `<div class="alert alert-warning">Please <a href="/auth/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}">log in</a> as a patient to book.</div>`;
+      return;
+    }
+    const btn = document.getElementById('book-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner"></span> Booking...';
+    try {
+      await api.post('/appointments', {
+        doctorId, date: document.getElementById('book-date').value, startTime: selectedSlot,
+        consultationMode: document.getElementById('book-mode').value,
+        reason: document.getElementById('book-reason').value.trim() || undefined,
+      });
+      toast.success('Appointment requested!');
+      alertBox.innerHTML = '<div class="alert alert-success">Your request was sent. The doctor will confirm shortly — check your appointments page.</div>';
+      btn.textContent = 'Requested';
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      btn.disabled = false;
+      updateBookButton();
+    }
+  }
+
+  loadDoctor();
+</script>
+</body>
+</html>
