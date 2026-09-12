@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical Records — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>Medical Records</h2>
+    <p class="text-muted">Consultation summaries documented by your doctors. Always discuss results with a qualified professional.</p>
+    <div id="records-list"><div class="card skeleton" style="height:100px;"></div></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Medical Records');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    const el = document.getElementById('records-list');
+    try {
+      const { records } = await api.get('/medical-records');
+      if (!records.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128203;</div><h4>No medical records yet</h4><p>Records appear here after a completed consultation.</p></div>'; return; }
+      el.innerHTML = records.map((r) => `
+        <div class="card card-interactive" style="margin-bottom:var(--space-3); cursor:pointer;" onclick="openRecord(${r.id})">
+          <div class="flex justify-between items-start">
+            <div>
+              <h4 style="margin-bottom:2px;">${r.diagnosis}</h4>
+              <p class="text-sm text-muted mb-0">${r.doctor_name} &#8226; ${r.specialization} &#8226; ${r.record_date}</p>
+            </div>
+            ${r.follow_up_date ? `<span class="badge badge-info">Follow-up ${r.follow_up_date}</span>` : ''}
+          </div>
+        </div>
+      `).join('');
+    } catch (e) { el.innerHTML = '<div class="alert alert-danger">Could not load records.</div>'; }
+  }
+
+  async function openRecord(id) {
+    const { record, prescriptions } = await api.get(`/medical-records/${id}`);
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="rec-backdrop">
+        <div class="modal" style="max-width:560px;">
+          <div class="modal-header"><h3 class="mb-0">${record.diagnosis}</h3><button class="modal-close" id="rec-close">&times;</button></div>
+          <p class="text-sm text-muted">${record.doctor_name} &#8226; ${record.specialization} &#8226; ${record.record_date}</p>
+          <p class="text-sm">${record.consultation_summary || ''}</p>
+          <div class="form-row text-sm">
+            <div><strong>Blood pressure:</strong> ${record.vitals_bp || '—'}</div>
+            <div><strong>Pulse:</strong> ${record.vitals_pulse || '—'}</div>
+          </div>
+          ${record.follow_up_date ? `<div class="alert alert-info" style="margin-top:var(--space-3);">Follow-up recommended by ${record.follow_up_date}. ${record.follow_up_notes || ''}</div>` : ''}
+          <hr class="divider">
+          <h4>Prescriptions</h4>
+          ${prescriptions.length ? prescriptions.map((p) => `
+            <div style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+              <strong class="text-sm">${p.medicine_name}</strong> — <span class="text-sm">${p.dosage}, ${p.frequency}</span>
+              ${p.instructions ? `<div class="text-sm text-muted">${p.instructions}</div>` : ''}
+            </div>
+          `).join('') : '<p class="text-muted text-sm">No prescriptions for this visit.</p>'}
+        </div>
+      </div>`;
+    document.getElementById('rec-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+  }
+</script>
+</body>
+</html>

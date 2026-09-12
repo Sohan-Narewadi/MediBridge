@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Appointments — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .rx-row { display:grid; grid-template-columns: 2fr 1fr 1fr 0.7fr auto; gap: var(--space-2); margin-bottom: var(--space-2); align-items:center; }
+  @media (max-width: 700px) { .rx-row { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>Appointments</h2>
+    <div class="pill-nav" id="tabs" style="margin: var(--space-4) 0;">
+      <button data-tab="today" class="active">Today</button>
+      <button data-tab="upcoming">Upcoming</button>
+      <button data-tab="pending">Pending requests</button>
+      <button data-tab="completed">Completed</button>
+      <button data-tab="all">All</button>
+    </div>
+    <div id="appt-list"><div class="card skeleton" style="height:100px;"></div></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  let allAppointments = [];
+  let activeTab = 'today';
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'Appointments');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  document.querySelectorAll('#tabs button').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    render();
+  }));
+
+  async function load() {
+    try { const { appointments } = await api.get('/appointments'); allAppointments = appointments; render(); }
+    catch (e) { document.getElementById('appt-list').innerHTML = '<div class="alert alert-danger">Could not load appointments.</div>'; }
+  }
+
+  function filtered() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (activeTab === 'today') return allAppointments.filter((a) => a.appointment_date === today);
+    if (activeTab === 'upcoming') return allAppointments.filter((a) => a.appointment_date > today && a.status !== 'cancelled');
+    if (activeTab === 'pending') return allAppointments.filter((a) => a.status === 'pending');
+    if (activeTab === 'completed') return allAppointments.filter((a) => a.status === 'completed');
+    return allAppointments;
+  }
+
+  function render() {
+    const list = filtered();
+    const el = document.getElementById('appt-list');
+    if (!list.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128197;</div><p>Nothing in this view.</p></div>'; return; }
+    el.innerHTML = list.map((a) => `
+      <div class="card" style="margin-bottom:var(--space-3);">
+        <div class="flex justify-between items-start" style="flex-wrap:wrap; gap:var(--space-3);">
+          <div>
+            <h4 style="margin-bottom:2px;">${a.patient_name}</h4>
+            <p class="text-sm mb-0">&#128197; ${a.appointment_date} at ${a.start_time.slice(0,5)} &#8226; ${a.consultation_mode.replace('_',' ')}</p>
+            ${a.reason ? `<p class="text-sm text-muted mb-0">Reason: ${a.reason}</p>` : ''}
+          </div>
+          <span class="badge status-${a.status}">${a.status}</span>
+        </div>
+        <div class="flex gap-2" style="margin-top:var(--space-3); flex-wrap:wrap;">
+          ${a.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="setStatus(${a.id},'confirmed')">Confirm</button><button class="btn btn-danger btn-sm" onclick="setStatus(${a.id},'cancelled')">Decline</button>` : ''}
+          ${a.status === 'confirmed' ? `<button class="btn btn-primary btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g,"\\'")}')">Complete + add notes</button><button class="btn btn-danger btn-sm" onclick="setStatus(${a.id},'cancelled')">Cancel</button>` : ''}
+          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g,"\\'")}')">View / add notes</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function setStatus(id, status) {
+    try { await api.patch(`/appointments/${id}/status`, { status, reason: status === 'cancelled' ? 'Cancelled by doctor' : undefined }); toast.success(`Appointment ${status}.`); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+
+  function openNotes(appointmentId, patientId, patientName) {
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="notes-backdrop">
+        <div class="modal" style="max-width:600px;">
+          <div class="modal-header"><h3 class="mb-0">Consultation notes — ${patientName}</h3><button class="modal-close" id="notes-close">&times;</button></div>
+          <div class="field"><label for="dx">Diagnosis</label><input id="dx" required></div>
+          <div class="field"><label for="summary">Consultation summary</label><textarea id="summary" rows="3"></textarea></div>
+          <div class="form-row">
+            <div class="field"><label for="bp">Blood pressure</label><input id="bp" placeholder="120/80"></div>
+            <div class="field"><label for="pulse">Pulse</label><input id="pulse" placeholder="72 bpm"></div>
+          </div>
+          <div class="field"><label for="fu">Follow-up date (optional)</label><input type="date" id="fu"></div>
+
+          <h4 style="margin-top:var(--space-4);">Prescriptions</h4>
+          <div id="rx-rows"></div>
+          <button type="button" class="btn btn-outline btn-sm" id="add-rx-row">+ Add medicine</button>
+
+          <div id="notes-alert" style="margin-top:var(--space-4);"></div>
+          <button class="btn btn-primary btn-block" id="notes-submit" style="margin-top:var(--space-3);">Save &amp; mark completed</button>
+        </div>
+      </div>`;
+    document.getElementById('notes-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('add-rx-row').addEventListener('click', addRxRow);
+    addRxRow();
+
+    document.getElementById('notes-submit').addEventListener('click', async () => {
+      const rows = Array.from(document.querySelectorAll('.rx-row')).map((row) => ({
+        medicineName: row.querySelector('.rx-name').value.trim(),
+        dosage: row.querySelector('.rx-dosage').value.trim(),
+        frequency: row.querySelector('.rx-freq').value.trim(),
+        durationDays: Number(row.querySelector('.rx-days').value) || null,
+      })).filter((r) => r.medicineName);
+
+      try {
+        await api.post('/medical-records', {
+          appointmentId, patientId, diagnosis: document.getElementById('dx').value.trim(),
+          consultationSummary: document.getElementById('summary').value.trim() || undefined,
+          vitalsBp: document.getElementById('bp').value.trim() || undefined,
+          vitalsPulse: document.getElementById('pulse').value.trim() || undefined,
+          followUpDate: document.getElementById('fu').value || undefined,
+          prescriptions: rows,
+        });
+        toast.success('Consultation saved and appointment marked completed.');
+        document.getElementById('modal-root').innerHTML = '';
+        load();
+      } catch (e) { document.getElementById('notes-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  }
+
+  function addRxRow() {
+    const wrap = document.getElementById('rx-rows');
+    const row = document.createElement('div');
+    row.className = 'rx-row';
+    row.innerHTML = `
+      <input class="rx-name" placeholder="Medicine name">
+      <input class="rx-dosage" placeholder="Dosage">
+      <input class="rx-freq" placeholder="Frequency">
+      <input class="rx-days" type="number" placeholder="Days">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    wrap.appendChild(row);
+  }
+</script>
+</body>
+</html>

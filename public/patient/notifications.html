@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notifications — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Mark all read</button></div>
+    <div id="notif-list"><div class="card skeleton" style="height:70px;"></div></div>
+  </main>
+</div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Notifications');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  const ICONS = { appointment: '&#128197;', reminder: '&#9201;', record: '&#128203;', tip: '&#128161;', cancellation: '&#10060;' };
+
+  async function load() {
+    const el = document.getElementById('notif-list');
+    const { notifications } = await api.get('/notifications');
+    if (!notifications.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128276;</div><p>No notifications yet.</p></div>'; return; }
+    el.innerHTML = notifications.map((n) => `
+      <div class="card" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
+        <div class="flex justify-between items-start">
+          <div class="flex gap-3">
+            <span style="font-size:1.2rem;">${ICONS[n.type] || '&#128276;'}</span>
+            <div>
+              <strong class="text-sm">${n.title}</strong>
+              <p class="text-sm text-muted mb-0">${n.message}</p>
+              <p class="text-sm text-muted mb-0">${new Date(n.created_at).toLocaleString()}</p>
+            </div>
+          </div>
+          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+  async function markRead(id) { await api.patch(`/notifications/${id}/read`); load(); }
+  document.getElementById('mark-all').addEventListener('click', async () => { await api.patch('/notifications/read-all'); load(); });
+</script>
+</body>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medications — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">Medications &amp; Reminders</h2><button class="btn btn-primary btn-sm" id="add-med-btn">+ Add medication</button></div>
+
+    <div class="card" style="margin-bottom: var(--space-5);">
+      <h4>Adherence — last 14 days</h4>
+      <canvas id="adherence-chart" height="80"></canvas>
+    </div>
+
+    <div class="pill-nav" id="tabs" style="margin-bottom: var(--space-4);">
+      <button data-tab="today" class="active">Today</button>
+      <button data-tab="upcoming">Upcoming</button>
+      <button data-tab="expired">Completed / Expired</button>
+    </div>
+    <div id="med-list"><div class="card skeleton" style="height:90px;"></div></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+  let activeTab = 'today';
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Medications');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    loadChart();
+    loadMeds();
+  });
+
+  document.querySelectorAll('#tabs button').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    loadMeds();
+  }));
+
+  async function loadChart() {
+    const { trend } = await api.get('/care/adherence-trend');
+    const labels = [];
+    const data = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0, 10);
+      labels.push(iso.slice(5));
+      const match = trend.find((t) => t.date === iso);
+      data.push(match ? match.adherence_pct : null);
+    }
+    new Chart(document.getElementById('adherence-chart'), {
+      type: 'line',
+      data: { labels, datasets: [{ label: 'Adherence %', data, borderColor: '#0d9488', backgroundColor: 'rgba(13,148,136,0.12)', fill: true, tension: 0.3, spanGaps: true }] },
+      options: { responsive: true, scales: { y: { min: 0, max: 100 } }, plugins: { legend: { display: false } } },
+    });
+  }
+
+  async function loadMeds() {
+    const el = document.getElementById('med-list');
+    el.innerHTML = '<div class="card skeleton" style="height:90px;"></div>';
+    try {
+      const { medications } = await api.get(`/medications?bucket=${activeTab}`);
+      if (!medications.length) { el.innerHTML = `<div class="empty-state"><div class="icon">&#9201;</div><p>Nothing in this view.</p></div>`; return; }
+      el.innerHTML = medications.map((m) => `
+        <div class="card" style="margin-bottom:var(--space-3);">
+          <div class="flex justify-between items-start" style="flex-wrap:wrap; gap:var(--space-3);">
+            <div>
+              <h4 style="margin-bottom:2px;">${m.medicine_name}</h4>
+              <p class="text-sm text-muted mb-0">${m.dosage} &#8226; ${m.frequency} &#8226; reminders at ${m.reminder_times}</p>
+              <p class="text-sm text-muted mb-0">${m.start_date} &#8594; ${m.end_date || 'ongoing'}</p>
+              ${m.instructions ? `<p class="text-sm mb-0">${m.instructions}</p>` : ''}
+            </div>
+            <div class="text-right">
+              ${activeTab === 'today' ? `
+                <div class="flex gap-2">
+                  <button class="btn btn-sm ${m.today_status === 'taken' ? 'btn-primary' : 'btn-outline'}" onclick="log(${m.id}, 'taken')">Taken</button>
+                  <button class="btn btn-sm ${m.today_status === 'skipped' ? 'btn-primary' : 'btn-outline'}" onclick="log(${m.id}, 'skipped')">Skip</button>
+                  <button class="btn btn-sm ${m.today_status === 'missed' ? 'btn-primary' : 'btn-outline'}" onclick="log(${m.id}, 'missed')">Missed</button>
+                </div>
+              ` : ''}
+              ${activeTab !== 'expired' ? `<button class="btn btn-ghost btn-sm" style="margin-top:4px;" onclick="stopMed(${m.id})">Stop</button>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    } catch (e) { el.innerHTML = '<div class="alert alert-danger">Could not load medications.</div>'; }
+  }
+
+  async function log(id, status) {
+    try { await api.post(`/medications/${id}/log`, { status }); toast.success('Logged.'); loadMeds(); loadChart(); }
+    catch (e) { toast.error(e.message); }
+  }
+  async function stopMed(id) {
+    if (!confirm('Stop this medication?')) return;
+    try { await api.del(`/medications/${id}`); toast.success('Medication stopped.'); loadMeds(); }
+    catch (e) { toast.error(e.message); }
+  }
+
+  document.getElementById('add-med-btn').addEventListener('click', () => {
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="add-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">Add medication</h3><button class="modal-close" id="add-close">&times;</button></div>
+          <div class="field"><label for="m-name">Medicine name</label><input id="m-name" required></div>
+          <div class="form-row">
+            <div class="field"><label for="m-dosage">Dosage</label><input id="m-dosage" placeholder="e.g. 1 tablet" required></div>
+            <div class="field"><label for="m-freq">Frequency</label><input id="m-freq" placeholder="e.g. Twice a day" required></div>
+          </div>
+          <div class="form-row">
+            <div class="field"><label for="m-start">Start date</label><input type="date" id="m-start" value="${new Date().toISOString().slice(0,10)}" required></div>
+            <div class="field"><label for="m-end">End date (optional)</label><input type="date" id="m-end"></div>
+          </div>
+          <div class="field"><label for="m-time">Reminder time(s)</label><input id="m-time" value="08:00" placeholder="e.g. 08:00,20:00"></div>
+          <div class="field"><label for="m-instr">Instructions (optional)</label><input id="m-instr"></div>
+          <div id="add-alert"></div>
+          <button class="btn btn-primary btn-block" id="add-submit">Add medication</button>
+        </div>
+      </div>`;
+    document.getElementById('add-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('add-submit').addEventListener('click', async () => {
+      try {
+        await api.post('/medications', {
+          medicineName: document.getElementById('m-name').value.trim(),
+          dosage: document.getElementById('m-dosage').value.trim(),
+          frequency: document.getElementById('m-freq').value.trim(),
+          startDate: document.getElementById('m-start').value,
+          endDate: document.getElementById('m-end').value || undefined,
+          reminderTimes: document.getElementById('m-time').value.trim() || '08:00',
+          instructions: document.getElementById('m-instr').value.trim() || undefined,
+        });
+        toast.success('Medication added.');
+        document.getElementById('modal-root').innerHTML = '';
+        loadMeds();
+      } catch (e) { document.getElementById('add-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" style="max-width:640px;">
+    <h2>My Profile</h2>
+    <div class="card">
+      <form id="profile-form">
+        <div class="form-row">
+          <div class="field"><label for="fullName">Full name</label><input id="fullName" required></div>
+          <div class="field"><label for="phone">Phone</label><input id="phone"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="dob">Date of birth</label><input type="date" id="dob"></div>
+          <div class="field"><label for="gender">Gender</label><select id="gender">
+            <option value="prefer_not_to_say">Prefer not to say</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option>
+          </select></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="bloodGroup">Blood group</label><input id="bloodGroup" placeholder="e.g. O+"></div>
+          <div class="field"><label for="city">City</label><input id="city"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label for="heightCm">Height (cm)</label><input type="number" id="heightCm"></div>
+          <div class="field"><label for="weightKg">Weight (kg)</label><input type="number" id="weightKg"></div>
+        </div>
+        <div class="field"><label for="address">Address</label><input id="address"></div>
+        <div class="form-row">
+          <div class="field"><label for="emName">Emergency contact name</label><input id="emName"></div>
+          <div class="field"><label for="emPhone">Emergency contact phone</label><input id="emPhone"></div>
+        </div>
+        <div class="field"><label for="allergies">Allergies</label><input id="allergies" placeholder="comma separated"></div>
+        <div class="field"><label for="conditions">Chronic conditions</label><input id="conditions" placeholder="comma separated"></div>
+        <div id="profile-alert"></div>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'My Profile');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    const { profile } = await api.get('/users/me/profile');
+    document.getElementById('fullName').value = profile.full_name || '';
+    document.getElementById('phone').value = profile.phone || '';
+    document.getElementById('dob').value = profile.date_of_birth || '';
+    document.getElementById('gender').value = profile.gender || 'prefer_not_to_say';
+    document.getElementById('bloodGroup').value = profile.blood_group || '';
+    document.getElementById('city').value = profile.city || '';
+    document.getElementById('heightCm').value = profile.height_cm || '';
+    document.getElementById('weightKg').value = profile.weight_kg || '';
+    document.getElementById('address').value = profile.address || '';
+    document.getElementById('emName').value = profile.emergency_contact_name || '';
+    document.getElementById('emPhone').value = profile.emergency_contact_phone || '';
+    document.getElementById('allergies').value = profile.allergies || '';
+    document.getElementById('conditions').value = profile.chronic_conditions || '';
+  }
+
+  document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api.put('/users/me/profile', {
+        fullName: document.getElementById('fullName').value.trim(),
+        phone: document.getElementById('phone').value.trim(),
+        dateOfBirth: document.getElementById('dob').value || null,
+        gender: document.getElementById('gender').value,
+        bloodGroup: document.getElementById('bloodGroup').value.trim(),
+        city: document.getElementById('city').value.trim(),
+        heightCm: document.getElementById('heightCm').value || null,
+        weightKg: document.getElementById('weightKg').value || null,
+        address: document.getElementById('address').value.trim(),
+        emergencyContactName: document.getElementById('emName').value.trim(),
+        emergencyContactPhone: document.getElementById('emPhone').value.trim(),
+        allergies: document.getElementById('allergies').value.trim(),
+        chronicConditions: document.getElementById('conditions').value.trim(),
+      });
+      toast.success('Profile updated.');
+    } catch (err) {
+      document.getElementById('profile-alert').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+  });
+</script>
+</body>
+</html>
