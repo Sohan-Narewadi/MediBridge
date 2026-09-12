@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Create your account — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .auth-shell { min-height: calc(100vh - var(--header-height)); display:flex; align-items:center; justify-content:center; padding: var(--space-6) var(--space-4); }
+  .auth-card { max-width: 460px; width: 100%; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<div class="auth-shell">
+  <div class="card auth-card">
+    <h2>Create your patient account</h2>
+    <p class="text-muted">Doctor and admin accounts are set up by MediBridge staff — this form is for patients.</p>
+
+    <div id="form-alert"></div>
+
+    <form id="register-form" novalidate>
+      <div class="field">
+        <label for="fullName">Full name</label>
+        <input type="text" id="fullName" name="fullName" required minlength="2" autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" required autocomplete="email">
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label for="phone">Phone (optional)</label>
+          <input type="tel" id="phone" name="phone" autocomplete="tel">
+        </div>
+        <div class="field">
+          <label for="dateOfBirth">Date of birth</label>
+          <input type="date" id="dateOfBirth" name="dateOfBirth">
+        </div>
+      </div>
+      <div class="field">
+        <label for="gender">Gender</label>
+        <select id="gender" name="gender">
+          <option value="prefer_not_to_say">Prefer not to say</option>
+          <option value="female">Female</option>
+          <option value="male">Male</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
+        <p class="hint">At least 8 characters.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Create account</button>
+    </form>
+
+    <p class="text-sm text-center" style="margin-top: var(--space-5);">
+      Already have an account? <a href="/auth/login.html">Log in</a>
+    </p>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertBox = document.getElementById('form-alert');
+    alertBox.innerHTML = '';
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span> Creating account...';
+
+    try {
+      await api.post('/auth/register', {
+        fullName: document.getElementById('fullName').value.trim(),
+        email: document.getElementById('email').value.trim(),
+        phone: document.getElementById('phone').value.trim() || undefined,
+        dateOfBirth: document.getElementById('dateOfBirth').value || undefined,
+        gender: document.getElementById('gender').value,
+        password: document.getElementById('password').value,
+      });
+      window.location.href = '/patient/dashboard.html';
+    } catch (err) {
+      const details = (err.details || []).map((d) => d.message).join(' ');
+      alertBox.innerHTML = `<div class="alert alert-danger">${err.message}${details ? ' ' + details : ''}</div>`;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Create account';
+    }
+  });
+</script>
+</body>
+</html>

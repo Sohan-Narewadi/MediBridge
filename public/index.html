@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MediBridge — Smart Healthcare Access &amp; Management</title>
+<meta name="description" content="MediBridge connects patients, doctors and care teams with appointment booking, medical records, medication reminders and a personal Care Score.">
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .hero { padding: var(--space-10) 0 var(--space-8); background: radial-gradient(circle at top right, var(--color-primary-50), var(--color-bg) 60%); }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: var(--space-8); align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; } }
+  .hero .eyebrow { display:inline-flex; align-items:center; gap:0.4rem; background: var(--color-primary-100); color: var(--color-primary-800); font-weight:700; font-size:0.78rem; padding: 0.35rem 0.8rem; border-radius: var(--radius-full); margin-bottom: var(--space-4); }
+  .hero-search { background: var(--color-surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-md); padding: var(--space-4); display: flex; gap: var(--space-3); margin-top: var(--space-6); border: 1px solid var(--color-ink-200); }
+  @media (max-width: 640px) { .hero-search { flex-direction: column; } }
+  .hero-search select, .hero-search input { flex: 1; }
+  .hero-visual { background: linear-gradient(160deg, var(--color-primary-600), var(--color-primary-800)); border-radius: var(--radius-lg); padding: var(--space-6); color: #fff; box-shadow: var(--shadow-lg); }
+  .hero-visual .score-card { background: rgba(255,255,255,0.1); border-radius: var(--radius-md); padding: var(--space-4); margin-top: var(--space-4); backdrop-filter: blur(4px); }
+  .stats-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-5); text-align: center; }
+  @media (max-width: 760px) { .stats-strip { grid-template-columns: repeat(2, 1fr); } }
+  .stats-strip .num { font-family: var(--font-display); font-size: 2rem; font-weight: 800; color: var(--color-primary-700); }
+  .category-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-4); }
+  .category-card { text-align: center; padding: var(--space-5) var(--space-3); }
+  .category-card .ico { font-size: 1.8rem; margin-bottom: var(--space-2); }
+  .steps-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-5); }
+  @media (max-width: 900px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 540px) { .steps-grid { grid-template-columns: 1fr; } }
+  .step-num { width: 36px; height: 36px; border-radius: 50%; background: var(--color-primary-600); color: #fff; display:flex; align-items:center; justify-content:center; font-weight:800; margin-bottom: var(--space-3); }
+  .benefits-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+  @media (max-width: 860px) { .benefits-grid { grid-template-columns: 1fr; } }
+  .emergency-banner { background: linear-gradient(135deg, #fff7ed, #fee2e2); border: 1px solid #fecaca; border-radius: var(--radius-lg); padding: var(--space-6); display:flex; align-items:center; justify-content:space-between; gap: var(--space-5); flex-wrap: wrap; }
+  .testimonial-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-5); }
+  @media (max-width: 860px) { .testimonial-grid { grid-template-columns: 1fr; } }
+  .section-head { text-align: center; max-width: 640px; margin: 0 auto var(--space-7); }
+  .section-head .kicker { color: var(--color-primary-700); font-weight: 700; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<section class="hero">
+  <div class="container hero-grid">
+    <div>
+      <span class="eyebrow">&#10003; Trusted care, simplified</span>
+      <h1>Healthcare access that meets you where you are.</h1>
+      <p style="font-size: 1.05rem; max-width: 540px;">
+        Find the right doctor, book in minutes, keep every record and prescription in one place, and stay on
+        top of your health with a personal Care Score — all backed by a real, secure platform.
+      </p>
+      <div class="flex gap-3" style="margin-top: var(--space-5);">
+        <a href="/auth/register.html" class="btn btn-primary btn-lg">Get started free</a>
+        <a href="/doctors.html" class="btn btn-outline btn-lg">Browse doctors</a>
+      </div>
+
+      <form class="hero-search" action="/doctors.html" method="get">
+        <select name="specialization" id="hero-spec" aria-label="Specialization">
+          <option value="">Any specialization</option>
+        </select>
+        <input type="text" name="q" placeholder="Search by doctor name or condition" aria-label="Search doctors">
+        <button type="submit" class="btn btn-primary">Search</button>
+      </form>
+    </div>
+
+    <div class="hero-visual">
+      <p style="color: #ccfbf1; font-weight: 700; margin-bottom: 0.25rem; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em;">Your Care Score</p>
+      <h3 style="color:#fff; margin-bottom:0;">See your healthcare engagement at a glance</h3>
+      <div class="score-card">
+        <div class="flex items-center justify-between">
+          <div>
+            <div style="font-size: 2.4rem; font-weight: 800;">82<span style="font-size:1.1rem; opacity:0.7;">/100</span></div>
+            <div style="font-size: 0.82rem; color: #e0f2fe;">Good standing this month</div>
+          </div>
+          <div style="text-align:right; font-size:0.78rem; color:#ccfbf1; line-height:1.7;">
+            <div>Adherence &#8226; 88%</div>
+            <div>Checkup recency &#8226; 100</div>
+            <div>Follow-ups &#8226; 75%</div>
+          </div>
+        </div>
+      </div>
+      <p style="font-size:0.82rem; color:#ccfbf1; margin-top: var(--space-4); margin-bottom:0;">
+        MediBridge's signature feature: one number that blends medication adherence, checkup recency and
+        follow-up completion — with the full breakdown always visible.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="section-tight">
+  <div class="container">
+    <div class="stats-strip">
+      <div><div class="num">24+</div><div class="text-muted text-sm">Verified doctors</div></div>
+      <div><div class="num">15</div><div class="text-muted text-sm">Specializations</div></div>
+      <div><div class="num">1,200+</div><div class="text-muted text-sm">Appointments managed</div></div>
+      <div><div class="num">4.6★</div><div class="text-muted text-sm">Average patient rating</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">Browse by need</p>
+      <h2>Healthcare categories</h2>
+      <p>Jump straight to the kind of care you're looking for.</p>
+    </div>
+    <div class="category-grid" id="category-grid">
+      <div class="card category-card skeleton" style="height:120px;"></div>
+      <div class="card category-card skeleton" style="height:120px;"></div>
+      <div class="card category-card skeleton" style="height:120px;"></div>
+      <div class="card category-card skeleton" style="height:120px;"></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background: var(--color-surface); border-top:1px solid var(--color-ink-200); border-bottom:1px solid var(--color-ink-200);">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">Featured doctors</p>
+      <h2>Meet a few of our top-rated providers</h2>
+    </div>
+    <div class="doctor-grid" id="featured-doctors">
+      <div class="card skeleton" style="height:280px;"></div>
+      <div class="card skeleton" style="height:280px;"></div>
+      <div class="card skeleton" style="height:280px;"></div>
+    </div>
+    <div class="text-center" style="margin-top: var(--space-6);">
+      <a href="/doctors.html" class="btn btn-outline">View all doctors</a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">How it works</p>
+      <h2>From search to treatment, in four steps</h2>
+    </div>
+    <div class="steps-grid">
+      <div><div class="step-num">1</div><h4>Search &amp; compare</h4><p class="text-sm">Filter doctors by specialization, location, fee and availability.</p></div>
+      <div><div class="step-num">2</div><h4>Book instantly</h4><p class="text-sm">Pick a real open slot from the doctor's live schedule — no back-and-forth.</p></div>
+      <div><div class="step-num">3</div><h4>Consult &amp; track</h4><p class="text-sm">Attend in person or by video, then get your notes and prescription digitally.</p></div>
+      <div><div class="step-num">4</div><h4>Stay on track</h4><p class="text-sm">Medication reminders and your Care Score keep you accountable between visits.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background: var(--color-surface); border-top:1px solid var(--color-ink-200); border-bottom:1px solid var(--color-ink-200);">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">Why MediBridge</p>
+      <h2>Built for trust, accessibility and simplicity</h2>
+    </div>
+    <div class="benefits-grid">
+      <div class="card"><h4>&#128274; Secure by design</h4><p class="text-sm">Hashed passwords, role-based access and a database that enforces who can see what.</p></div>
+      <div class="card"><h4>&#9889; Real-time availability</h4><p class="text-sm">Time slots are computed live from each doctor's schedule — never double-booked.</p></div>
+      <div class="card"><h4>&#128202; One health picture</h4><p class="text-sm">Records, prescriptions and medications unify into a single timeline and Care Score.</p></div>
+      <div class="card"><h4>&#127973; Equitable access</h4><p class="text-sm">Video consultations and transparent fees reduce barriers to getting seen.</p></div>
+      <div class="card"><h4>&#128276; Never miss a dose</h4><p class="text-sm">Medication reminders with an adherence view built for real daily use.</p></div>
+      <div class="card"><h4>&#128101; For every role</h4><p class="text-sm">Purpose-built dashboards for patients, doctors and administrators.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <div class="emergency-banner">
+      <div>
+        <h3 style="margin-bottom:4px;">&#128680; Medical emergency?</h3>
+        <p class="mb-0" style="max-width: 560px;">MediBridge is not an emergency service. If you or someone nearby has a life-threatening emergency, call your local emergency number immediately.</p>
+      </div>
+      <a href="/emergency.html" class="btn btn-danger">Emergency guidance</a>
+    </div>
+  </div>
+</section>
+
+<section class="section" style="background: var(--color-surface); border-top:1px solid var(--color-ink-200); border-bottom:1px solid var(--color-ink-200);">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">Patient stories</p>
+      <h2>What people are saying</h2>
+    </div>
+    <div class="testimonial-grid">
+      <div class="card"><p>"Booking took two minutes and I could see exactly which slots were free. No phone tag."</p><p class="text-sm text-muted mb-0">— Riya K., patient</p></div>
+      <div class="card"><p>"The medication reminders and adherence tracking genuinely changed how consistent I am."</p><p class="text-sm text-muted mb-0">— Kabir K., patient</p></div>
+      <div class="card"><p>"Having consultation notes and prescriptions in one place made my follow-up so much smoother."</p><p class="text-sm text-muted mb-0">— Ananya D., patient</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section text-center">
+  <div class="container">
+    <h2>Ready to take the first step?</h2>
+    <p>Create a free account and book your first appointment today.</p>
+    <div class="flex gap-3" style="justify-content:center;">
+      <a href="/auth/register.html" class="btn btn-primary btn-lg">Create your account</a>
+      <a href="/doctors.html" class="btn btn-outline btn-lg">Browse doctors first</a>
+    </div>
+  </div>
+</section>
+
+<div id="site-footer"></div>
+
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  async function loadHomeData() {
+    try {
+      const { specializations } = await api.get('/specializations');
+      const select = document.getElementById('hero-spec');
+      specializations.forEach((s) => {
+        const opt = document.createElement('option');
+        opt.value = s.id; opt.textContent = `${s.name} (${s.doctor_count})`;
+        select.appendChild(opt);
+      });
+      const grid = document.getElementById('category-grid');
+      grid.innerHTML = specializations.slice(0, 8).map((s) => `
+        <a href="/doctors.html?specialization=${s.id}" class="card category-card card-interactive" style="text-decoration:none; color:inherit;">
+          <div class="ico">&#129658;</div>
+          <h4 style="margin-bottom:2px;">${s.name}</h4>
+          <p class="text-sm text-muted mb-0">${s.doctor_count} doctors</p>
+        </a>
+      `).join('');
+    } catch (e) { /* specializations are non-critical for first paint */ }
+
+    try {
+      const { doctors } = await api.get('/doctors?sort=rating&pageSize=3');
+      const grid = document.getElementById('featured-doctors');
+      if (!doctors.length) { grid.innerHTML = '<p class="text-muted">No doctors available yet.</p>'; return; }
+      grid.innerHTML = doctors.map((d) => `
+        <a href="/doctor.html?id=${d.id}" class="card doctor-card card-interactive" style="text-decoration:none; color:inherit;">
+          <div class="photo">${d.full_name.split(' ').map(p=>p[0]).slice(0,2).join('')}</div>
+          <h4>${d.full_name}</h4>
+          <div class="spec">${d.specialization}</div>
+          <div class="meta-row">
+            <span>&#127891; ${d.experience_years} yrs</span>
+            <span>&#8377;${d.consultation_fee}</span>
+            <span>${d.city || ''}</span>
+          </div>
+          <div class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-sm">(${d.rating_count})</span></div>
+        </a>
+      `).join('');
+    } catch (e) {
+      document.getElementById('featured-doctors').innerHTML = '<p class="text-muted">Could not load doctors right now.</p>';
+    }
+  }
+  loadHomeData();
+</script>
+</body>
+</html>

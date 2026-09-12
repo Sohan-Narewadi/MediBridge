@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Appointments — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">My Appointments</h2><a href="/patient/doctors.html" class="btn btn-primary btn-sm">Book new</a></div>
+
+    <div class="pill-nav" id="tabs" style="margin: var(--space-4) 0;">
+      <button data-tab="upcoming" class="active">Upcoming</button>
+      <button data-tab="completed">Completed</button>
+      <button data-tab="cancelled">Cancelled</button>
+      <button data-tab="all">All</button>
+    </div>
+
+    <div id="appt-list"><div class="card skeleton" style="height:100px;"></div></div>
+  </main>
+</div>
+
+<div id="modal-root"></div>
+
+<script>
+  let allAppointments = [];
+  let activeTab = 'upcoming';
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'My Appointments');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  document.querySelectorAll('#tabs button').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeTab = btn.dataset.tab;
+    render();
+  }));
+
+  async function load() {
+    try {
+      const { appointments } = await api.get('/appointments');
+      allAppointments = appointments;
+      render();
+    } catch (e) {
+      document.getElementById('appt-list').innerHTML = '<div class="alert alert-danger">Could not load appointments.</div>';
+    }
+  }
+
+  function filtered() {
+    const today = new Date().toISOString().slice(0, 10);
+    if (activeTab === 'upcoming') return allAppointments.filter((a) => ['pending', 'confirmed'].includes(a.status) && a.appointment_date >= today);
+    if (activeTab === 'completed') return allAppointments.filter((a) => a.status === 'completed');
+    if (activeTab === 'cancelled') return allAppointments.filter((a) => a.status === 'cancelled');
+    return allAppointments;
+  }
+
+  function render() {
+    const list = filtered();
+    const el = document.getElementById('appt-list');
+    if (!list.length) {
+      el.innerHTML = `<div class="empty-state"><div class="icon">&#128197;</div><h4>Nothing here yet</h4><p>No appointments in this view.</p></div>`;
+      return;
+    }
+    el.innerHTML = list.map((a) => `
+      <div class="card" style="margin-bottom: var(--space-3);">
+        <div class="flex justify-between items-start" style="flex-wrap:wrap; gap: var(--space-3);">
+          <div>
+            <h4 style="margin-bottom:2px;">${a.doctor_name} <span class="text-muted text-sm">&#8226; ${a.specialization}</span></h4>
+            <p class="text-sm mb-0">&#128197; ${a.appointment_date} at ${a.start_time.slice(0,5)} &#8226; ${a.consultation_mode.replace('_',' ')}</p>
+            ${a.reason ? `<p class="text-sm text-muted mb-0">Reason: ${a.reason}</p>` : ''}
+            ${a.status === 'cancelled' && a.cancellation_reason ? `<p class="text-sm text-muted mb-0">Cancelled by ${a.cancelled_by}: ${a.cancellation_reason}</p>` : ''}
+          </div>
+          <span class="badge status-${a.status}">${a.status}</span>
+        </div>
+        <div class="flex gap-2" style="margin-top: var(--space-3);">
+          ${['pending', 'confirmed'].includes(a.status) ? `<button class="btn btn-outline btn-sm" onclick="openReschedule(${a.id}, ${a.doctor_id})">Reschedule</button><button class="btn btn-danger btn-sm" onclick="cancelAppt(${a.id})">Cancel</button>` : ''}
+          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openReview(${a.id})">Leave a review</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function cancelAppt(id) {
+    if (!confirm('Cancel this appointment?')) return;
+    try {
+      await api.patch(`/appointments/${id}/status`, { status: 'cancelled', reason: 'Cancelled by patient' });
+      toast.success('Appointment cancelled.');
+      load();
+    } catch (e) { toast.error(e.message); }
+  }
+
+  function openReschedule(id, doctorId) {
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="rs-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">Reschedule appointment</h3><button class="modal-close" id="rs-close">&times;</button></div>
+          <div class="field"><label for="rs-date">New date</label><input type="date" id="rs-date" min="${new Date().toISOString().slice(0,10)}"></div>
+          <div id="rs-slots"><p class="text-muted text-sm">Pick a date to see open slots.</p></div>
+          <div id="rs-alert"></div>
+          <button class="btn btn-primary btn-block" id="rs-submit" disabled>Select a slot</button>
+        </div>
+      </div>`;
+    let newSlot = null;
+    document.getElementById('rs-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('rs-date').addEventListener('change', async (e) => {
+      const wrap = document.getElementById('rs-slots');
+      wrap.innerHTML = '<div class="skeleton" style="height:70px;"></div>';
+      const { slots } = await api.get(`/doctors/${doctorId}/slots?date=${e.target.value}`);
+      if (!slots.length) { wrap.innerHTML = '<p class="text-muted text-sm">No open slots that day.</p>'; return; }
+      wrap.innerHTML = `<div class="slot-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${slots.map((s) => `<button type="button" class="slot-btn" style="padding:0.5rem;border-radius:8px;border:1.5px solid var(--color-ink-200);background:#fff;cursor:pointer;" data-start="${s.startTime}">${s.startTime.slice(0,5)}</button>`).join('')}</div>`;
+      wrap.querySelectorAll('.slot-btn').forEach((b) => b.addEventListener('click', () => {
+        wrap.querySelectorAll('.slot-btn').forEach((x) => { x.style.background = '#fff'; x.style.color = 'inherit'; });
+        b.style.background = 'var(--color-primary-600)'; b.style.color = '#fff';
+        newSlot = b.dataset.start;
+        document.getElementById('rs-submit').disabled = false;
+      }));
+    });
+    document.getElementById('rs-submit').addEventListener('click', async () => {
+      try {
+        await api.patch(`/appointments/${id}/reschedule`, { date: document.getElementById('rs-date').value, startTime: newSlot });
+        toast.success('Appointment rescheduled.');
+        document.getElementById('modal-root').innerHTML = '';
+        load();
+      } catch (e) { document.getElementById('rs-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  }
+
+  function openReview(id) {
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="rv-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">Leave a review</h3><button class="modal-close" id="rv-close">&times;</button></div>
+          <div class="field"><label for="rv-rating">Rating</label><select id="rv-rating"><option value="5">5 - Excellent</option><option value="4">4 - Good</option><option value="3">3 - Average</option><option value="2">2 - Poor</option><option value="1">1 - Very poor</option></select></div>
+          <div class="field"><label for="rv-comment">Comment (optional)</label><textarea id="rv-comment" rows="3"></textarea></div>
+          <div id="rv-alert"></div>
+          <button class="btn btn-primary btn-block" id="rv-submit">Submit review</button>
+        </div>
+      </div>`;
+    document.getElementById('rv-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('rv-submit').addEventListener('click', async () => {
+      try {
+        await api.post('/reviews', { appointmentId: id, rating: Number(document.getElementById('rv-rating').value), comment: document.getElementById('rv-comment').value.trim() || undefined });
+        toast.success('Thanks for your feedback!');
+        document.getElementById('modal-root').innerHTML = '';
+      } catch (e) { document.getElementById('rv-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  }
+</script>
+</body>
+</html>

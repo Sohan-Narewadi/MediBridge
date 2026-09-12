@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Specializations — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">Specializations</h2><button class="btn btn-primary btn-sm" id="add-btn">+ Add specialization</button></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Description</th><th>Doctors</th><th></th></tr></thead>
+        <tbody id="s-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('admin', 'Specializations');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    const body = document.getElementById('s-body');
+    const { specializations } = await api.get('/specializations');
+    body.innerHTML = specializations.map((s) => `
+      <tr>
+        <td><strong>${s.name}</strong></td><td class="text-sm">${s.description || '—'}</td><td>${s.doctor_count}</td>
+        <td>
+          <button class="btn btn-outline btn-sm" onclick='openForm(${JSON.stringify(s).replace(/'/g, "&apos;")})'>Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="remove(${s.id})">Delete</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  function openForm(s) {
+    const editing = !!s;
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="sp-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">${editing ? 'Edit' : 'Add'} specialization</h3><button class="modal-close" id="sp-close">&times;</button></div>
+          <div class="field"><label for="sp-name">Name</label><input id="sp-name" value="${editing ? s.name : ''}" required></div>
+          <div class="field"><label for="sp-desc">Description</label><input id="sp-desc" value="${editing ? (s.description || '') : ''}"></div>
+          <div id="sp-alert"></div>
+          <button class="btn btn-primary btn-block" id="sp-submit">${editing ? 'Save changes' : 'Create'}</button>
+        </div>
+      </div>`;
+    document.getElementById('sp-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('sp-submit').addEventListener('click', async () => {
+      const payload = { name: document.getElementById('sp-name').value.trim(), description: document.getElementById('sp-desc').value.trim() };
+      try {
+        if (editing) await api.put(`/specializations/${s.id}`, payload);
+        else await api.post('/specializations', payload);
+        toast.success('Saved.');
+        document.getElementById('modal-root').innerHTML = '';
+        load();
+      } catch (e) { document.getElementById('sp-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+    });
+  }
+
+  async function remove(id) {
+    if (!confirm('Delete this specialization?')) return;
+    try { await api.del(`/specializations/${id}`); toast.success('Deleted.'); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+
+  document.getElementById('add-btn').addEventListener('click', () => openForm(null));
+</script>
+</body>
+</html>

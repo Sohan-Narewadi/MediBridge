@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audit Log — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>System Activity / Audit Log</h2>
+    <p class="text-muted">A lightweight trail of key platform events, most recent first.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
+        <tbody id="log-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('admin', 'Audit Log');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+  async function load() {
+    const { logs } = await api.get('/admin/audit-logs');
+    const body = document.getElementById('log-body');
+    if (!logs.length) { body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No activity recorded yet.</td></tr>'; return; }
+    body.innerHTML = logs.map((l) => `
+      <tr><td class="text-sm">${new Date(l.created_at).toLocaleString()}</td><td>${l.user_name || 'System'}</td><td><span class="badge badge-neutral">${l.action}</span></td><td class="text-sm">${l.details || ''}</td></tr>
+    `).join('');
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Profile — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" style="max-width:680px;">
+    <h2>My Profile</h2>
+    <div class="card">
+      <form id="profile-form">
+        <div class="form-row">
+          <div class="field"><label for="fullName">Full name</label><input id="fullName" required></div>
+          <div class="field"><label for="specialization">Specialization</label><select id="specialization"></select></div>
+        </div>
+        <div class="field"><label for="qualifications">Qualifications</label><input id="qualifications"></div>
+        <div class="form-row">
+          <div class="field"><label for="experienceYears">Experience (years)</label><input type="number" id="experienceYears"></div>
+          <div class="field"><label for="consultationFee">Consultation fee (&#8377;)</label><input type="number" id="consultationFee"></div>
+        </div>
+        <div class="field"><label for="languages">Languages</label><input id="languages"></div>
+        <div class="field"><label for="bio">About / bio</label><textarea id="bio" rows="3"></textarea></div>
+        <div class="form-row">
+          <div class="field"><label for="clinicName">Clinic name</label><input id="clinicName"></div>
+          <div class="field"><label for="city">City</label><input id="city"></div>
+        </div>
+        <div class="field"><label for="clinicAddress">Clinic address</label><input id="clinicAddress"></div>
+        <div class="field"><label for="consultationModes">Consultation modes</label>
+          <select id="consultationModes">
+            <option value="in_person,video">In-person &amp; Video</option>
+            <option value="in_person">In-person only</option>
+            <option value="video">Video only</option>
+          </select>
+        </div>
+        <div id="profile-alert"></div>
+        <button class="btn btn-primary" type="submit">Save changes</button>
+      </form>
+    </div>
+  </main>
+</div>
+
+<script>
+  let doctorId;
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'My Profile');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    doctorId = e.detail.id;
+    load();
+  });
+
+  async function load() {
+    const { specializations } = await api.get('/specializations');
+    const sel = document.getElementById('specialization');
+    specializations.forEach((s) => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; sel.appendChild(o); });
+
+    const { doctor } = await api.get(`/doctors/${doctorId}`);
+    document.getElementById('fullName').value = doctor.full_name;
+    document.getElementById('specialization').value = doctor.specialization_id;
+    document.getElementById('qualifications').value = doctor.qualifications || '';
+    document.getElementById('experienceYears').value = doctor.experience_years;
+    document.getElementById('consultationFee').value = doctor.consultation_fee;
+    document.getElementById('languages').value = doctor.languages;
+    document.getElementById('bio').value = doctor.bio || '';
+    document.getElementById('clinicName').value = doctor.clinic_name || '';
+    document.getElementById('city').value = doctor.city || '';
+    document.getElementById('clinicAddress').value = doctor.clinic_address || '';
+    document.getElementById('consultationModes').value = doctor.consultation_modes;
+  }
+
+  document.getElementById('profile-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/doctors/${doctorId}`, {
+        fullName: document.getElementById('fullName').value.trim(),
+        specializationId: Number(document.getElementById('specialization').value),
+        qualifications: document.getElementById('qualifications').value.trim(),
+        experienceYears: Number(document.getElementById('experienceYears').value) || 0,
+        consultationFee: Number(document.getElementById('consultationFee').value) || 0,
+        languages: document.getElementById('languages').value.trim(),
+        bio: document.getElementById('bio').value.trim(),
+        clinicName: document.getElementById('clinicName').value.trim(),
+        city: document.getElementById('city').value.trim(),
+        clinicAddress: document.getElementById('clinicAddress').value.trim(),
+        consultationModes: document.getElementById('consultationModes').value,
+      });
+      toast.success('Profile updated.');
+    } catch (err) { document.getElementById('profile-alert').innerHTML = `<div class="alert alert-danger">${err.message}</div>`; }
+  });
+</script>
+</body>
+</html>

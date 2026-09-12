@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manage Patients — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">Patients</h2><input type="text" id="search" placeholder="Search name or email" style="max-width:260px;"></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Name</th><th>Email</th><th>City</th><th>Blood group</th><th>Appointments</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+        <tbody id="p-body"><tr><td colspan="8"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+    <div class="pagination flex gap-2" id="pagination" style="margin-top:var(--space-4); justify-content:center;"></div>
+  </main>
+</div>
+
+<script>
+  let page = 1;
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('admin', 'Patients');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+  document.getElementById('search').addEventListener('input', () => { page = 1; load(); });
+
+  async function load() {
+    const body = document.getElementById('p-body');
+    const q = document.getElementById('search').value.trim();
+    const { patients, total, pageSize } = await api.get(`/admin/patients?page=${page}&pageSize=10${q ? '&q=' + encodeURIComponent(q) : ''}`);
+    if (!patients.length) { body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No patients found.</td></tr>'; document.getElementById('pagination').innerHTML = ''; return; }
+    body.innerHTML = patients.map((p) => `
+      <tr>
+        <td><strong>${p.full_name}</strong></td>
+        <td>${p.email}</td>
+        <td>${p.city || '—'}</td>
+        <td>${p.blood_group || '—'}</td>
+        <td>${p.appointment_count}</td>
+        <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Active' : 'Inactive'}</span></td>
+        <td>${new Date(p.created_at).toLocaleDateString()}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="toggleStatus(${p.id}, ${p.is_active ? 0 : 1})">${p.is_active ? 'Deactivate' : 'Activate'}</button></td>
+      </tr>
+    `).join('');
+
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const pag = document.getElementById('pagination');
+    pag.innerHTML = '';
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm ' + (i === page ? 'btn-primary' : 'btn-outline');
+      btn.textContent = i;
+      btn.addEventListener('click', () => { page = i; load(); });
+      pag.appendChild(btn);
+    }
+  }
+
+  async function toggleStatus(id, isActive) {
+    try { await api.patch(`/admin/users/${id}/status`, { isActive: !!isActive }); toast.success('Updated.'); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+</script>
+</body>
+</html>

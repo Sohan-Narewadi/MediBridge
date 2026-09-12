@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Patients — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>My Patients</h2>
+    <p class="text-muted">Patients you've had at least one appointment with.</p>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Patient</th><th>Phone</th><th>Blood group</th><th>Allergies</th><th>Visits</th><th>Last visit</th><th></th></tr></thead>
+        <tbody id="p-body"><tr><td colspan="7"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      </table>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'My Patients');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    const body = document.getElementById('p-body');
+    try {
+      const { patients } = await api.get('/appointments/my-patients');
+      if (!patients.length) { body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No patients yet.</td></tr>'; return; }
+      body.innerHTML = patients.map((p) => `
+        <tr>
+          <td><strong>${p.full_name}</strong></td>
+          <td>${p.phone || '—'}</td>
+          <td>${p.blood_group || '—'}</td>
+          <td>${p.allergies || 'None recorded'}</td>
+          <td>${p.appointment_count}</td>
+          <td>${p.last_visit || '—'}</td>
+          <td><button class="btn btn-outline btn-sm" onclick="openHistory(${p.id}, '${p.full_name.replace(/'/g,"\\'")}')">View history</button></td>
+        </tr>
+      `).join('');
+    } catch (e) { body.innerHTML = '<tr><td colspan="7" class="text-center"><div class="alert alert-danger">Could not load patients.</div></td></tr>'; }
+  }
+
+  async function openHistory(patientId, name) {
+    const { records } = await api.get(`/medical-records?patientId=${patientId}`);
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="hist-backdrop">
+        <div class="modal" style="max-width:560px;">
+          <div class="modal-header"><h3 class="mb-0">${name}'s records</h3><button class="modal-close" id="hist-close">&times;</button></div>
+          ${records.length ? records.map((r) => `
+            <div style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+              <strong class="text-sm">${r.diagnosis}</strong><div class="text-sm text-muted">${r.record_date} &#8226; ${r.doctor_name}</div>
+            </div>
+          `).join('') : '<p class="text-muted text-sm">No records yet.</p>'}
+        </div>
+      </div>`;
+    document.getElementById('hist-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+  }
+</script>
+</body>
+</html>

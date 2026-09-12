@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Availability — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .avail-row { display:grid; grid-template-columns: 1.2fr 1fr 1fr 1fr auto; gap: var(--space-2); align-items:center; margin-bottom: var(--space-2); }
+  @media (max-width: 700px) { .avail-row { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" style="max-width:760px;">
+    <h2>Weekly Availability</h2>
+    <p class="text-muted">Define the recurring time blocks you're available each week. Patients can only book within these windows.</p>
+    <div class="card">
+      <div id="avail-rows"></div>
+      <button type="button" class="btn btn-outline btn-sm" id="add-row">+ Add time block</button>
+      <hr class="divider">
+      <div id="avail-alert"></div>
+      <button class="btn btn-primary" id="save-btn">Save availability</button>
+    </div>
+  </main>
+</div>
+
+<script>
+  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  let doctorId;
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'Availability');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    doctorId = e.detail.id;
+    load();
+  });
+
+  function addRow(data = {}) {
+    const wrap = document.getElementById('avail-rows');
+    const row = document.createElement('div');
+    row.className = 'avail-row';
+    row.innerHTML = `
+      <select class="a-day">${DAYS.map((d, i) => `<option value="${i}" ${data.day_of_week === i ? 'selected' : ''}>${d}</option>`).join('')}</select>
+      <input type="time" class="a-start" value="${(data.start_time || '09:00:00').slice(0,5)}">
+      <input type="time" class="a-end" value="${(data.end_time || '13:00:00').slice(0,5)}">
+      <select class="a-dur"><option value="15" ${data.slot_duration_mins===15?'selected':''}>15 min</option><option value="30" ${!data.slot_duration_mins || data.slot_duration_mins===30?'selected':''}>30 min</option><option value="45" ${data.slot_duration_mins===45?'selected':''}>45 min</option><option value="60" ${data.slot_duration_mins===60?'selected':''}>60 min</option></select>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="this.parentElement.remove()">&times;</button>
+    `;
+    wrap.appendChild(row);
+  }
+
+  async function load() {
+    const { availability } = await api.get(`/doctors/${doctorId}`);
+    document.getElementById('avail-rows').innerHTML = '';
+    if (!availability.length) { addRow(); } else { availability.forEach((a) => addRow(a)); }
+  }
+
+  document.getElementById('add-row').addEventListener('click', () => addRow());
+  document.getElementById('save-btn').addEventListener('click', async () => {
+    const blocks = Array.from(document.querySelectorAll('.avail-row')).map((row) => ({
+      dayOfWeek: Number(row.querySelector('.a-day').value),
+      startTime: row.querySelector('.a-start').value + ':00',
+      endTime: row.querySelector('.a-end').value + ':00',
+      slotDurationMins: Number(row.querySelector('.a-dur').value),
+    }));
+    try {
+      await api.put(`/doctors/${doctorId}/availability`, { blocks });
+      toast.success('Availability saved.');
+    } catch (e) { document.getElementById('avail-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
+  });
+</script>
+</body>
+</html>

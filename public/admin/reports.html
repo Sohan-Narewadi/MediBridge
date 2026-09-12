@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reported Issues — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>Reported Issues</h2>
+    <div class="pill-nav" id="tabs" style="margin-bottom: var(--space-4);">
+      <button data-status="" class="active">All</button>
+      <button data-status="open">Open</button>
+      <button data-status="in_review">In review</button>
+      <button data-status="resolved">Resolved</button>
+      <button data-status="dismissed">Dismissed</button>
+    </div>
+    <div id="report-list"><div class="card skeleton" style="height:90px;"></div></div>
+  </main>
+</div>
+
+<script>
+  let activeStatus = '';
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('admin', 'Reported Issues');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+  document.querySelectorAll('#tabs button').forEach((btn) => btn.addEventListener('click', () => {
+    document.querySelectorAll('#tabs button').forEach((b) => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeStatus = btn.dataset.status;
+    load();
+  }));
+
+  async function load() {
+    const el = document.getElementById('report-list');
+    const { reports } = await api.get(`/admin/reports${activeStatus ? '?status=' + activeStatus : ''}`);
+    if (!reports.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#9888;</div><p>No reports in this view.</p></div>'; return; }
+    el.innerHTML = reports.map((r) => `
+      <div class="card" style="margin-bottom:var(--space-3);">
+        <div class="flex justify-between items-start">
+          <div>
+            <h4 style="margin-bottom:2px;">${r.subject}</h4>
+            <p class="text-sm text-muted mb-0">${r.reporter_name} (${r.reporter_role}) &#8226; ${r.category} &#8226; ${new Date(r.created_at).toLocaleDateString()}</p>
+            <p class="text-sm" style="margin-top:6px;">${r.description}</p>
+            ${r.admin_notes ? `<p class="text-sm text-muted mb-0"><strong>Admin notes:</strong> ${r.admin_notes}</p>` : ''}
+          </div>
+          <span class="badge badge-${r.status === 'open' ? 'warning' : r.status === 'resolved' ? 'success' : r.status === 'dismissed' ? 'neutral' : 'info'}">${r.status.replace('_',' ')}</span>
+        </div>
+        <div class="flex gap-2" style="margin-top:var(--space-3);">
+          ${r.status !== 'in_review' ? `<button class="btn btn-outline btn-sm" onclick="setStatus(${r.id},'in_review')">Mark in review</button>` : ''}
+          ${r.status !== 'resolved' ? `<button class="btn btn-primary btn-sm" onclick="setStatus(${r.id},'resolved')">Resolve</button>` : ''}
+          ${r.status !== 'dismissed' ? `<button class="btn btn-ghost btn-sm" onclick="setStatus(${r.id},'dismissed')">Dismiss</button>` : ''}
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function setStatus(id, status) {
+    const notes = status === 'resolved' ? (prompt('Add a short resolution note (optional):') || '') : '';
+    try { await api.patch(`/admin/reports/${id}`, { status, adminNotes: notes || undefined }); toast.success('Updated.'); load(); }
+    catch (e) { toast.error(e.message); }
+  }
+</script>
+</body>
+</html>

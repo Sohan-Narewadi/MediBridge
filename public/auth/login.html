@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Log in — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .auth-shell { min-height: calc(100vh - var(--header-height)); display:flex; align-items:center; justify-content:center; padding: var(--space-6) var(--space-4); }
+  .auth-card { max-width: 420px; width: 100%; }
+  .demo-box { background: var(--color-primary-50); border: 1px solid var(--color-primary-200); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: 0.8rem; margin-top: var(--space-5); }
+  .demo-box button { display:block; width:100%; text-align:left; background:none; border:none; padding: 0.3rem 0; cursor:pointer; color: var(--color-primary-800); font-weight:600; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<div class="auth-shell">
+  <div class="card auth-card">
+    <h2>Welcome back</h2>
+    <p class="text-muted">Log in to manage appointments, records and more.</p>
+
+    <div id="form-alert"></div>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="email">Email address</label>
+        <input type="email" id="email" name="email" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Log in</button>
+    </form>
+
+    <p class="text-sm text-center" style="margin-top: var(--space-5);">
+      New to MediBridge? <a href="/auth/register.html">Create an account</a>
+    </p>
+
+    <div class="demo-box">
+      <strong>Demo accounts</strong> (password shown on click auto-fills):
+      <button type="button" data-email="patient@medibridge.demo" data-password="Patient@123">Patient — patient@medibridge.demo</button>
+      <button type="button" data-email="doctor@medibridge.demo" data-password="Doctor@123">Doctor — doctor@medibridge.demo</button>
+      <button type="button" data-email="admin@medibridge.demo" data-password="Admin@123">Admin — admin@medibridge.demo</button>
+    </div>
+  </div>
+</div>
+
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html' };
+
+  document.querySelectorAll('.demo-box button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.getElementById('email').value = btn.dataset.email;
+      document.getElementById('password').value = btn.dataset.password;
+    });
+  });
+
+  document.getElementById('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const alertBox = document.getElementById('form-alert');
+    alertBox.innerHTML = '';
+    const submitBtn = document.getElementById('submit-btn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner"></span> Logging in...';
+
+    try {
+      const { user } = await api.post('/auth/login', {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value,
+      });
+      const params = new URLSearchParams(window.location.search);
+      window.location.href = params.get('next') || ROLE_DASHBOARD[user.role] || '/index.html';
+    } catch (err) {
+      alertBox.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Log in';
+    }
+  });
+</script>
+</body>
+</html>

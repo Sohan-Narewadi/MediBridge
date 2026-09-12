@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Resources — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .resource-grid { display:grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: var(--space-5); }
+  .resource-card .cat { color: var(--color-primary-700); font-weight:700; font-size:0.76rem; text-transform:uppercase; letter-spacing:0.03em; }
+</style>
+</head>
+<body>
+<div id="site-header"></div>
+
+<div class="container section-tight">
+  <h1>Healthcare resources</h1>
+  <p class="text-muted" style="max-width:640px;">
+    General educational information to support everyday health decisions. This content is not a substitute
+    for professional medical advice, diagnosis or treatment — always consult a qualified healthcare provider.
+  </p>
+
+  <div class="pill-nav" id="category-pills" style="margin: var(--space-5) 0;">
+    <button data-cat="" class="active">All</button>
+  </div>
+
+  <div class="resource-grid" id="resource-grid">
+    <div class="card skeleton" style="height:160px;"></div>
+    <div class="card skeleton" style="height:160px;"></div>
+    <div class="card skeleton" style="height:160px;"></div>
+  </div>
+</div>
+
+<div id="modal-root"></div>
+<div id="site-footer"></div>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/nav.js"></script>
+<script>
+  let activeCategory = '';
+
+  async function loadCategories() {
+    const { categories } = await api.get('/resources');
+    const pills = document.getElementById('category-pills');
+    categories.forEach((c) => {
+      const btn = document.createElement('button');
+      btn.textContent = `${c.category} (${c.count})`;
+      btn.dataset.cat = c.category;
+      btn.addEventListener('click', () => selectCategory(c.category));
+      pills.appendChild(btn);
+    });
+    pills.querySelector('[data-cat=""]').addEventListener('click', () => selectCategory(''));
+  }
+
+  function selectCategory(cat) {
+    activeCategory = cat;
+    document.querySelectorAll('#category-pills button').forEach((b) => b.classList.toggle('active', b.dataset.cat === cat));
+    loadResources();
+  }
+
+  async function loadResources() {
+    const grid = document.getElementById('resource-grid');
+    grid.innerHTML = '<div class="card skeleton" style="height:160px;"></div><div class="card skeleton" style="height:160px;"></div>';
+    const { resources } = await api.get(`/resources${activeCategory ? '?category=' + encodeURIComponent(activeCategory) : ''}`);
+    if (!resources.length) { grid.innerHTML = '<div class="empty-state"><h4>No articles in this category yet.</h4></div>'; return; }
+    grid.innerHTML = resources.map((r) => `
+      <div class="card resource-card card-interactive" style="cursor:pointer;" data-id="${r.id}">
+        <span class="cat">${r.category}</span>
+        <h4>${r.title}</h4>
+        <p class="text-sm">${r.summary}</p>
+        <p class="text-sm text-muted mb-0">&#9201; ${r.read_mins} min read</p>
+      </div>
+    `).join('');
+    grid.querySelectorAll('.resource-card').forEach((card) => card.addEventListener('click', () => openArticle(card.dataset.id)));
+  }
+
+  async function openArticle(id) {
+    const { resource } = await api.get(`/resources/${id}`);
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="article-backdrop">
+        <div class="modal">
+          <div class="modal-header">
+            <span class="badge badge-info">${resource.category}</span>
+            <button class="modal-close" id="close-article" aria-label="Close">&times;</button>
+          </div>
+          <h3>${resource.title}</h3>
+          <p>${resource.content}</p>
+          <div class="alert alert-info" style="margin-top:var(--space-4);">This is general information, not medical advice. Consult a healthcare professional for guidance specific to you.</div>
+        </div>
+      </div>
+    `;
+    document.getElementById('close-article').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
+    document.getElementById('article-backdrop').addEventListener('click', (e) => { if (e.target.id === 'article-backdrop') document.getElementById('modal-root').innerHTML = ''; });
+  }
+
+  loadCategories();
+  loadResources();
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Doctors — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .discover-layout { display:grid; grid-template-columns: 240px 1fr; gap: var(--space-5); align-items:start; }
+  @media (max-width: 760px) { .discover-layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>Find a doctor</h2>
+    <p class="text-muted">Search and book directly from the results below.</p>
+
+    <div class="discover-layout">
+      <aside class="card">
+        <h4>Filters</h4>
+        <div class="field"><label for="f-q">Search</label><input type="text" id="f-q" placeholder="Name or specialization"></div>
+        <div class="field"><label for="f-spec">Specialization</label><select id="f-spec"><option value="">All</option></select></div>
+        <div class="field"><label for="f-mode">Consultation</label><select id="f-mode"><option value="">Any</option><option value="in_person">In-person</option><option value="video">Video</option></select></div>
+      </aside>
+      <div>
+        <div class="flex justify-between items-center" style="margin-bottom: var(--space-3);">
+          <span id="result-count" class="text-muted text-sm">Loading...</span>
+          <select id="sort-select"><option value="rating">Top rated</option><option value="experience">Most experienced</option><option value="fee_low">Fee: low to high</option></select>
+        </div>
+        <div class="doctor-grid" id="doctor-results"><div class="card skeleton" style="height:260px;"></div><div class="card skeleton" style="height:260px;"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Find Doctors');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    init();
+  });
+
+  function initials(name) { return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase(); }
+
+  async function init() {
+    const { specializations } = await api.get('/specializations');
+    const sel = document.getElementById('f-spec');
+    specializations.forEach((s) => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name; sel.appendChild(o); });
+    ['f-q'].forEach((id) => document.getElementById(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); }));
+    ['f-spec', 'f-mode', 'sort-select'].forEach((id) => document.getElementById(id).addEventListener('change', load));
+    load();
+  }
+
+  async function load() {
+    const grid = document.getElementById('doctor-results');
+    grid.innerHTML = '<div class="card skeleton" style="height:260px;"></div><div class="card skeleton" style="height:260px;"></div>';
+    const params = new URLSearchParams();
+    const q = document.getElementById('f-q').value.trim();
+    if (q) params.set('q', q);
+    if (document.getElementById('f-spec').value) params.set('specialization', document.getElementById('f-spec').value);
+    if (document.getElementById('f-mode').value) params.set('mode', document.getElementById('f-mode').value);
+    params.set('sort', document.getElementById('sort-select').value);
+    params.set('pageSize', 12);
+
+    const { doctors, total } = await api.get(`/doctors?${params.toString()}`);
+    document.getElementById('result-count').textContent = `${total} doctor${total === 1 ? '' : 's'} found`;
+    if (!doctors.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">&#128269;</div><p>No doctors match your filters.</p></div>'; return; }
+    grid.innerHTML = doctors.map((d) => `
+      <a href="/doctor.html?id=${d.id}" class="card doctor-card card-interactive" style="text-decoration:none; color:inherit;">
+        <div class="photo">${initials(d.full_name)}</div>
+        <h4>${d.full_name}</h4>
+        <div class="spec">${d.specialization}</div>
+        <div class="meta-row"><span>&#127891; ${d.experience_years} yrs</span><span>&#8377;${d.consultation_fee}</span></div>
+        <div class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-sm">(${d.rating_count})</span></div>
+      </a>
+    `).join('');
+  }
+</script>
+</body>
+</html>
