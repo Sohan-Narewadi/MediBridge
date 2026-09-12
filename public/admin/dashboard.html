@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Dashboard — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="admin"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div id="welcome-block" style="margin-bottom: var(--space-5);"><div class="skeleton" style="height:32px; width:280px;"></div></div>
+
+    <div class="stat-grid" id="stat-grid">
+      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
+      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-top: var(--space-5); align-items:start;">
+      <div class="card"><h3>Appointment status breakdown</h3><canvas id="status-chart" height="170"></canvas></div>
+      <div class="card"><h3>Doctors by specialization</h3><canvas id="spec-chart" height="170"></canvas></div>
+    </div>
+
+    <div class="card" style="margin-top: var(--space-5);">
+      <h3>User growth — last 6 months</h3>
+      <canvas id="growth-chart" height="90"></canvas>
+    </div>
+
+    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-5); align-items:start;">
+      <div class="card">
+        <div class="card-header"><h3>Recent registrations</h3><a href="/admin/patients.html" class="text-sm">Manage users</a></div>
+        <div id="recent-users"><div class="skeleton" style="height:80px;"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Recent appointments</h3><a href="/admin/appointments.html" class="text-sm">View all</a></div>
+        <div id="recent-appts"><div class="skeleton" style="height:80px;"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+  document.addEventListener('mb:auth-ready', async (e) => {
+    const user = e.detail;
+    MB_LAYOUT.renderDashboardShell('admin', 'Admin Dashboard');
+    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    document.getElementById('welcome-block').innerHTML = `<h2 style="margin-bottom:2px;">Welcome, ${user.fullName}</h2><p class="text-muted">Platform overview and system activity.</p>`;
+
+    try {
+      const stats = await api.get('/admin/stats');
+      renderStats(stats.totals);
+      renderUsers(stats.recentUsers);
+      renderAppts(stats.recentAppointments);
+      const analytics = await api.get('/admin/analytics');
+      renderStatusChart(analytics.statusBreakdown);
+      renderSpecChart(analytics.specializationDistribution);
+      renderGrowthChart(analytics.growth);
+    } catch (err) { toast.error('Could not load admin dashboard.'); }
+  });
+
+  function renderStats(t) {
+    document.getElementById('stat-grid').innerHTML = `
+      <div class="card stat-card"><div class="value">${t.patients}</div><div class="label">Total patients</div></div>
+      <div class="card stat-card"><div class="value">${t.doctors}</div><div class="label">Active doctors</div></div>
+      <div class="card stat-card"><div class="value">${t.appointments}</div><div class="label">Total appointments</div></div>
+      <div class="card stat-card"><div class="value">${t.openReports}</div><div class="label">Open reports</div></div>
+    `;
+  }
+
+  function renderUsers(users) {
+    const el = document.getElementById('recent-users');
+    if (!users.length) { el.innerHTML = '<p class="text-muted text-sm">No users yet.</p>'; return; }
+    el.innerHTML = users.map((u) => `
+      <div class="flex justify-between items-center" style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+        <div><strong class="text-sm">${u.full_name}</strong><div class="text-sm text-muted">${u.email}</div></div>
+        <span class="badge badge-neutral">${u.role}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderAppts(appts) {
+    const el = document.getElementById('recent-appts');
+    if (!appts.length) { el.innerHTML = '<p class="text-muted text-sm">No appointments yet.</p>'; return; }
+    el.innerHTML = appts.map((a) => `
+      <div class="flex justify-between items-center" style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
+        <div><strong class="text-sm">${a.patient_name}</strong><div class="text-sm text-muted">with ${a.doctor_name} &#8226; ${a.appointment_date}</div></div>
+        <span class="badge status-${a.status}">${a.status}</span>
+      </div>
+    `).join('');
+  }
+
+  function renderStatusChart(data) {
+    const colors = { pending: '#d97706', confirmed: '#2563eb', completed: '#16a34a', cancelled: '#dc2626' };
+    new Chart(document.getElementById('status-chart'), {
+      type: 'doughnut',
+      data: { labels: data.map((d) => d.status), datasets: [{ data: data.map((d) => d.count), backgroundColor: data.map((d) => colors[d.status]) }] },
+      options: { plugins: { legend: { position: 'bottom' } } },
+    });
+  }
+
+  function renderSpecChart(data) {
+    new Chart(document.getElementById('spec-chart'), {
+      type: 'bar',
+      data: { labels: data.map((d) => d.name), datasets: [{ label: 'Doctors', data: data.map((d) => d.doctor_count), backgroundColor: '#4f46e5' }] },
+      options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { ticks: { precision: 0 } } } },
+    });
+  }
+
+  function renderGrowthChart(rows) {
+    const months = [...new Set(rows.map((r) => r.month))].sort();
+    const roles = ['patient', 'doctor'];
+    new Chart(document.getElementById('growth-chart'), {
+      type: 'line',
+      data: {
+        labels: months,
+        datasets: roles.map((role, i) => ({
+          label: role, borderColor: i === 0 ? '#0d9488' : '#4f46e5',
+          data: months.map((m) => (rows.find((r) => r.month === m && r.role === role) || {}).count || 0),
+          tension: 0.3,
+        })),
+      },
+      options: { scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+    });
+  }
+</script>
+</body>
+</html>
