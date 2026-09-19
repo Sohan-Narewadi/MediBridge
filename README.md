@@ -199,7 +199,44 @@ plan, and the full breakdown is always shown alongside the number.
 - Payment/billing for consultation fees is out of scope.
 - Video consultation is a selectable mode but does not launch an actual video call (no WebRTC integration).
 
-## 12. Quality checklist (self-assessment)
+## 12. Deploying to Vercel (full stack)
+
+MediBridge can be deployed as a single Vercel project — the whole Express app (API + static
+pages) runs as one serverless function via `api/index.js` and `vercel.json`. Vercel does not
+host MySQL itself, so you need a separate free MySQL-compatible database (Aiven, Railway,
+Clever Cloud, or PlanetScale all have free tiers).
+
+1. **Provision a MySQL database** with one of the hosts above and note its host, port, user,
+   password and database name.
+2. **Apply the schema and seed data** against that remote database — from your machine, point
+   `.env` at the remote host's credentials temporarily and run:
+   ```bash
+   npm run setup
+   ```
+3. **Push this repo to GitHub** (if not already).
+4. **Import the repo into Vercel** (vercel.com → Add New Project → import from GitHub).
+5. **Set environment variables** in the Vercel project settings (Settings → Environment
+   Variables) — the same keys as `.env.example`: `DB_HOST`, `DB_PORT`, `DB_USER`,
+   `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_EXPIRES_IN`. Leave `PORT` unset (Vercel manages
+   this). `NODE_ENV` is set to `production` by Vercel automatically, which makes auth cookies
+   `secure` — this requires the site be served over HTTPS, which Vercel does by default.
+6. **Deploy.** Vercel builds `api/index.js` (which re-exports `server/app.js`) and routes every
+   request — API and static pages alike — through it, so behavior matches `npm start` locally.
+7. Visit the deployed URL and log in with one of the [demo accounts](#8-demo-accounts) to
+   confirm the dashboards load.
+
+Because every request (including static assets) goes through one serverless function rather
+than a CDN-cached static host, expect a brief cold start after periods of inactivity — normal
+for free-tier serverless hosting and not a sign of a broken deployment.
+
+### Static-only preview (GitHub Pages)
+
+If you just want to showcase the frontend UI without a live backend, you can publish the
+`public/` folder to GitHub Pages. Pages that call the API (login, dashboards, booking, etc.)
+will show a "could not load" error there since there's no server to answer them — this mode is
+for browsing the design only, not a functional demo.
+
+## 13. Quality checklist (self-assessment)
 
 - ✅ Real Express + MySQL backend with parameterized queries throughout.
 - ✅ Role-based authentication (bcrypt + JWT) and authorization enforced server-side.

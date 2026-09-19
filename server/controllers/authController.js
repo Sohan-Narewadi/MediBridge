@@ -53,7 +53,8 @@ const me = asyncHandler(async (req, res) => {
     [req.user.id]
   );
   if (!rows.length) throw new ApiError(404, 'User not found.');
-  res.json({ user: rows[0] });
+  const u = rows[0];
+  res.json({ user: { id: u.id, email: u.email, role: u.role, fullName: u.full_name, phone: u.phone, avatarUrl: u.avatar_url } });
 });
 
 module.exports = { register, login, logout, me };

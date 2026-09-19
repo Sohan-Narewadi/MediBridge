@@ -2,6 +2,7 @@
 // module so swapping drivers/config later only touches one file.
 require('dotenv').config();
 const mysql = require('mysql2/promise');
+const { getSslConfig } = require('./sslConfig');
 
 const pool = mysql.createPool({
   host: process.env.DB_HOST || 'localhost',
@@ -12,6 +13,7 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 10,
   dateStrings: true, // return DATE/DATETIME as plain strings, not JS Date
+  ssl: getSslConfig(),
 });
 
 module.exports = pool;
