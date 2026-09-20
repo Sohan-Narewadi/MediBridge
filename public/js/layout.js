@@ -38,7 +38,7 @@ const MB_LAYOUT = (() => {
     const el = document.getElementById('site-footer');
     if (!el) return;
     el.innerHTML = `
-      <footer style="background:var(--color-ink-900); color:var(--color-ink-300); padding: var(--space-8) 0 var(--space-6);">
+      <footer style="background:linear-gradient(160deg, var(--color-ink-900), #1e1b4b); color:var(--color-ink-300); padding: var(--space-8) 0 var(--space-6);">
         <div class="container">
           <div class="grid" style="grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-6);">
             <div>

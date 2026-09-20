@@ -11,10 +11,10 @@
   .profile-layout { display:grid; grid-template-columns: 1fr 340px; gap: var(--space-6); align-items:start; }
   @media (max-width: 900px) { .profile-layout { grid-template-columns: 1fr; } }
   .profile-head { display:flex; gap: var(--space-5); align-items:flex-start; flex-wrap:wrap; }
-  .profile-photo { width:96px; height:96px; border-radius: var(--radius-lg); background: var(--color-primary-100); color: var(--color-primary-700); display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:800; flex-shrink:0; }
+  .profile-photo { width:96px; height:96px; border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--color-primary-100), var(--color-accent-100)); color: var(--color-accent-700); display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:800; flex-shrink:0; }
   .slot-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
   .slot-btn { padding: 0.5rem; border-radius: var(--radius-sm); border: 1.5px solid var(--color-ink-200); background: var(--color-surface); cursor:pointer; font-size:0.82rem; font-weight:600; }
-  .slot-btn.selected { background: var(--color-primary-600); color:#fff; border-color: var(--color-primary-600); }
+  .slot-btn.selected { background: var(--gradient-primary); color:#fff; border-color: var(--color-primary-600); box-shadow: 0 3px 10px rgba(13, 148, 136, 0.3); }
   .review-item { border-bottom: 1px solid var(--color-ink-100); padding: var(--space-3) 0; }
   .review-item:last-child { border-bottom:none; }
 </style>
