@@ -6,26 +6,28 @@
 <title>Doctor Dashboard — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .brief-row { display: grid; grid-template-columns: 64px minmax(0, 1.4fr) auto minmax(0, 1.3fr) auto; align-items: center; gap: var(--space-3); padding: 0.7rem 0; border-top: 1px solid var(--color-ink-150); }
-  .brief-row:first-child { border-top: 0; padding-top: 0.2rem; }
-  .brief-row .t { font-family: var(--font-mono); font-size: 0.84rem; color: var(--color-ink-900); }
-  .brief-row .t small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: var(--color-ink-500); text-transform: uppercase; letter-spacing: 0.05em; }
-  .brief-row .who { font-weight: 500; font-size: 0.9rem; }
-  .brief-row .why { font-size: 0.78rem; color: var(--color-ink-500); }
-  .brief-row .flags { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; min-width: 0; }
-  .intake-ok, .intake-miss { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; white-space: nowrap; }
-  .intake-ok { color: var(--color-success-700); }
-  .intake-miss { color: var(--color-ink-500); }
-  .day-sep { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); padding: var(--space-3) 0 var(--space-1); border-top: 1px solid var(--color-ink-150); }
-  .day-sep:first-child { border-top: 0; padding-top: 0; }
-  .day-sep + .brief-row { border-top: 0; }
-  @media (max-width: 760px) {
-    .brief-row { grid-template-columns: 56px minmax(0, 1fr) auto; }
-    .brief-row .flags { grid-column: 2 / -1; }
-    .brief-row .intake-cell { display: none; }
-  }
-  .adm-row .wait { font-family: var(--font-mono); font-size: 0.84rem; text-align: right; white-space: nowrap; }
-  .adm-row .wait small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: var(--color-ink-500); }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+  .tile { display: flex; flex-direction: column; gap: 0.35rem; padding: var(--space-4) var(--space-5); background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-lg); color: var(--color-ink-900); transition: border-color .15s; }
+  .tile:hover { border-color: var(--color-primary-300); text-decoration: none; }
+  .tile .ico { color: var(--color-primary-600); display: inline-flex; }
+  .tile .num { font-family: var(--font-display); font-size: 2.1rem; line-height: 1; }
+  .tile .num small { font-size: 1rem; color: var(--color-ink-500); }
+  .tile .lbl { font-size: 0.78rem; color: var(--color-ink-500); }
+  .tile.warn .num { color: var(--color-warning-700); }
+  @media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .v-row { display: flex; align-items: center; gap: var(--space-3); padding: 0.7rem 0; border-top: 1px solid var(--color-ink-150); }
+  .day-sep + .v-row, .v-row:first-child { border-top: 0; }
+  .v-row .t { font-family: var(--font-mono); font-size: 0.85rem; width: 48px; flex-shrink: 0; }
+  .v-row .who { flex: 1; min-width: 0; font-weight: 500; }
+  .day-sep { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); padding: var(--space-3) 0 var(--space-1); }
+  .day-sep:first-child { padding-top: 0; }
+  .tick { color: var(--color-success-700); display: inline-flex; }
+  .tick.miss { color: var(--color-ink-400); }
+  details.more { margin-top: var(--space-4); }
+  details.more > summary { cursor: pointer; font-size: 0.82rem; color: var(--color-ink-500); padding: 0.4rem 0; list-style: none; }
+  details.more > summary::-webkit-details-marker { display: none; }
+  details.more > summary:hover { color: var(--color-primary-700); }
+  @media (max-width: 760px) { .v-row .flag { display: none; } }
 </style>
 </head>
 <body>
@@ -41,47 +43,32 @@
   <main class="dash-main">
     <div class="page-head" id="welcome-block"><div><div class="skeleton" style="height:28px; width:300px;"></div></div></div>
 
-    <div class="kpi-row" id="kpis" style="--kpi-cols:4;">
-      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
-    </div>
+    <div class="tiles" id="kpis"></div>
 
-    <div class="grid" style="grid-template-columns: 1.65fr 1fr; margin-top: var(--space-4); align-items:start;">
+    <div class="grid" style="grid-template-columns: 1.6fr 1fr; align-items:start;">
       <div class="card">
-        <div class="card-header">
-          <div>
-            <h3>Pre-visit briefs</h3>
-            <div class="text-xs text-muted" style="margin-top:2px;">Compiled from the patient's intake, records, medicines and adherence. Open one before the consult.</div>
-          </div>
-          <a href="/doctor/appointments.html">Schedule</a>
-        </div>
+        <div class="card-header"><h3>Visits</h3><a href="/doctor/appointments.html">All</a></div>
         <div id="briefs"><div class="skeleton" style="height:180px;"></div></div>
       </div>
-
       <div class="flex-col gap-4">
         <div class="card">
-          <div class="card-header"><h3>Awaiting discharge</h3><a href="/doctor/inpatients.html">Inpatients</a></div>
+          <div class="card-header"><h3>Waiting to leave</h3><a href="/doctor/inpatients.html">All</a></div>
           <div id="discharge"><div class="skeleton" style="height:80px;"></div></div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>Needs confirmation</h3><a href="/doctor/appointments.html">All</a></div>
+          <div class="card-header"><h3>To confirm</h3></div>
           <div id="pending"><div class="skeleton" style="height:60px;"></div></div>
         </div>
       </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1.2fr 1fr; margin-top: var(--space-4); align-items:start;">
-      <div class="card">
-        <div class="card-header"><h3>Appointments · last 14 days</h3></div>
-        <div style="position:relative; height:200px;"><canvas id="trend-chart"></canvas></div>
+    <details class="more">
+      <summary>Activity &amp; recent consults</summary>
+      <div class="grid" style="grid-template-columns: 1.2fr 1fr; margin-top: var(--space-3); align-items:start;">
+        <div class="card"><div class="card-header"><h3>Last 14 days</h3></div><div style="position:relative; height:180px;"><canvas id="trend-chart"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3>Recent</h3><a href="/doctor/patients.html">Patients</a></div><div id="recent-consults"><div class="skeleton" style="height:80px;"></div></div></div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3>Recent consultations</h3><a href="/doctor/patients.html">My patients</a></div>
-        <div id="recent-consults"><div class="skeleton" style="height:80px;"></div></div>
-      </div>
-    </div>
+    </details>
   </main>
 </div>
 
@@ -89,7 +76,7 @@
 <script>
   const { esc, fmtMinutes, icon } = MB_LAYOUT;
   const DEPT = { billing: 'Billing', insurance: 'Insurance', pharmacy: 'Pharmacy', nursing: 'Nursing', documentation: 'Records' };
-  const state = { core: null, briefs: null, cleared: null };
+  const state = { core: null, briefs: null, cleared: null, openTransfers: null };
 
   function parseDate(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
   function dayLabel(iso) {
@@ -105,17 +92,12 @@
     MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
     const hour = new Date().getHours();
     const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    const first = (user.fullName || '').replace(/^Dr\.?\s*/i, '').split(' ')[0];
     document.getElementById('welcome-block').innerHTML = `
-      <div>
-        <h2>${greet}, ${esc(user.fullName)}</h2>
-        <p id="welcome-sub">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
-      </div>
-      <div class="actions">
-        <a href="/doctor/inpatients.html" class="btn btn-outline">${icon('bed')}Inpatients</a>
-        <a href="/doctor/transfers.html" class="btn btn-outline">${icon('transfer')}Request transfer</a>
-      </div>`;
+      <div><h2>${greet}, Dr. ${esc(first)}</h2></div>
+      <div class="actions"><a href="/doctor/transfers.html" class="btn btn-outline">${icon('transfer')}Transfer</a></div>`;
 
-    await Promise.all([loadCore(), loadBriefs(), loadDischarge()]);
+    await Promise.all([loadCore(), loadBriefs(), loadDischarge(), loadTransfers()]);
     renderKpis();
     renderBriefs();
   });
@@ -128,8 +110,8 @@
       renderTrend(state.core.trend || []);
     } catch (err) {
       toast.error('Could not load dashboard.');
-      document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable.</p>';
-      document.getElementById('recent-consults').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable.</p>';
+      document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable</p>';
+      document.getElementById('recent-consults').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable</p>';
     }
   }
 
@@ -138,100 +120,87 @@
     catch (e) { state.briefs = null; }
   }
 
+  async function loadTransfers() {
+    try { state.openTransfers = ((await api.get('/transfers')).requests || []).filter((r) => r.status === 'open').length; }
+    catch (e) { state.openTransfers = null; }
+  }
+
   async function loadDischarge() {
     const el = document.getElementById('discharge');
     try {
       const { admissions } = await api.get('/discharge/admissions?status=cleared');
       state.cleared = admissions || [];
-      if (!state.cleared.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No patients waiting to leave.</p>'; return; }
+      if (!state.cleared.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">None</p>'; return; }
       el.innerHTML = state.cleared.slice(0, 5).map((a) => {
         const b = a.bottleneck;
         return `
-          <div class="list-row adm-row">
-            <div class="min-w-0">
-              <div class="primary truncate">${esc(a.patient_name)}</div>
-              <div class="secondary truncate">${esc(a.ward || '')}${a.bed ? ` · ${esc(a.bed)}` : ''} · ${a.tasks_done ?? 0}/${a.tasks_total ?? 5} done</div>
-              ${b ? `<div style="margin-top:4px;"><span class="badge status-${esc(b.status)}">${esc(DEPT[b.department] || b.department)}${b.status === 'blocked' ? ' blocked' : ''} · ${fmtMinutes(b.minutes)}</span></div>` : ''}
-            </div>
-            <div class="wait">${fmtMinutes(a.waiting_minutes)}<small>waiting</small></div>
+          <div class="list-row">
+            <div class="min-w-0"><div class="primary truncate">${esc(a.patient_name)}</div></div>
+            ${b ? `<span class="badge status-${esc(b.status)}">${esc(DEPT[b.department] || b.department)} · ${fmtMinutes(b.minutes)}</span>` : `<span class="badge badge-plain">${fmtMinutes(a.waiting_minutes)}</span>`}
           </div>`;
       }).join('');
     } catch (e) {
       state.cleared = null;
-      el.innerHTML = '<p class="text-muted text-sm mb-0">Inpatient data unavailable.</p>';
+      el.innerHTML = '<p class="text-muted text-sm mb-0">Unavailable</p>';
     }
   }
 
   function renderKpis() {
     const core = state.core || {};
     const today = core.todayAppointments || [];
-    const counts = core.counts || {};
     const briefs = state.briefs || [];
-    const todayIso = new Date().toLocaleDateString('en-CA');
-    const todayBriefs = briefs.filter((b) => String(b.appointment_date).slice(0, 10) === todayIso);
     const ready = briefs.filter((b) => b.intake_done).length;
-    const flagged = briefs.filter((b) => b.flag_count > 0).length;
     const waiting = state.cleared ? state.cleared.length : null;
-    const pendingUpcoming = [...today, ...(core.upcomingAppointments || [])].filter((a) => a.status === 'pending').length;
-    const longest = state.cleared && state.cleared.length ? Math.max(...state.cleared.map((a) => a.waiting_minutes || 0)) : 0;
-    document.getElementById('kpis').innerHTML = `
-      <div class="kpi"><div class="kpi-label">${icon('calendar', 13)}Consults today</div><div class="kpi-value">${today.length}</div><div class="kpi-sub">${(core.upcomingAppointments || []).length} more upcoming</div></div>
-      <div class="kpi"><div class="kpi-label">${icon('fileText', 13)}Briefs ready</div><div class="kpi-value">${state.briefs ? `${ready}<small>/ ${briefs.length}</small>` : '—'}</div><div class="kpi-sub">${state.briefs ? `${flagged} with flags · next 7 days` : 'unavailable'}</div></div>
-      <div class="kpi ${waiting ? 'is-warning' : ''}"><div class="kpi-label">${icon('bed', 13)}Awaiting discharge</div><div class="kpi-value">${waiting == null ? '—' : waiting}</div><div class="kpi-sub">${waiting ? `longest wait ${fmtMinutes(longest)}` : 'no one waiting'}</div></div>
-      <div class="kpi"><div class="kpi-label">${icon('users', 13)}Patients</div><div class="kpi-value">${counts.total_patients || 0}</div><div class="kpi-sub">${pendingUpcoming} booking${pendingUpcoming === 1 ? '' : 's'} to confirm</div></div>`;
-    const sub = document.getElementById('welcome-sub');
-    if (sub) sub.textContent += ` · ${today.length} consult${today.length === 1 ? '' : 's'} today${state.briefs ? ` · ${todayBriefs.filter((b) => b.intake_done).length} pre-visit forms in` : ''}`;
+    const tile = (href, ic, num, lbl, warn) => `<a class="tile ${warn ? 'warn' : ''}" href="${href}"><span class="ico">${icon(ic, 18)}</span><span class="num">${num}</span><span class="lbl">${lbl}</span></a>`;
+    document.getElementById('kpis').innerHTML =
+      tile('/doctor/appointments.html', 'calendar', today.length, 'Today') +
+      tile('/doctor/appointments.html', 'fileText', state.briefs ? `${ready}<small>/${briefs.length}</small>` : '—', 'Briefs ready') +
+      tile('/doctor/inpatients.html', 'bed', waiting == null ? '—' : waiting, 'To discharge', waiting > 0) +
+      tile('/doctor/transfers.html', 'transfer', state.openTransfers == null ? '—' : state.openTransfers, 'Transfers');
   }
 
-  function flagChip(f, extra) {
+  function flagChip(f) {
     if (!f) return '';
     const level = typeof f === 'object' ? (f.level || 'info') : 'warning';
-    const text = typeof f === 'object' ? f.text : f;
-    return `<span class="flag flag-${esc(level)} truncate" style="max-width:100%;" title="${esc(text)}">${esc(text)}</span>${extra > 0 ? `<span class="text-xs text-muted">+${extra}</span>` : ''}`;
+    let text = typeof f === 'object' ? f.text : f;
+    const full = text;
+    if (text.length > 26) text = text.slice(0, 24) + '…';
+    return `<span class="flag flag-${esc(level)}" title="${esc(full)}">${esc(text)}</span>`;
   }
 
   function renderBriefs() {
     const el = document.getElementById('briefs');
     let items = state.briefs;
-    let fallback = false;
     if (!items || !items.length) {
-      // No briefs endpoint yet, or nothing in the next 7 days: fall back to the upcoming schedule.
       const core = state.core || {};
       items = [...(core.todayAppointments || []), ...(core.upcomingAppointments || [])]
         .filter((a) => a.status !== 'cancelled' && a.status !== 'completed')
-        .map((a) => ({ appointment_id: a.id, patient_name: a.patient_name, appointment_date: a.appointment_date, start_time: a.start_time, intake_done: null, reason: a.reason }));
-      fallback = true;
+        .map((a) => ({ appointment_id: a.id, patient_name: a.patient_name, appointment_date: a.appointment_date, start_time: a.start_time, intake_done: null }));
     }
-    if (!items.length) {
-      el.innerHTML = '<div class="empty-state" style="padding: var(--space-5);"><p class="mb-0">No consults scheduled in the next few days.</p></div>';
-      return;
-    }
+    if (!items.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">Nothing scheduled.</p>'; return; }
     let lastDay = null;
-    el.innerHTML = items.slice(0, 10).map((b) => {
+    el.innerHTML = items.slice(0, 8).map((b) => {
       const day = String(b.appointment_date).slice(0, 10);
       const sep = day !== lastDay ? `<div class="day-sep">${dayLabel(day)}</div>` : '';
       lastDay = day;
-      const intake = b.intake_done == null ? '' : b.intake_done
-        ? `<span class="intake-ok">${icon('checkCircle', 14)}Intake in</span>`
-        : `<span class="intake-miss">${icon('clock', 14)}No intake yet</span>`;
+      const tick = b.intake_done == null ? '' : b.intake_done
+        ? `<span class="tick" title="Intake in">${icon('checkCircle', 16)}</span>`
+        : `<span class="tick miss" title="No intake yet">${icon('clock', 16)}</span>`;
       return `${sep}
-        <div class="brief-row">
+        <div class="v-row">
           <div class="t">${String(b.start_time).slice(0, 5)}</div>
-          <div class="min-w-0">
-            <div class="who truncate">${esc(b.patient_name)}</div>
-            ${b.reason ? `<div class="why truncate">${esc(b.reason)}</div>` : ''}
-          </div>
-          <div class="intake-cell">${intake}</div>
-          <div class="flags">${b.top_flag ? flagChip(b.top_flag, (b.flag_count || 0) - 1) : (b.flag_count === 0 ? '<span class="text-xs text-muted">No flags</span>' : '')}</div>
-          <a href="/doctor/brief.html?appointment=${b.appointment_id}" class="btn btn-outline btn-sm">Open brief</a>
+          <div class="who truncate">${esc(b.patient_name)}</div>
+          ${tick}
+          ${flagChip(b.top_flag)}
+          <a href="/doctor/brief.html?appointment=${b.appointment_id}" class="btn btn-outline btn-sm">Brief</a>
         </div>`;
-    }).join('') + (fallback && state.briefs === null ? '<p class="text-xs text-muted" style="margin:var(--space-3) 0 0;">Brief summaries are loading from the Smart Brief service; showing your schedule.</p>' : '');
+    }).join('');
   }
 
   function renderPending(list) {
     const el = document.getElementById('pending');
-    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">All bookings are confirmed.</p>'; return; }
-    el.innerHTML = list.slice(0, 5).map((a) => `
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">All confirmed</p>'; return; }
+    el.innerHTML = list.slice(0, 4).map((a) => `
       <div class="list-row">
         <div class="min-w-0">
           <div class="primary truncate">${esc(a.patient_name)}</div>
@@ -244,7 +213,7 @@
 
   function renderConsults(list) {
     const el = document.getElementById('recent-consults');
-    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No consultations recorded yet.</p>'; return; }
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">None yet</p>'; return; }
     el.innerHTML = list.map((c) => `
       <div class="list-row">
         <div class="min-w-0"><div class="primary truncate">${esc(c.diagnosis || 'Consultation')}</div><div class="secondary">${esc(c.patient_name)}</div></div>
@@ -266,7 +235,7 @@
       data.push(match ? match.count : 0);
     }
     if (!data.some(Boolean)) {
-      document.getElementById('trend-chart').parentElement.innerHTML = '<div class="empty-state" style="padding-top:var(--space-8);"><p class="mb-0">No appointments in the last 14 days.</p></div>';
+      document.getElementById('trend-chart').parentElement.innerHTML = '<p class="text-muted text-sm">No visits</p>';
       return;
     }
     new Chart(document.getElementById('trend-chart'), {
@@ -287,9 +256,9 @@
     btn.disabled = true;
     try {
       await api.patch(`/appointments/${btn.dataset.confirm}/status`, { status: 'confirmed' });
-      toast.success('Appointment confirmed.');
+      toast.success('Confirmed.');
       btn.closest('.list-row').remove();
-      if (!document.querySelector('#pending .list-row')) document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">All bookings are confirmed.</p>';
+      if (!document.querySelector('#pending .list-row')) document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">All confirmed</p>';
     } catch (e) { btn.disabled = false; toast.error(e.message); }
   }
 </script>

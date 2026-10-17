@@ -6,7 +6,11 @@
 <title>Before Your Visit — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .in-intake-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-5); align-items: start; }
+  .in-intake-layout { max-width: 640px; display: flex; flex-direction: column; gap: var(--space-4); }
+  details.in-more { margin-bottom: var(--space-4); }
+  details.in-more summary { cursor: pointer; font-size: 0.86rem; color: var(--color-ink-500); margin-bottom: var(--space-3); }
+  details.in-file { font-size: 0.86rem; }
+  details.in-file summary { cursor: pointer; display: flex; align-items: center; gap: var(--space-2); color: var(--color-ink-700); }
   .in-eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary-700); margin-bottom: var(--space-1); }
   .in-on-file { background: var(--color-primary-50); border-color: var(--color-primary-100); }
   .in-on-file dl { display: grid; grid-template-columns: 120px 1fr; gap: var(--space-2) var(--space-3); font-size: 0.88rem; margin: 0; }
@@ -24,7 +28,6 @@
   .in-step-label { display: flex; align-items: baseline; gap: var(--space-2); }
   .in-step-label .in-num { font-family: var(--font-display); font-weight: 800; color: var(--color-primary-700); }
   .in-opt { font-weight: 500; color: var(--color-ink-500); font-size: 0.78rem; }
-  @media (max-width: 900px) { .in-intake-layout { grid-template-columns: 1fr; } .in-intake-layout aside { order: -1; } }
 </style>
 </head>
 <body>
@@ -37,27 +40,28 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div id="intake-head" style="margin-bottom: var(--space-5);"><div class="skeleton" style="height:36px; width:340px;"></div></div>
+    <div id="intake-head" style="margin-bottom: var(--space-4);"><div class="skeleton" style="height:36px; width:340px;"></div></div>
 
     <div class="in-intake-layout">
+      <div class="card card-compact in-on-file" id="on-file"><div class="skeleton" style="height:24px;"></div></div>
       <form class="card" id="intake-form" novalidate>
         <div class="field">
-          <label for="complaint" class="in-step-label"><span class="in-num">1</span> What's the main reason for this visit?</label>
-          <input id="complaint" maxlength="255" placeholder="e.g. Shortness of breath when climbing stairs" required>
+          <label for="complaint">Why are you coming?</label>
+          <input id="complaint" maxlength="255" placeholder="e.g. Breathless on stairs" required>
         </div>
 
         <div class="field">
-          <label class="in-step-label"><span class="in-num">2</span> Symptoms <span class="in-opt">tap all that apply</span></label>
+          <label>Symptoms</label>
           <div class="in-chip-picker" id="symptom-chips"></div>
           <div class="in-chip-add">
-            <input id="symptom-custom" placeholder="Add another symptom" maxlength="40">
+            <input id="symptom-custom" placeholder="Other" maxlength="40">
             <button type="button" class="btn btn-outline btn-sm" id="symptom-add">Add</button>
           </div>
         </div>
 
         <div class="form-row">
           <div class="field">
-            <label for="duration" class="in-step-label"><span class="in-num">3</span> How long has this been going on?</label>
+            <label for="duration">For how long?</label>
             <select id="duration">
               <option value="">Select…</option>
               <option>Since today</option>
@@ -69,38 +73,24 @@
             </select>
           </div>
           <div class="field">
-            <label class="in-step-label"><span class="in-num">4</span> How much is it affecting you?</label>
+            <label>How bad?</label>
             <div class="in-sev-picker" id="sev-picker"></div>
           </div>
         </div>
 
-        <div class="field">
-          <label for="med-changes" class="in-step-label"><span class="in-num">5</span> Any change in your medicines since your last visit? <span class="in-opt">optional</span></label>
-          <input id="med-changes" maxlength="255" placeholder="e.g. Stopped the evening tablet, started a multivitamin">
-        </div>
-        <div class="field">
-          <label for="new-allergies" class="in-step-label"><span class="in-num">6</span> Any new allergies or reactions? <span class="in-opt">optional</span></label>
-          <input id="new-allergies" maxlength="255" placeholder="Leave blank if none">
-        </div>
-        <div class="field">
-          <label for="questions" class="in-step-label"><span class="in-num">7</span> Anything you want to ask the doctor? <span class="in-opt">optional</span></label>
-          <textarea id="questions" rows="3" maxlength="500" placeholder="Write it down now so you don't forget during the visit."></textarea>
-        </div>
+        <details class="in-more">
+          <summary>Add more (optional)</summary>
+          <div class="field"><label for="med-changes">Medicine changes</label><input id="med-changes" maxlength="255"></div>
+          <div class="field"><label for="new-allergies">New allergies</label><input id="new-allergies" maxlength="255"></div>
+          <div class="field mb-0"><label for="questions">Question for the doctor</label><textarea id="questions" rows="2" maxlength="500"></textarea></div>
+        </details>
 
         <div id="form-alert"></div>
         <div class="flex gap-3" style="flex-wrap:wrap;">
-          <button type="submit" class="btn btn-primary" id="submit-btn">Send to my doctor</button>
-          <a href="/patient/appointments.html" class="btn btn-ghost">Skip for now</a>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Send</button>
+          <a href="/patient/appointments.html" class="btn btn-ghost">Skip</a>
         </div>
       </form>
-
-      <aside class="flex-col gap-4">
-        <div class="card in-on-file" id="on-file"><div class="skeleton" style="height:160px;"></div></div>
-        <div class="card card-compact">
-          <h4>Why we ask</h4>
-          <p class="text-sm mb-0">Your doctor gets a one-page brief before you walk in, so the visit starts with your problem, not with paperwork. It takes about a minute, and you never retype what's already in your profile.</p>
-        </div>
-      </aside>
     </div>
   </main>
 </div>
@@ -149,25 +139,23 @@
 
   function renderHead(a, intake) {
     document.getElementById('intake-head').innerHTML = `
-      <div class="in-eyebrow">${intake ? 'Update your pre-visit info' : 'One minute before your visit'}</div>
-      <h2 style="margin-bottom:2px;">Tell ${esc(a.doctor_name)} what's going on</h2>
-      <p class="text-muted mb-0">${esc(a.specialization)} · ${esc(fmtDate(a.appointment_date))} at ${esc(a.start_time.slice(0, 5))}</p>`;
+      <h2 class="mb-0">${esc(a.doctor_name)}</h2>
+      <p class="text-muted mb-0 text-sm">${esc(fmtDate(a.appointment_date))} · ${esc(a.start_time.slice(0, 5))}</p>`;
   }
 
   function renderOnFile(p, meds) {
     const age = p.date_of_birth ? Math.floor((Date.now() - new Date(`${p.date_of_birth}T00:00:00`)) / (365.25 * 86400000)) : null;
     document.getElementById('on-file').innerHTML = `
-      <div class="card-header" style="margin-bottom: var(--space-3);"><h4 class="mb-0">Already on file</h4><span class="badge badge-success">No need to repeat</span></div>
-      <dl>
-        <dt>Name</dt><dd>${esc(p.full_name)}</dd>
-        <dt>Age / sex</dt><dd>${age != null ? age + ' y' : '—'} · ${esc((p.gender || '—').replace(/_/g, ' '))}</dd>
-        <dt>Blood group</dt><dd>${esc(p.blood_group || '—')}</dd>
-        <dt>Allergies</dt><dd>${p.allergies ? `<span class="badge badge-danger">${esc(p.allergies)}</span>` : 'None recorded'}</dd>
-        <dt>Conditions</dt><dd>${esc(p.chronic_conditions || 'None recorded')}</dd>
-        <dt>Medicines</dt><dd>${meds.length ? meds.map((m) => esc(m.medicine_name)).join(', ') : 'None active'}</dd>
-        <dt>Past visits</dt><dd>Records &amp; prescriptions shared automatically</dd>
-      </dl>
-      <p class="text-sm mb-0" style="margin-top: var(--space-3);">Something wrong? <a href="/patient/profile.html">Update your profile</a> once and every doctor sees it.</p>`;
+      <details class="in-file">
+        <summary><span class="badge badge-success">On file</span> Allergies, conditions, medicines</summary>
+        <dl style="margin-top: var(--space-3);">
+          <dt>Age / sex</dt><dd>${age != null ? age + ' y' : '—'} · ${esc((p.gender || '—').replace(/_/g, ' '))} · ${esc(p.blood_group || '—')}</dd>
+          <dt>Allergies</dt><dd>${esc(p.allergies || 'None')}</dd>
+          <dt>Conditions</dt><dd>${esc(p.chronic_conditions || 'None')}</dd>
+          <dt>Medicines</dt><dd>${meds.length ? meds.map((m) => esc(m.medicine_name)).join(', ') : 'None active'}</dd>
+        </dl>
+        <a href="/patient/profile.html" class="text-sm">Edit profile</a>
+      </details>`;
   }
 
   function renderChips() {
@@ -210,7 +198,7 @@
     document.getElementById('med-changes').value = i.medication_changes || '';
     document.getElementById('new-allergies').value = i.new_allergies || '';
     document.getElementById('questions').value = i.questions_for_doctor || '';
-    document.getElementById('submit-btn').textContent = 'Update what my doctor sees';
+    document.getElementById('submit-btn').textContent = 'Update';
   }
 
   document.getElementById('intake-form').addEventListener('submit', async (e) => {
@@ -220,7 +208,7 @@
     const complaint = document.getElementById('complaint').value.trim();
     if (complaint.length < 3) {
       document.getElementById('complaint').classList.add('invalid');
-      alertBox.innerHTML = '<div class="alert alert-danger">Please tell your doctor briefly why you are coming.</div>';
+      alertBox.innerHTML = '<div class="alert alert-danger">Add a short reason.</div>';
       return;
     }
     document.getElementById('complaint').classList.remove('invalid');
@@ -238,13 +226,13 @@
         newAllergies: document.getElementById('new-allergies').value.trim() || null,
         questionsForDoctor: document.getElementById('questions').value.trim() || null,
       });
-      toast.success('Sent. Your doctor will see this before your visit.');
+      toast.success('Sent.');
       setTimeout(() => { window.location.href = '/patient/appointments.html'; }, 900);
     } catch (err) {
       const details = err.details ? err.details.map((d) => esc(d.message)).join('<br>') : esc(err.message);
       alertBox.innerHTML = `<div class="alert alert-danger">${details}</div>`;
       btn.disabled = false;
-      btn.textContent = 'Send to my doctor';
+      btn.textContent = 'Send';
     }
   });
 </script>

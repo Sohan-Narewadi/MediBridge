@@ -16,8 +16,7 @@
 
 <div class="auth-shell">
   <div class="card auth-card">
-    <h2>Create your patient account</h2>
-    <p class="text-muted">Doctor and admin accounts are set up by MediBridge staff — this form is for patients.</p>
+    <h2>Create account</h2>
 
     <div id="form-alert"></div>
 
@@ -32,11 +31,11 @@
       </div>
       <div class="form-row">
         <div class="field">
-          <label for="phone">Phone (optional)</label>
+          <label for="phone">Phone</label>
           <input type="tel" id="phone" name="phone" autocomplete="tel">
         </div>
         <div class="field">
-          <label for="dateOfBirth">Date of birth</label>
+          <label for="dateOfBirth">Birth date</label>
           <input type="date" id="dateOfBirth" name="dateOfBirth">
         </div>
       </div>
@@ -52,13 +51,13 @@
       <div class="field">
         <label for="password">Password</label>
         <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password">
-        <p class="hint">At least 8 characters.</p>
+        <p class="hint">8+ characters</p>
       </div>
       <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">Create account</button>
     </form>
 
     <p class="text-sm text-center" style="margin-top: var(--space-5);">
-      Already have an account? <a href="/auth/login.html">Log in</a>
+      Have an account? <a href="/auth/login.html">Log in</a>
     </p>
   </div>
 </div>
@@ -74,7 +73,7 @@
     alertBox.innerHTML = '';
     const submitBtn = document.getElementById('submit-btn');
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<span class="spinner"></span> Creating account...';
+    submitBtn.innerHTML = '<span class="spinner"></span>';
 
     try {
       await api.post('/auth/register', {

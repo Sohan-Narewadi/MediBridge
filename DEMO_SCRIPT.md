@@ -25,12 +25,12 @@ Scroll through "Care breaks at the handoffs" and the four modules.
 ## 2. Smart Brief: enter once, reuse everywhere (2 min)
 
 **Patient** (`patient@medibridge.demo`)
-1. Dashboard → **Before your next visit** card → *Fill pre-visit form*.
+1. Dashboard → the "what needs you now" card → *Fill pre-visit form*.
 2. Point out the "already on file" panel: allergies, conditions and medicines are **not** asked
    again. Pick symptom chips and a severity, then submit. It takes about 2 minutes.
 
 **Doctor** (`doctor@medibridge.demo`)
-3. Dashboard → **Pre-visit briefs** → open the first patient's brief.
+3. Dashboard → **Visits** list → click **Brief** on the first patient's brief.
 4. Show **Things to know first**. These flags are computed from real data: a new allergy reported in
    the intake, severity 4/5, a medication change, a recent hospital stay, first visit.
 5. Show "Why they're coming" (the patient's own words and question), medicines with adherence,
@@ -56,7 +56,7 @@ Scroll through "Care breaks at the handoffs" and the four modules.
 5. On Aarav: **Resume** → **Mark done**.
 
 **Admin** (`admin@medibridge.demo`)
-6. Sidebar → **Operations Center**. The live board shows the cleared patients still in a bed and
+6. Sidebar → **Operations Center** (Discharge tab). The live board shows the cleared patients still in a bed and
    who is holding each one. The department chart shows Insurance averaging about 3h against a 2h
    target.
    > "This is the number a hospital manager has never had: which desk to fix first."
@@ -87,7 +87,7 @@ commitments. The follow-up date becomes a commitment automatically.
 **Patient** → **My Care Plan**: the plan in plain words and a checklist (Overdue / Coming up /
 Done) showing who is responsible: You, Doctor or Hospital. Tick one off.
 
-**Admin** → Operations Center → **Visit Loop** section: overdue commitments are the "broken
+**Admin** → Operations Center → **Follow-ups** tab: overdue commitments are the "broken
 loops", the patients to call.
 
 ## Likely questions and short answers

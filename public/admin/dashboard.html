@@ -21,6 +21,15 @@
   .legend i { display: inline-block; width: 10px; height: 8px; border-radius: 2px; }
   @media (max-width: 520px) { .dept-bar { grid-template-columns: 84px 1fr 70px; } }
   .chart-box { position: relative; height: 220px; }
+  a.kpi { color: inherit; display: block; transition: background-color .12s ease; }
+  a.kpi:hover { background: var(--color-ink-50); text-decoration: none; }
+  .kpi .kpi-value { font-size: 2.3rem; }
+  .plat { margin-top: var(--space-6); }
+  .plat > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: var(--space-3); padding: 0.7rem 0; border-top: 1px solid var(--color-line); font-weight: 600; font-size: 0.95rem; }
+  .plat > summary::-webkit-details-marker { display: none; }
+  .plat > summary::after { content: '+'; font-weight: 400; font-size: 1.2rem; color: var(--color-ink-500); }
+  .plat[open] > summary::after { content: '\2013'; }
+  .plat-sum { font-weight: 400; font-size: 0.8rem; margin-left: auto; }
 </style>
 </head>
 <body>
@@ -37,10 +46,6 @@
     <div class="page-head" id="welcome-block"><div><div class="skeleton" style="height:28px; width:280px;"></div></div></div>
 
     <!-- Operations: the handoff modules -->
-    <div class="ops-head">
-      <div class="t"><span class="live-dot"></span>Operations</div>
-      <a href="/admin/operations.html" class="btn btn-outline btn-sm">Open Operations Center <span data-icon="arrowRight"></span></a>
-    </div>
     <div class="kpi-row" id="ops-kpis" style="--kpi-cols:4;">
       <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
       <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
@@ -50,46 +55,43 @@
 
     <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-top: var(--space-4); align-items:start;">
       <div class="card">
-        <div class="card-header">
-          <div><h3>Where discharges wait</h3><div class="text-xs text-muted" style="margin-top:2px;">Average time from "medically fit" to task done, last 30 days</div></div>
-        </div>
+        <div class="card-header"><h3>Where discharges wait</h3><a href="/admin/operations.html#discharge">Details</a></div>
         <div id="dept-bars"><div class="skeleton" style="height:150px;"></div></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Overdue follow-ups</h3><a href="/admin/operations.html">Details</a></div>
+        <div class="card-header"><h3>Overdue follow-ups</h3><a href="/admin/operations.html#loops">Details</a></div>
         <div id="overdue-list"><div class="skeleton" style="height:150px;"></div></div>
       </div>
     </div>
 
-    <!-- Platform -->
-    <div class="ops-head" style="margin-top: var(--space-7);"><div class="t">Platform</div></div>
-    <div class="kpi-row" id="stat-grid" style="--kpi-cols:4;">
-      <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
-      <div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
-    </div>
-
-    <div class="grid" style="grid-template-columns: 1fr 1.3fr; margin-top: var(--space-4); align-items:start;">
-      <div class="card"><div class="card-header"><h3>Appointments by status</h3></div><div class="chart-box"><canvas id="status-chart"></canvas></div></div>
-      <div class="card"><div class="card-header"><h3>Doctors by specialization</h3></div><div class="chart-box"><canvas id="spec-chart"></canvas></div></div>
-    </div>
-
-    <div class="card" style="margin-top: var(--space-4);">
-      <div class="card-header"><h3>User growth · last 6 months</h3></div>
-      <div class="chart-box" style="height:180px;"><canvas id="growth-chart"></canvas></div>
-    </div>
-
-    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-4); align-items:start;">
-      <div class="card">
-        <div class="card-header"><h3>Recent registrations</h3><a href="/admin/patients.html">Manage users</a></div>
-        <div id="recent-users"><div class="skeleton" style="height:80px;"></div></div>
+    <!-- Platform stats (collapsed) -->
+    <details class="plat" id="plat">
+      <summary><span>Platform stats</span><span class="plat-sum text-muted" id="plat-sum"></span></summary>
+      <div class="kpi-row" id="stat-grid" style="--kpi-cols:4; margin-top: var(--space-3);">
+        <div class="kpi"><div class="skeleton" style="height:48px;"></div></div>
+        <div class="kpi"><div class="skeleton" style="height:48px;"></div></div>
+        <div class="kpi"><div class="skeleton" style="height:48px;"></div></div>
+        <div class="kpi"><div class="skeleton" style="height:48px;"></div></div>
       </div>
-      <div class="card">
-        <div class="card-header"><h3>Recent appointments</h3><a href="/admin/appointments.html">All appointments</a></div>
-        <div id="recent-appts"><div class="skeleton" style="height:80px;"></div></div>
+      <div class="grid" style="grid-template-columns: 1fr 1.3fr; margin-top: var(--space-4); align-items:start;">
+        <div class="card"><div class="card-header"><h3>Appointments</h3></div><div class="chart-box"><canvas id="status-chart"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3>Doctors</h3></div><div class="chart-box"><canvas id="spec-chart"></canvas></div></div>
       </div>
-    </div>
+      <div class="card" style="margin-top: var(--space-4);">
+        <div class="card-header"><h3>User growth</h3></div>
+        <div class="chart-box" style="height:180px;"><canvas id="growth-chart"></canvas></div>
+      </div>
+      <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-4); align-items:start;">
+        <div class="card">
+          <div class="card-header"><h3>New users</h3><a href="/admin/patients.html">Manage</a></div>
+          <div id="recent-users"><div class="skeleton" style="height:80px;"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Recent visits</h3><a href="/admin/appointments.html">All</a></div>
+          <div id="recent-appts"><div class="skeleton" style="height:80px;"></div></div>
+        </div>
+      </div>
+    </details>
   </main>
 </div>
 
@@ -104,8 +106,8 @@
     MB_LAYOUT.renderDashboardShell('admin', 'Dashboard');
     MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
     document.getElementById('welcome-block').innerHTML = `
-      <div><h2>Platform overview</h2><p>${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} · handoffs, people and activity at a glance.</p></div>
-      <div class="actions"><a href="/admin/operations.html" class="btn btn-primary">${icon('activity')}Operations Center</a></div>`;
+      <div><h2>Overview</h2></div>
+      <div class="actions"><a href="/admin/operations.html" class="btn btn-primary">${icon('activity')}Operations</a></div>`;
     MB_LAYOUT.hydrate();
 
     if (window.Chart) {
@@ -132,26 +134,26 @@
     const topSla = top && d.deptAvg ? (d.deptAvg.find((x) => x.department === top.department) || {}).sla_minutes : null;
     const pct = (x) => (x == null ? dash : `${Math.round(Number(x) <= 1 ? Number(x) * 100 : Number(x))}%`);
     document.getElementById('ops-kpis').innerHTML = `
-      <div class="kpi ${d && d.currentWaiting ? 'is-warning' : ''}">
+      <a class="kpi ${d && d.currentWaiting ? 'is-warning' : ''}" href="/admin/operations.html#discharge">
         <div class="kpi-label">${icon('bed', 13)}Waiting to leave</div>
         <div class="kpi-value">${d ? d.currentWaiting : dash}</div>
-        <div class="kpi-sub">${d ? `avg wait ${fmtMinutes(d.avgWaitMinutes)} · ${d.dischargesLast30} discharges/30d` : 'Discharge data unavailable'}</div>
-      </div>
-      <div class="kpi ${top ? 'is-danger' : ''}">
+        <div class="kpi-sub">${d ? `avg ${fmtMinutes(d.avgWaitMinutes)}` : ''}</div>
+      </a>
+      <a class="kpi ${top ? 'is-danger' : ''}" href="/admin/operations.html#discharge">
         <div class="kpi-label">${icon('alertCircle', 13)}Top bottleneck</div>
-        <div class="kpi-value" style="font-size:1.35rem; padding-top:0.25rem;">${top ? esc(DEPT[top.department] || top.department) : dash}</div>
-        <div class="kpi-sub">${top ? `avg ${fmtMinutes(top.avg_minutes)}${topSla ? ` vs SLA ${fmtMinutes(topSla)}` : ''}` : 'no bottleneck data'}</div>
-      </div>
-      <div class="kpi">
+        <div class="kpi-value" style="font-size:1.8rem; padding-top:0.3rem;">${top ? esc(DEPT[top.department] || top.department) : dash}</div>
+        <div class="kpi-sub">${top ? `${fmtMinutes(top.avg_minutes)}${topSla ? ` vs ${fmtMinutes(topSla)}` : ''}` : ''}</div>
+      </a>
+      <a class="kpi" href="/admin/operations.html#transfers">
         <div class="kpi-label">${icon('transfer', 13)}Open transfers</div>
         <div class="kpi-value">${t ? t.open : dash}</div>
-        <div class="kpi-sub">${t ? `avg response ${fmtMinutes(t.avgResponseMinutes)} · ${pct(t.acceptanceRate)} accepted` : 'Transfer data unavailable'}</div>
-      </div>
-      <div class="kpi ${v && v.overdueCount ? 'is-danger' : ''}">
-        <div class="kpi-label">${icon('listChecks', 13)}Overdue follow-ups</div>
+        <div class="kpi-sub">${t ? `${pct(t.acceptanceRate)} accepted` : ''}</div>
+      </a>
+      <a class="kpi ${v && v.overdueCount ? 'is-danger' : ''}" href="/admin/operations.html#loops">
+        <div class="kpi-label">${icon('listChecks', 13)}Overdue</div>
         <div class="kpi-value">${v ? v.overdueCount : dash}</div>
-        <div class="kpi-sub">${v ? `${v.openCount} open · ${pct(v.completionRate)} completed` : 'Visit Loop data unavailable'}</div>
-      </div>`;
+        <div class="kpi-sub">${v ? `${v.openCount} open` : ''}</div>
+      </a>`;
 
     renderDeptBars(d);
     renderOverdue(v);
@@ -160,7 +162,7 @@
   function renderDeptBars(d) {
     const el = document.getElementById('dept-bars');
     const rows = d && d.deptAvg ? d.deptAvg : [];
-    if (!rows.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No completed discharges in the last 30 days.</p>'; return; }
+    if (!rows.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No data yet.</p>'; return; }
     const max = Math.max(...rows.map((r) => Math.max(Number(r.avg_minutes) || 0, Number(r.sla_minutes) || 0))) * 1.08;
     const sorted = rows.slice().sort((a, b) => b.avg_minutes - a.avg_minutes);
     el.innerHTML = `
@@ -181,18 +183,17 @@
       <div class="legend">
         <span><i style="background:var(--color-success-500);"></i>within target</span>
         <span><i style="background:var(--color-danger-500); opacity:.8;"></i>over target</span>
-        <span><i style="background:var(--color-ink-900); width:2px;"></i>SLA target</span>
-        <span>“% late” = share of discharges over target</span>
+        <span><i style="background:var(--color-ink-900); width:2px;"></i>target</span>
       </div>`;
   }
 
   function renderOverdue(v) {
     const el = document.getElementById('overdue-list');
-    if (!v) { el.innerHTML = '<p class="text-muted text-sm mb-0">Visit Loop data unavailable.</p>'; return; }
+    if (!v) { el.innerHTML = '<p class="text-muted text-sm mb-0">Unavailable.</p>'; return; }
     const list = v.overdueList || [];
-    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No overdue follow-ups. Every loop is closed.</p>'; return; }
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">All caught up.</p>'; return; }
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    el.innerHTML = list.slice(0, 6).map((o) => {
+    el.innerHTML = list.slice(0, 4).map((o) => {
       const [y, m, dd] = String(o.due_date).slice(0, 10).split('-').map(Number);
       const late = Math.round((today - new Date(y, m - 1, dd)) / 86400000);
       return `
@@ -211,23 +212,30 @@
     try {
       const stats = await api.get('/admin/stats');
       renderStats(stats.totals);
-      renderUsers(stats.recentUsers || []);
-      renderAppts(stats.recentAppointments || []);
+      renderUsers((stats.recentUsers || []).slice(0, 4));
+      renderAppts((stats.recentAppointments || []).slice(0, 4));
+      const t = stats.totals;
+      document.getElementById('plat-sum').textContent = `${t.patients} patients · ${t.doctors} doctors · ${t.appointments} visits`;
     } catch (err) { toast.error('Could not load platform statistics.'); }
-    try {
-      const analytics = await api.get('/admin/analytics');
-      renderStatusChart(analytics.statusBreakdown || []);
-      renderSpecChart(analytics.specializationDistribution || []);
-      renderGrowthChart(analytics.growth || []);
-    } catch (err) { toast.error('Could not load analytics.'); }
+    // Charts are drawn the first time the section is opened (a hidden canvas has no size).
+    document.getElementById('plat').addEventListener('toggle', async function once(ev) {
+      if (!ev.target.open) return;
+      ev.target.removeEventListener('toggle', once);
+      try {
+        const analytics = await api.get('/admin/analytics');
+        renderStatusChart(analytics.statusBreakdown || []);
+        renderSpecChart(analytics.specializationDistribution || []);
+        renderGrowthChart(analytics.growth || []);
+      } catch (err) { toast.error('Could not load analytics.'); }
+    });
   }
 
   function renderStats(t) {
     document.getElementById('stat-grid').innerHTML = `
-      <div class="kpi"><div class="kpi-label">${icon('users', 13)}Patients</div><div class="kpi-value">${t.patients}</div><div class="kpi-sub">registered</div></div>
-      <div class="kpi"><div class="kpi-label">${icon('stethoscope', 13)}Active doctors</div><div class="kpi-value">${t.doctors}</div><div class="kpi-sub">across all specializations</div></div>
+      <div class="kpi"><div class="kpi-label">${icon('users', 13)}Patients</div><div class="kpi-value">${t.patients}</div><div class="kpi-sub"></div></div>
+      <div class="kpi"><div class="kpi-label">${icon('stethoscope', 13)}Doctors</div><div class="kpi-value">${t.doctors}</div><div class="kpi-sub"></div></div>
       <div class="kpi"><div class="kpi-label">${icon('calendar', 13)}Appointments</div><div class="kpi-value">${t.appointments}</div><div class="kpi-sub">${t.pending != null ? `${t.pending} pending` : 'all time'}</div></div>
-      <div class="kpi ${t.openReports ? 'is-warning' : ''}"><div class="kpi-label">${icon('alert', 13)}Open reports</div><div class="kpi-value">${t.openReports}</div><div class="kpi-sub"><a href="/admin/reports.html">Review issues</a></div></div>`;
+      <div class="kpi ${t.openReports ? 'is-warning' : ''}"><div class="kpi-label">${icon('alert', 13)}Reports</div><div class="kpi-value">${t.openReports}</div><div class="kpi-sub"><a href="/admin/reports.html">Review</a></div></div>`;
   }
 
   function renderUsers(users) {
@@ -248,7 +256,7 @@
     if (!appts.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No appointments yet.</p>'; return; }
     el.innerHTML = appts.map((a) => `
       <div class="list-row">
-        <div class="min-w-0"><div class="primary truncate">${esc(a.patient_name)}</div><div class="secondary truncate">with ${esc(a.doctor_name)} · ${esc(String(a.appointment_date).slice(0, 10))}</div></div>
+        <div class="min-w-0"><div class="primary truncate">${esc(a.patient_name)}</div><div class="secondary truncate">${esc(a.doctor_name)} · ${esc(String(a.appointment_date).slice(0, 10))}</div></div>
         <span class="badge status-${esc(a.status)}">${esc(a.status)}</span>
       </div>`).join('');
   }

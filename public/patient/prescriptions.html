@@ -17,11 +17,10 @@
   <div id="dash-sidebar"></div>
   <main class="dash-main">
     <h2>Prescriptions</h2>
-    <p class="text-muted">Every medicine a doctor has prescribed you, with the option to turn it into a tracked reminder.</p>
     <div class="table-wrap">
       <table class="data-table">
-        <thead><tr><th>Medicine</th><th>Dosage / Frequency</th><th>Prescribed by</th><th>Date</th><th>Diagnosis</th><th></th></tr></thead>
-        <tbody id="rx-body"><tr><td colspan="6"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+        <thead><tr><th>Medicine</th><th>Dose</th><th>From</th><th></th></tr></thead>
+        <tbody id="rx-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
   </main>
@@ -38,18 +37,16 @@
     const body = document.getElementById('rx-body');
     try {
       const { prescriptions } = await api.get('/prescriptions');
-      if (!prescriptions.length) { body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No prescriptions yet.</td></tr>'; return; }
+      if (!prescriptions.length) { body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">None yet.</td></tr>'; return; }
       body.innerHTML = prescriptions.map((p) => `
         <tr>
-          <td><strong>${p.medicine_name}</strong></td>
+          <td><strong>${p.medicine_name}</strong><div class="text-xs text-muted">${p.diagnosis}</div></td>
           <td>${p.dosage}, ${p.frequency}${p.duration_days ? ` (${p.duration_days}d)` : ''}</td>
-          <td>${p.doctor_name}</td>
-          <td>${p.record_date}</td>
-          <td>${p.diagnosis}</td>
-          <td>${p.already_tracked ? '<span class="badge badge-success">Tracked</span>' : `<button class="btn btn-outline btn-sm" onclick="track(${p.id}, '${p.medicine_name.replace(/'/g, "\\'")}', '${p.dosage.replace(/'/g, "\\'")}', '${p.frequency.replace(/'/g, "\\'")}', ${p.duration_days || 7})">Add reminder</button>`}</td>
+          <td>${p.doctor_name}<div class="text-xs text-muted">${p.record_date}</div></td>
+          <td>${p.already_tracked ? '<span class="badge badge-success">Tracked</span>' : `<button class="btn btn-outline btn-sm" onclick="track(${p.id}, '${p.medicine_name.replace(/'/g, "\\'")}', '${p.dosage.replace(/'/g, "\\'")}', '${p.frequency.replace(/'/g, "\\'")}', ${p.duration_days || 7})">Remind me</button>`}</td>
         </tr>
       `).join('');
-    } catch (e) { body.innerHTML = '<tr><td colspan="6" class="text-center"><div class="alert alert-danger">Could not load prescriptions.</div></td></tr>'; }
+    } catch (e) { body.innerHTML = '<tr><td colspan="4" class="text-center"><div class="alert alert-danger">Could not load prescriptions.</div></td></tr>'; }
   }
 
   async function track(id, name, dosage, frequency, durationDays) {
@@ -60,7 +57,7 @@
         prescriptionId: id, medicineName: name, dosage, frequency,
         startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10),
       });
-      toast.success('Added to your medication reminders.');
+      toast.success('Reminder added.');
       load();
     } catch (e) { toast.error(e.message); }
   }

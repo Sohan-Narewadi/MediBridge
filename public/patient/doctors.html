@@ -6,11 +6,13 @@
 <title>Find Doctors — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .discover-layout { display:grid; grid-template-columns: 240px 1fr; gap: var(--space-5); align-items:start; }
-  @media (max-width: 760px) { .discover-layout { grid-template-columns: 1fr; } }
+  .filter-bar { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-3); margin-top: var(--space-4); }
+  @media (max-width: 760px) { .filter-bar { grid-template-columns: 1fr 1fr; } .filter-bar input { grid-column: 1 / -1; } }
+  .doctor-card .meta-row { margin-bottom: var(--space-2); }
 </style>
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -21,23 +23,15 @@
   <div id="dash-sidebar"></div>
   <main class="dash-main">
     <h2>Find a doctor</h2>
-    <p class="text-muted">Search and book directly from the results below.</p>
 
-    <div class="discover-layout">
-      <aside class="card">
-        <h4>Filters</h4>
-        <div class="field"><label for="f-q">Search</label><input type="text" id="f-q" placeholder="Name or specialization"></div>
-        <div class="field"><label for="f-spec">Specialization</label><select id="f-spec"><option value="">All</option></select></div>
-        <div class="field"><label for="f-mode">Consultation</label><select id="f-mode"><option value="">Any</option><option value="in_person">In-person</option><option value="video">Video</option></select></div>
-      </aside>
-      <div>
-        <div class="flex justify-between items-center" style="margin-bottom: var(--space-3);">
-          <span id="result-count" class="text-muted text-sm">Loading...</span>
-          <select id="sort-select"><option value="rating">Top rated</option><option value="experience">Most experienced</option><option value="fee_low">Fee: low to high</option></select>
-        </div>
-        <div class="doctor-grid" id="doctor-results"><div class="card skeleton" style="height:260px;"></div><div class="card skeleton" style="height:260px;"></div></div>
-      </div>
+    <div class="filter-bar">
+      <input type="text" id="f-q" placeholder="Search name or specialty" aria-label="Search">
+      <select id="f-spec" aria-label="Specialization"><option value="">All specialties</option></select>
+      <select id="f-mode" aria-label="Consultation"><option value="">Any mode</option><option value="in_person">In person</option><option value="video">Video</option></select>
+      <select id="sort-select" aria-label="Sort"><option value="rating">Top rated</option><option value="experience">Most experienced</option><option value="fee_low">Lowest fee</option></select>
     </div>
+    <div id="result-count" class="text-muted text-xs" style="margin: var(--space-3) 0;">&nbsp;</div>
+    <div class="doctor-grid" id="doctor-results"><div class="card skeleton" style="height:160px;"></div><div class="card skeleton" style="height:160px;"></div></div>
   </main>
 </div>
 
@@ -71,17 +65,17 @@
     params.set('pageSize', 12);
 
     const { doctors, total } = await api.get(`/doctors?${params.toString()}`);
-    document.getElementById('result-count').textContent = `${total} doctor${total === 1 ? '' : 's'} found`;
-    if (!doctors.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">&#128269;</div><p>No doctors match your filters.</p></div>'; return; }
+    document.getElementById('result-count').textContent = `${total} doctor${total === 1 ? '' : 's'}`;
+    if (!doctors.length) { grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon" data-icon="search"></div><p>No matches.</p></div>'; return; }
     grid.innerHTML = doctors.map((d) => `
       <a href="/doctor.html?id=${d.id}" class="card doctor-card card-interactive" style="text-decoration:none; color:inherit;">
         <div class="photo">${initials(d.full_name)}</div>
         <h4>${d.full_name}</h4>
         <div class="spec">${d.specialization}</div>
-        <div class="meta-row"><span>&#127891; ${d.experience_years} yrs</span><span>&#8377;${d.consultation_fee}</span></div>
-        <div class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-sm">(${d.rating_count})</span></div>
+        <div class="meta-row"><span>${d.experience_years} yrs</span><span>&#8377;${d.consultation_fee}</span><span class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)}</span></div>
       </a>
     `).join('');
+    MB_LAYOUT.hydrate();
   }
 </script>
 </body>

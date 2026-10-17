@@ -49,17 +49,20 @@ const MB_TRANSFERS = (() => {
     const preAdmission = params.get('admissionId');
 
     root.innerHTML = `
+      <div class="tc-stepper" id="tc-stepper">
+        <span class="on" data-s="1">1 Patient</span><span data-s="2">2 Hospitals</span><span data-s="3">3 Send</span>
+      </div>
       <div class="tc-steps">
         <section class="tc-step">
-          <div class="tc-step-head"><span class="tc-step-num">1</span><h4 class="mb-0">Who needs to move, and why</h4></div>
+          <div class="tc-step-head"><h4 class="mb-0">Patient</h4></div>
           <div class="form-row">
             <div class="field">
               <label for="tc-patient">Patient</label>
               <select id="tc-patient"><option value="">Loading patients...</option></select>
-              <div class="hint">Admitted patients are listed first. Their records are pulled in automatically.</div>
+              
             </div>
             <div class="field">
-              <label for="tc-spec">Care needed (not available here)</label>
+              <label for="tc-spec">Care needed</label>
               <select id="tc-spec"><option value="">Loading...</option></select>
             </div>
           </div>
@@ -74,38 +77,37 @@ const MB_TRANSFERS = (() => {
             </div>
             <div class="field">
               <label class="tc-check"><input type="checkbox" id="tc-icu"> ICU bed required</label>
-              <div class="hint">Hospitals without a free ICU bed drop down the list.</div>
+              
             </div>
           </div>
           <div class="field">
-            <label for="tc-reason">Reason for transfer</label>
-            <input id="tc-reason" maxlength="255" placeholder="e.g. Needs neurosurgical evaluation; no neurosurgeon on site">
+            <label for="tc-reason">Reason</label>
+            <input id="tc-reason" maxlength="255" placeholder="One line, e.g. needs neurosurgery">
           </div>
           <button type="button" class="btn btn-primary" id="tc-find">Find hospitals</button>
         </section>
 
         <section class="tc-step" id="tc-step2" hidden>
-          <div class="tc-step-head"><span class="tc-step-num">2</span><h4 class="mb-0">Choose who to ask</h4></div>
-          <p class="text-sm text-muted">Ranked by specialty, free beds, ICU, distance and how quickly each hospital usually responds. The first hospital to accept gets the patient, and the others are stood down automatically.</p>
+          <div class="tc-step-head"><h4 class="mb-0">Hospitals</h4><span class="text-sm text-muted">first to accept wins</span></div>
           <div id="tc-matches"></div>
         </section>
 
         <section class="tc-step" id="tc-step3" hidden>
-          <div class="tc-step-head"><span class="tc-step-num">3</span><h4 class="mb-0">Review what they will see, then send</h4></div>
-          <p class="text-sm text-muted">MediBridge writes this summary from records it already holds, so you don't need to type it. Receiving hospitals see only initials until they open the request, and every open is logged.</p>
-          <pre class="tc-summary" id="tc-summary">Generating summary...</pre>
+          <div class="tc-step-head"><h4 class="mb-0">Send</h4><span class="text-sm text-muted">auto-written summary</span></div>
+          <details class="tc-sum"><summary>Preview what they will see</summary><pre class="tc-summary" id="tc-summary">Generating summary...</pre></details>
           <div class="field">
-            <label class="tc-check"><input type="checkbox" id="tc-consent"> The patient (or their guardian) has agreed to share this summary with the selected hospitals</label>
+            <label class="tc-check"><input type="checkbox" id="tc-consent"> Patient or guardian consents to sharing</label>
           </div>
           <div class="field">
-            <label for="tc-consent-note">Consent note <span class="text-muted">(optional)</span></label>
-            <input id="tc-consent-note" maxlength="160" placeholder="e.g. Verbal consent from patient's wife at bedside">
+            <label for="tc-consent-note">Note <span class="text-muted">(optional)</span></label>
+            <input id="tc-consent-note" maxlength="160" placeholder="e.g. verbal consent at bedside">
           </div>
-          <button type="button" class="btn btn-primary" id="tc-send" disabled>Send request</button>
+          <button type="button" class="btn btn-primary" id="tc-send" disabled>Send</button>
         </section>
       </div>`;
 
     const $ = (id) => root.querySelector(`#${id}`);
+    const setStep = (n) => root.querySelectorAll('#tc-stepper span').forEach((s) => s.classList.toggle('on', Number(s.dataset.s) <= n));
     let urgency = 'urgent';
     let patients = [];
     let matches = [];
@@ -174,7 +176,7 @@ const MB_TRANSFERS = (() => {
         ({ matches } = await api.post('/transfers/match', { specializationId: body.specializationId, needsIcu: body.needsIcu }));
         $('tc-step2').hidden = false;
         if (!matches.length) {
-          $('tc-matches').innerHTML = `<div class="alert alert-warning">No partner hospital in the network lists this specialty right now. Escalate to the duty administrator.</div>`;
+          $('tc-matches').innerHTML = `<div class="alert alert-warning">No hospital offers this specialty.</div>`;
           $('tc-step3').hidden = true;
           return;
         }
@@ -184,14 +186,14 @@ const MB_TRANSFERS = (() => {
             <div class="tc-match-body">
               <div class="flex items-center justify-between gap-3">
                 <strong>${esc(m.name)}</strong>
-                <span class="tc-score">${m.score}<span class="text-muted text-sm">/100</span></span>
+                <span class="tc-score">${m.score}</span>
               </div>
-              <div class="tc-bar"><span style="width:${m.score}%"></span></div>
-              <div class="tc-reasons">${m.reasons.map((r) => `<span>${esc(r)}</span>`).join('')}</div>
+              <div class="tc-chips">${m.reasons.slice(0, 3).map((r) => `<span class="badge badge-plain">${esc(r)}</span>`).join('')}</div>
             </div>
           </label>`).join('');
         root.querySelectorAll('.tc-match-pick').forEach((c) => c.addEventListener('change', syncSend));
         $('tc-step3').hidden = false;
+        setStep(2);
         syncSend();
         refreshSummary();
         $('tc-step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -203,7 +205,7 @@ const MB_TRANSFERS = (() => {
       }
     });
 
-    $('tc-consent').addEventListener('change', syncSend);
+    $('tc-consent').addEventListener('change', () => { syncSend(); if ($('tc-consent').checked) setStep(3); });
 
     $('tc-send').addEventListener('click', async () => {
       const body = {
@@ -217,7 +219,7 @@ const MB_TRANSFERS = (() => {
       btn.innerHTML = '<span class="spinner"></span> Sending...';
       try {
         const { request } = await api.post('/transfers', body);
-        toast.success(`Request sent to ${request.hospitalsContacted} hospital${request.hospitalsContacted === 1 ? '' : 's'}. You'll be notified as they respond.`);
+        toast.success(`Sent to ${request.hospitalsContacted} hospital${request.hospitalsContacted === 1 ? '' : 's'}.`);
         if (onSent) onSent(request);
         renderWizard(root, { onSent });
       } catch (err) {
@@ -232,12 +234,12 @@ const MB_TRANSFERS = (() => {
   // Outgoing requests (sender side)
   // -------------------------------------------------------------------------
   function offerTiming(o, requestStatus) {
-    if (o.responded_at) return `responded in ${minutesLabel(o.response_minutes)}`;
+    if (o.responded_at) return `${minutesLabel(o.response_minutes)}`;
     if (o.status === 'pending' && requestStatus === 'open') return `waiting ${live(o.minutes_since_sent)}`;
     return '';
   }
 
-  function renderOutgoing(root, { emptyText = 'No transfer requests yet.' } = {}) {
+  function renderOutgoing(root, { emptyText = 'None' } = {}) {
     let filter = 'active';
     root.innerHTML = `
       <div class="flex items-center justify-between gap-3" style="margin-bottom:var(--space-4); flex-wrap:wrap;">
@@ -245,7 +247,6 @@ const MB_TRANSFERS = (() => {
           <button type="button" data-v="active" class="active">Active</button>
           <button type="button" data-v="history">History</button>
         </div>
-        <span class="text-sm text-muted">Updates automatically every 20 seconds</span>
       </div>
       <div id="tc-out-list"><div class="skeleton" style="height:120px;"></div></div>`;
     const listEl = root.querySelector('#tc-out-list');
@@ -261,7 +262,7 @@ const MB_TRANSFERS = (() => {
         loadedAt = Date.now();
         const shown = requests.filter((r) => (filter === 'active' ? ['open', 'accepted'].includes(r.status) : ['completed', 'cancelled'].includes(r.status)));
         if (!shown.length) {
-          listEl.innerHTML = `<div class="empty-state"><p class="mb-0">${filter === 'active' ? esc(emptyText) : 'No closed requests yet.'}</p></div>`;
+          listEl.innerHTML = `<div class="empty-state"><p class="mb-0">${filter === 'active' ? esc(emptyText) : 'None'}</p></div>`;
           return;
         }
         listEl.innerHTML = shown.map((r) => {
@@ -271,26 +272,25 @@ const MB_TRANSFERS = (() => {
             <div class="flex items-center justify-between gap-3" style="flex-wrap:wrap;">
               <div>
                 <h4 class="mb-0">${esc(r.patient_name)} <span class="text-muted text-sm">&middot; ${esc(r.specialization)}${r.needs_icu ? ' &middot; ICU' : ''}</span></h4>
-                <div class="text-sm text-muted">Sent ${minutesLabel(r.minutes_ago)} ago by ${esc(r.requested_by_name || 'care team')} &middot; ${esc(r.reason)}</div>
+                <div class="text-sm text-muted">${minutesLabel(r.minutes_ago)} ago</div>
               </div>
               <div class="flex items-center gap-2">${urgencyBadge(r.urgency)} ${badge(cls, label)}</div>
             </div>
-            ${r.status === 'accepted' ? `<div class="alert alert-success" style="margin:var(--space-3) 0 0;">${esc(r.accepted_hospital)} accepted. Arrange transport, then mark the transfer complete.</div>` : ''}
+            ${r.status === 'accepted' ? `<div class="alert alert-success" style="margin:var(--space-3) 0 0;">${esc(r.accepted_hospital)} accepted.</div>` : ''}
             <ul class="tc-offers">
               ${r.offers.map((o) => {
                 const shownStatus = o.status === 'pending' && r.status !== 'open' ? 'withdrawn' : o.status;
                 const [oc, ol] = OFFER_STATUS[shownStatus] || ['badge-neutral', shownStatus];
                 return `<li>
-                  <div><strong class="text-sm">${esc(o.hospital_name)}</strong> <span class="text-sm text-muted">match ${o.match_score}</span>
-                    ${o.response_note ? `<div class="text-sm text-muted">&ldquo;${esc(o.response_note)}&rdquo;</div>` : ''}</div>
+                  <div><strong class="text-sm">${esc(o.hospital_name)}</strong> ${o.response_note ? `<div class="text-sm text-muted">&ldquo;${esc(o.response_note)}&rdquo;</div>` : ''}</div>
                   <div class="flex items-center gap-2"><span class="text-sm text-muted">${offerTiming(o, r.status)}</span>${badge(oc, ol)}</div>
                 </li>`;
               }).join('')}
             </ul>
             ${['open', 'accepted'].includes(r.status) ? `
             <div class="flex gap-2" style="margin-top:var(--space-3);">
-              ${r.status === 'accepted' ? `<button class="btn btn-primary btn-sm" data-act="complete" data-id="${r.id}">Patient has left: mark complete</button>` : ''}
-              <button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${r.id}">Cancel request</button>
+              ${r.status === 'accepted' ? `<button class="btn btn-primary btn-sm" data-act="complete" data-id="${r.id}">Complete</button>` : ''}
+              <button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${r.id}">Cancel</button>
             </div>` : ''}
           </article>`;
         }).join('');
@@ -331,10 +331,10 @@ const MB_TRANSFERS = (() => {
         const avg = answered.length ? answered.reduce((s, o) => s + o.minutes_waiting, 0) / answered.length : null;
         if (statsRoot) {
           statsRoot.innerHTML = `
-            <div class="card stat-card"><span class="value">${pending.length}</span><span class="label">Waiting for your answer</span></div>
+            <div class="card stat-card"><span class="value">${pending.length}</span><span class="label">Waiting</span></div>
             <div class="card stat-card"><span class="value">${pending.filter((o) => o.urgency === 'critical').length}</span><span class="label">Critical</span></div>
-            <div class="card stat-card"><span class="value">${offers.filter((o) => o.status === 'accepted').length}</span><span class="label">Accepted by you</span></div>
-            <div class="card stat-card"><span class="value">${avg === null ? '&ndash;' : minutesLabel(avg)}</span><span class="label">Your average response</span></div>`;
+            <div class="card stat-card"><span class="value">${offers.filter((o) => o.status === 'accepted').length}</span><span class="label">Accepted</span></div>
+            <div class="card stat-card"><span class="value">${avg === null ? '&ndash;' : minutesLabel(avg)}</span><span class="label">Avg reply</span></div>`;
         }
 
         const pendingHtml = pending.length ? pending.map((o) => `
@@ -345,26 +345,25 @@ const MB_TRANSFERS = (() => {
             </div>
             <p class="mb-0" style="margin-top:var(--space-2);">${esc(o.patient_initials)}, ${o.patient_age ?? '?'}y ${esc(o.patient_gender)} &middot; from ${esc(o.from_hospital)}</p>
             <p class="text-sm text-muted">${esc(o.reason)}</p>
-            <button class="btn btn-primary btn-sm" data-open="${o.request_id}">Open request and respond</button>
+            <button class="btn btn-primary btn-sm" data-open="${o.request_id}">Open</button>
           </article>`).join('')
-          : `<div class="empty-state"><p class="mb-0">No requests waiting. New ones appear here automatically.</p></div>`;
+          : `<div class="empty-state"><p class="mb-0">Nothing waiting</p></div>`;
 
         const past = offers.filter((o) => !(o.status === 'pending' && o.request_status === 'open'));
         const pastHtml = past.length ? `
           <div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Patient</th><th>Care</th><th>From</th><th>Your answer</th><th>Note</th><th>Response time</th></tr></thead>
+            <thead><tr><th>Patient</th><th>Care</th><th>From</th><th>Answer</th><th>Time</th></tr></thead>
             <tbody>${past.map((o) => {
               const shown = o.status === 'pending' ? 'withdrawn' : o.status;
               const [c, l] = OFFER_STATUS[shown] || ['badge-neutral', shown];
               return `<tr><td>${esc(o.patient_initials)}, ${o.patient_age ?? '?'}y</td><td>${esc(o.specialization)}</td><td>${esc(o.from_hospital)}</td>
-                <td>${badge(c, l)}</td><td class="text-sm">${esc(o.response_note || '')}</td><td>${o.responded_at ? minutesLabel(o.minutes_waiting) : '&ndash;'}</td></tr>`;
+                <td>${badge(c, l)}</td><td>${o.responded_at ? minutesLabel(o.minutes_waiting) : '&ndash;'}</td></tr>`;
             }).join('')}</tbody>
-          </table></div>` : '<p class="text-muted text-sm">Nothing yet.</p>';
+          </table></div>` : '<p class="text-muted text-sm">None</p>';
 
         root.innerHTML = `
-          <h3>Waiting for your answer</h3>
           <div class="tc-incoming-list">${pendingHtml}</div>
-          <h3 style="margin-top:var(--space-6);">Past requests</h3>
+          <h3 style="margin-top:var(--space-6);">History</h3>
           ${pastHtml}`;
         root.querySelectorAll('[data-open]').forEach((b) => b.addEventListener('click', () => openRequest(b.dataset.open, load)));
       } catch (err) {
@@ -386,24 +385,24 @@ const MB_TRANSFERS = (() => {
         <div class="modal-backdrop" id="tc-backdrop">
           <div class="modal" style="max-width:640px;" role="dialog" aria-modal="true" aria-labelledby="tc-modal-title">
             <div class="modal-header">
-              <h3 class="mb-0" id="tc-modal-title">${esc(r.specialization)} transfer from ${esc(r.from_hospital)}</h3>
+              <h3 class="mb-0" id="tc-modal-title">${esc(r.specialization)} · ${esc(r.from_hospital)}</h3>
               <button class="modal-close" id="tc-close" aria-label="Close">&times;</button>
             </div>
             <div class="flex items-center gap-2" style="margin-bottom:var(--space-3); flex-wrap:wrap;">
               ${urgencyBadge(r.urgency)} ${r.needs_icu ? badge('badge-danger', 'ICU bed required') : ''}
               <span class="text-sm text-muted">Sent ${minutesLabel(r.minutes_ago)} ago by ${esc(r.requested_by_name || 'care team')}</span>
             </div>
-            <div class="alert alert-info">This summary was shared with the patient's consent${r.consent_note ? ` (${esc(r.consent_note)})` : ''}. Your access has been recorded in the audit trail.</div>
+            <p class="text-sm text-muted" style="display:flex;gap:.4rem;align-items:center;">Shared with consent · this view is logged</p>
             <pre class="tc-summary">${esc(r.clinical_summary)}</pre>
             ${canRespond ? `
               <div class="field">
-                <label for="tc-note">Note to the sending team</label>
-                <textarea id="tc-note" maxlength="255" placeholder="e.g. Bed 4 in Neuro ICU reserved, send ambulance to Gate 2"></textarea>
+                <label for="tc-note">Note</label>
+                <textarea id="tc-note" maxlength="255" placeholder="e.g. bed reserved, send ambulance"></textarea>
               </div>
               <div class="flex gap-2 justify-between">
                 <button class="btn btn-outline" id="tc-decline">Decline</button>
                 <button class="btn btn-primary" id="tc-accept">Accept patient</button>
-              </div>` : `<p class="text-muted text-sm mb-0">This request is no longer waiting for your answer.</p>`}
+              </div>` : `<p class="text-muted text-sm mb-0">Closed</p>`}
           </div>
         </div>`;
       const close = () => { modalRoot.innerHTML = ''; };

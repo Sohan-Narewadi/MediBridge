@@ -42,21 +42,20 @@
     if (!desk || desk.department !== 'transfer_desk') {
       main.innerHTML = `
         <h2>Transfers</h2>
-        <div class="alert alert-info">Hospital transfers are handled by the transfer desk. Your department's work is in <a href="/staff/dashboard.html">My Queue</a>.</div>`;
+        <p class="text-muted">Handled by the transfer desk. Your work is in <a href="/staff/dashboard.html">My Queue</a>.</p>`;
       return;
     }
 
     if (Number(desk.is_home)) {
       main.innerHTML = `
-        <h2>Transfer Desk &middot; ${esc(desk.hospital_name)}</h2>
-        <p class="text-muted tc-intro">Send one request to the right hospitals instead of phoning around. Track each answer live; the first hospital to accept gets the patient and the rest are stood down automatically.</p>
+        <div class="page-head"><div><h2>Transfers</h2><p>${esc(desk.hospital_name)}</p></div></div>
         <div class="tc-layout">
           <section class="card">
-            <div class="card-header"><h3>New transfer</h3></div>
+            <div class="card-header"><h3>New</h3></div>
             <div id="tc-wizard"></div>
           </section>
           <section>
-            <h3>Outgoing requests</h3>
+            <h3>Requests</h3>
             <div id="tc-outgoing"></div>
           </section>
         </div>`;
@@ -66,9 +65,8 @@
     }
 
     main.innerHTML = `
-      <h2>Incoming transfers &middot; ${esc(desk.hospital_name)}</h2>
-      <p class="text-muted tc-intro">Hospitals in the MediBridge network ask you here instead of by phone. Each request shows only initials until you open it. Accepting reserves a bed and stands the other hospitals down.</p>
-      <div class="stat-grid" id="tc-stats" style="margin-bottom:var(--space-6);"></div>
+      <div class="page-head"><div><h2>Incoming</h2><p>${esc(desk.hospital_name)}</p></div></div>
+      <div class="stat-grid" id="tc-stats" style="margin-bottom:var(--space-5);"></div>
       <div id="tc-incoming"><div class="skeleton" style="height:140px;"></div></div>`;
     MB_TRANSFERS.renderIncoming(document.getElementById('tc-incoming'), document.getElementById('tc-stats'));
   });

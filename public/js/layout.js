@@ -77,42 +77,16 @@ const MB_LAYOUT = (() => {
     const el = document.getElementById('site-footer');
     if (!el) return;
     el.innerHTML = `
-      <footer class="site-footer">
-        <div class="container">
-          <div class="footer-grid">
-            <div>
-              ${brand()}
-              <p style="max-width: 340px; margin-top: var(--space-3);">
-                A care-handoff platform: patient information follows the patient from booking to consult,
-                from ward to discharge desk, and from one hospital to the next.
-              </p>
-            </div>
-            <div>
-              <h4>Platform</h4>
-              <ul>
-                <li><a href="/doctors.html">Find doctors</a></li>
-                <li><a href="/resources.html">Health resources</a></li>
-                <li><a href="/emergency.html">Emergency guidance</a></li>
-                <li><a href="/about.html">About MediBridge</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4>Account</h4>
-              <ul>
-                <li><a href="/auth/login.html">Log in</a></li>
-                <li><a href="/auth/register.html">Create patient account</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4>Disclaimer</h4>
-              <p>MediBridge coordinates care information and logistics. It is not a diagnostic tool.
-                In an emergency, contact local emergency services immediately.</p>
-            </div>
-          </div>
-          <div class="legal">
-            <span>&copy; ${new Date().getFullYear()} MediBridge &middot; Student full-stack project &middot; All data is fictional.</span>
-            <span>Supports SDG 3 &middot; SDG 9 &middot; SDG 10</span>
-          </div>
+      <footer class="site-footer" style="padding:var(--space-5) 0;">
+        <div class="container flex items-center justify-between flex-wrap gap-4">
+          ${brand()}
+          <nav class="flex gap-5 text-sm" aria-label="Footer">
+            <a href="/doctors.html">Doctors</a>
+            <a href="/resources.html">Resources</a>
+            <a href="/emergency.html">Emergency</a>
+            <a href="/about.html">About</a>
+          </nav>
+          <span class="text-xs text-muted">Demo project &middot; fictional data &middot; not medical advice</span>
         </div>
       </footer>
     `;

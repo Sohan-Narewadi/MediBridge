@@ -3,15 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>My Queue — MediBridge</title>
+<title>Queue — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .stat-grid.five { grid-template-columns: repeat(5, 1fr); }
-  @media (max-width: 1000px) { .stat-grid.five { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 560px) { .stat-grid.five { grid-template-columns: repeat(2, 1fr); } }
+  .stat-grid.five { grid-template-columns: repeat(4, 1fr); margin-bottom: var(--space-5); }
+  .stat-grid.five .card { padding: var(--space-4); }
+  @media (max-width: 700px) { .stat-grid.five { grid-template-columns: repeat(2, 1fr); } }
+  .task-card { padding: var(--space-4) var(--space-5); }
+  .task-top { align-items: flex-start; }
+  .sla-chip { align-self: flex-start; }
+  .task-sub { font-size: 0.82rem; color: var(--color-ink-500); }
+  .sla-chip { font-family: var(--font-mono); font-size: 0.85rem; padding: 0.2rem 0.6rem; border-radius: var(--radius-full); background: var(--color-ink-100); color: var(--color-ink-900); white-space: nowrap; }
+  .sla-chip.warn { background: var(--color-warning-100); color: var(--color-warning-700); }
+  .sla-chip.over { background: var(--color-danger-100); color: var(--color-danger-700); }
   .queue-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
   .queue-head .eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-500); margin-bottom: var(--space-1); }
-  .task-card { margin-bottom: var(--space-3); border-left: 4px solid var(--color-ink-200); }
+  .task-card { margin-bottom: var(--space-3); border-left: 3px solid var(--color-ink-200); }
   .task-card.is-warning { border-left-color: var(--color-warning-500); }
   .task-card.is-danger { border-left-color: var(--color-danger-500); }
   .task-top { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
@@ -21,7 +28,7 @@
   .sla-clock .big { font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; color: var(--color-ink-900); font-variant-numeric: tabular-nums; }
   .sla-clock .big.warn { color: var(--color-warning-500); }
   .sla-clock .big.over { color: var(--color-danger-500); }
-  .sla-bar { height: 6px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; margin: var(--space-3) 0; }
+  .sla-bar { height: 4px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; margin: var(--space-3) 0; }
   .sla-bar > span { display: block; height: 100%; background: var(--color-success-500); transition: width 0.4s ease; }
   .sla-bar.warn > span { background: var(--color-warning-500); }
   .sla-bar.over > span { background: var(--color-danger-500); }
@@ -47,7 +54,7 @@
       <div id="queue-title"><div class="skeleton" style="height:32px; width:300px;"></div></div>
       <div class="flex items-center gap-3">
         <span class="updated" id="updated-at"></span>
-        <button class="btn btn-outline btn-sm" id="refresh-btn">Refresh</button>
+        <button class="btn btn-outline btn-sm" id="refresh-btn" aria-label="Refresh">Refresh</button>
       </div>
     </div>
 
@@ -57,10 +64,6 @@
       <div class="card skeleton" style="height:86px;"></div>
     </div>
 
-    <div class="card-header" style="margin-top: var(--space-6);">
-      <h3 class="mb-0">Patients waiting on your desk</h3>
-      <span class="text-sm text-muted">Most urgent first &middot; refreshes every 30s</span>
-    </div>
     <div id="task-list"><div class="card skeleton" style="height:130px;"></div></div>
   </main>
 </div>
@@ -70,7 +73,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
   const DEPT = { documentation: 'Medical Records', billing: 'Billing', insurance: 'Insurance', pharmacy: 'Pharmacy', nursing: 'Nursing' };
-  const STATUS_BADGE = { pending: ['badge-neutral', 'Not started'], in_progress: ['badge-info', 'In progress'], blocked: ['badge-danger', 'Blocked'] };
+  const STATUS_BADGE = { pending: ['badge-neutral', 'New'], in_progress: ['badge-warning', 'Working'], blocked: ['badge-danger', 'Blocked'] };
   // One-tap reasons per department, so staff rarely have to type.
   const QUICK_REASONS = {
     insurance: ['Awaiting TPA pre-authorisation approval', 'Policy documents missing', 'Insurer raised a query on the claim', 'Final bill not yet received from billing'],
@@ -115,14 +118,12 @@
   function renderHeader(data) {
     document.getElementById('queue-title').innerHTML = `
       <div class="eyebrow">${esc(data.hospital_name)}</div>
-      <h2 class="mb-0">${esc(data.department_label)} desk &mdash; discharge queue</h2>
-      <p class="text-muted mb-0">Patients the doctor has already cleared. Every minute here is a patient waiting to go home.</p>`;
+      <h2 class="mb-0">${esc(data.department_label)}</h2>`;
   }
 
   function renderStats(s) {
     const tiles = [
-      [s.overdue, 'Past target time'], [s.blocked, 'Blocked'], [s.pending, 'Not started'],
-      [s.inProgress, 'In progress'], [s.doneToday, 'Completed today'],
+      [s.overdue, 'Late'], [s.blocked, 'Blocked'], [s.pending + s.inProgress, 'To do'], [s.doneToday, 'Done today'],
     ];
     document.getElementById('stat-grid').innerHTML = tiles.map(([v, l]) =>
       `<div class="card stat-card"><span class="value">${v}</span><span class="label">${l}</span></div>`).join('');
@@ -137,7 +138,7 @@
   function renderTasks() {
     const el = document.getElementById('task-list');
     if (!state.tasks.length) {
-      el.innerHTML = `<div class="card empty-state"><h3>All clear</h3><p class="mb-0">No cleared patients are waiting on ${esc(state.department_label || 'your desk')} right now.</p></div>`;
+      el.innerHTML = `<div class="card empty-state"><h3>All clear</h3><p class="mb-0">Nobody waiting</p></div>`;
       return;
     }
     el.innerHTML = state.tasks.map((t) => {
@@ -149,34 +150,22 @@
       return `
       <div class="card task-card ${cls === 'over' ? 'is-danger' : cls === 'warn' ? 'is-warning' : ''}" data-task="${t.id}">
         <div class="task-top">
-          <div>
-            <div class="flex items-center gap-2" style="flex-wrap:wrap;"><h4>${esc(t.patient_name)}</h4><span class="badge ${badgeCls}">${badgeText}</span></div>
-            <div class="task-meta">
-              <span>${esc(t.ward || '')}${t.bed ? ` &middot; Bed ${esc(t.bed)}` : ''}</span>
-              <span>${esc(t.doctor_name)}</span>
-              <span>${esc(t.diagnosis || '')}</span>
-            </div>
-            <p class="text-sm mb-0" style="margin-top:var(--space-2);"><strong>${esc(t.title)}</strong></p>
-            ${showInsurance ? `<p class="text-sm text-muted mb-0">${t.insurance_provider
-              ? `Insurer: <strong>${esc(t.insurance_provider)}</strong> &middot; Policy ${esc(t.insurance_policy_no || 'n/a')}`
-              : 'Self-pay patient (no insurer)'}</p>` : ''}
+          <div class="min-w-0">
+            <div class="flex items-center gap-2" style="flex-wrap:wrap;"><h4 class="mb-0">${esc(t.patient_name)}</h4><span class="badge ${badgeCls}">${badgeText}</span></div>
+            <div class="task-sub">${esc(t.ward || '')}${t.bed ? ` · ${esc(t.bed)}` : ''}${showInsurance ? ` · ${t.insurance_provider ? esc(t.insurance_provider) : 'Self-pay'}` : ''}</div>
           </div>
-          <div class="sla-clock">
-            <div class="big ${cls}" data-timer="${t.id}">${fmtMins(mins)}</div>
-            <div class="text-sm text-muted">since cleared &middot; target ${fmtMins(t.sla_minutes)}</div>
-          </div>
+          <span class="sla-chip ${cls}" data-timer="${t.id}" title="Target ${fmtMins(t.sla_minutes)}">${fmtMins(mins)} / ${fmtMins(t.sla_minutes)}</span>
         </div>
         <div class="sla-bar ${cls}" data-bar="${t.id}"><span style="width:${pct}%"></span></div>
-        ${t.status === 'blocked' ? `<div class="alert alert-warning" style="margin-bottom:var(--space-3);"><span><strong>Blocked:</strong> ${esc(t.blocked_reason)}</span></div>` : ''}
+        ${t.status === 'blocked' ? `<div class="task-sub" style="margin-bottom:var(--space-3);color:var(--color-danger-700);">${esc(t.blocked_reason)}</div>` : ''}
         <div class="task-foot">
           <div class="chips">${t.other_pending.length
-            ? `Patient is also waiting on: ${t.other_pending.map((d) => `<span class="badge badge-neutral">${DEPT[d]}</span>`).join('')}`
-            : '<span class="badge badge-success">Your step is the last one left</span>'}</div>
+            ? `Also: ${t.other_pending.map((d) => `<span class="badge badge-neutral badge-plain">${DEPT[d]}</span>`).join('')}`
+            : '<span class="badge badge-success badge-plain">Last step</span>'}</div>
           <div class="flex gap-2" style="flex-wrap:wrap;">
-            ${t.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-act="in_progress" data-id="${t.id}">Start</button>` : ''}
-            ${t.status === 'blocked' ? `<button class="btn btn-outline btn-sm" data-act="in_progress" data-id="${t.id}">Resume</button>` : ''}
-            ${t.status !== 'blocked' ? `<button class="btn btn-ghost btn-sm" data-act="block" data-id="${t.id}">Report blocker</button>` : `<button class="btn btn-ghost btn-sm" data-act="block" data-id="${t.id}">Update blocker</button>`}
-            <button class="btn btn-primary btn-sm" data-act="done" data-id="${t.id}">Mark done</button>
+            ${t.status !== 'in_progress' ? `<button class="btn btn-outline btn-sm" data-act="in_progress" data-id="${t.id}">${t.status === 'blocked' ? 'Resume' : 'Start'}</button>` : ''}
+            <button class="btn btn-ghost btn-sm" data-act="block" data-id="${t.id}">${t.status === 'blocked' ? 'Edit blocker' : 'Blocked?'}</button>
+            <button class="btn btn-primary btn-sm" data-act="done" data-id="${t.id}">Done</button>
           </div>
         </div>
       </div>`;
@@ -196,7 +185,7 @@
       const cls = slaClass(mins, t.sla_minutes);
       const timer = document.querySelector(`[data-timer="${t.id}"]`);
       const bar = document.querySelector(`[data-bar="${t.id}"]`);
-      if (timer) { timer.textContent = fmtMins(mins); timer.className = `big ${cls}`; }
+      if (timer) { timer.textContent = `${fmtMins(mins)} / ${fmtMins(t.sla_minutes)}`; timer.className = `sla-chip ${cls}`; }
       if (bar) { bar.className = `sla-bar ${cls}`; bar.firstElementChild.style.width = `${Math.min(100, Math.round((mins / t.sla_minutes) * 100))}%`; }
     }
   }
@@ -205,7 +194,7 @@
     if (btn) btn.disabled = true;
     try {
       await api.patch(`/discharge/tasks/${id}`, payload);
-      const msg = { done: 'Step completed. The patient and doctor have been updated.', in_progress: 'Marked in progress.', blocked: 'Blocker reported to the attending doctor.' }[payload.status];
+      const msg = { done: 'Done.', in_progress: 'Started.', blocked: 'Blocker reported.' }[payload.status];
       toast.success(msg);
       document.getElementById('modal-root').innerHTML = '';
       load();
@@ -221,14 +210,14 @@
     document.getElementById('modal-root').innerHTML = `
       <div class="modal-backdrop" id="block-backdrop">
         <div class="modal">
-          <div class="modal-header"><h3 class="mb-0">What is holding this up?</h3><button class="modal-close" id="block-close" aria-label="Close">&times;</button></div>
-          <p class="text-sm text-muted">${esc(t.patient_name)} &middot; ${esc(t.title)}. The attending doctor sees this immediately, and the patient sees it as a plain-language delay.</p>
+          <div class="modal-header"><h3 class="mb-0">What's blocking?</h3><button class="modal-close" id="block-close" aria-label="Close">&times;</button></div>
+          <p class="text-sm text-muted">${esc(t.patient_name)}</p>
           <div class="reason-chips">${reasons.map((r) => `<button type="button" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}</div>
           <div class="field"><label for="block-reason">Reason</label>
             <textarea id="block-reason" maxlength="255" placeholder="e.g. Awaiting TPA pre-authorisation approval">${t.status === 'blocked' ? esc(t.blocked_reason) : ''}</textarea></div>
           <div class="flex justify-between gap-2">
             <button class="btn btn-ghost" id="block-cancel">Cancel</button>
-            <button class="btn btn-danger" id="block-save">Report blocker</button>
+            <button class="btn btn-danger" id="block-save">Report</button>
           </div>
         </div>
       </div>`;
@@ -241,7 +230,7 @@
     }));
     document.getElementById('block-save').addEventListener('click', (ev) => {
       const reason = document.getElementById('block-reason').value.trim();
-      if (!reason) { toast.error('Please describe the blocker.'); return; }
+      if (!reason) { toast.error('Add a reason.'); return; }
       updateTask(id, { status: 'blocked', blockedReason: reason }, ev.currentTarget);
     });
   }

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Profile — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<style>details.more summary { cursor: pointer; font-size: 0.86rem; color: var(--color-ink-500); }</style>
 </head>
 <body>
 <script src="/js/api.js"></script>
@@ -16,15 +17,15 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main" style="max-width:640px;">
-    <h2>My Profile</h2>
+    <h2>Profile</h2>
     <div class="card">
       <form id="profile-form">
         <div class="form-row">
-          <div class="field"><label for="fullName">Full name</label><input id="fullName" required></div>
+          <div class="field"><label for="fullName">Name</label><input id="fullName" required></div>
           <div class="field"><label for="phone">Phone</label><input id="phone"></div>
         </div>
         <div class="form-row">
-          <div class="field"><label for="dob">Date of birth</label><input type="date" id="dob"></div>
+          <div class="field"><label for="dob">Birth date</label><input type="date" id="dob"></div>
           <div class="field"><label for="gender">Gender</label><select id="gender">
             <option value="prefer_not_to_say">Prefer not to say</option><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option>
           </select></div>
@@ -33,19 +34,24 @@
           <div class="field"><label for="bloodGroup">Blood group</label><input id="bloodGroup" placeholder="e.g. O+"></div>
           <div class="field"><label for="city">City</label><input id="city"></div>
         </div>
-        <div class="form-row">
-          <div class="field"><label for="heightCm">Height (cm)</label><input type="number" id="heightCm"></div>
-          <div class="field"><label for="weightKg">Weight (kg)</label><input type="number" id="weightKg"></div>
-        </div>
-        <div class="field"><label for="address">Address</label><input id="address"></div>
-        <div class="form-row">
-          <div class="field"><label for="emName">Emergency contact name</label><input id="emName"></div>
-          <div class="field"><label for="emPhone">Emergency contact phone</label><input id="emPhone"></div>
-        </div>
-        <div class="field"><label for="allergies">Allergies</label><input id="allergies" placeholder="comma separated"></div>
-        <div class="field"><label for="conditions">Chronic conditions</label><input id="conditions" placeholder="comma separated"></div>
+        <div class="field"><label for="allergies">Allergies</label><input id="allergies" placeholder="Comma separated"></div>
+        <div class="field"><label for="conditions">Conditions</label><input id="conditions" placeholder="Comma separated"></div>
+        <details class="more" style="margin-bottom: var(--space-4);">
+          <summary>Body, address &amp; emergency contact</summary>
+          <div style="margin-top: var(--space-3);">
+            <div class="form-row">
+              <div class="field"><label for="heightCm">Height (cm)</label><input type="number" id="heightCm"></div>
+              <div class="field"><label for="weightKg">Weight (kg)</label><input type="number" id="weightKg"></div>
+            </div>
+            <div class="field"><label for="address">Address</label><input id="address"></div>
+            <div class="form-row">
+              <div class="field"><label for="emName">Emergency contact</label><input id="emName"></div>
+              <div class="field"><label for="emPhone">Their phone</label><input id="emPhone"></div>
+            </div>
+          </div>
+        </details>
         <div id="profile-alert"></div>
-        <button class="btn btn-primary" type="submit">Save changes</button>
+        <button class="btn btn-primary" type="submit">Save</button>
       </form>
     </div>
   </main>
@@ -93,7 +99,7 @@
         allergies: document.getElementById('allergies').value.trim(),
         chronicConditions: document.getElementById('conditions').value.trim(),
       });
-      toast.success('Profile updated.');
+      toast.success('Saved.');
     } catch (err) {
       document.getElementById('profile-alert').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
     }

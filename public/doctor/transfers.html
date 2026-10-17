@@ -18,16 +18,15 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <h2>TransferConnect</h2>
-    <p class="text-muted tc-intro">When a patient needs care this hospital can't give, send one request instead of making a round of phone calls. MediBridge finds hospitals with the right specialty and free beds, shares a consented summary, and the first hospital to accept gets the patient.</p>
+    <div class="page-head"><div><h2>TransferConnect</h2></div></div>
 
     <div class="tc-layout">
       <section class="card">
-        <div class="card-header"><h3>New transfer</h3></div>
+        <div class="card-header"><h3>New</h3></div>
         <div id="tc-wizard"></div>
       </section>
       <section>
-        <h3>My transfer requests</h3>
+        <h3>Requests</h3>
         <div id="tc-outgoing"></div>
       </section>
     </div>
@@ -40,7 +39,7 @@
     MB_LAYOUT.renderDashboardShell('doctor', 'TransferConnect');
     MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
     const outgoing = MB_TRANSFERS.renderOutgoing(document.getElementById('tc-outgoing'), {
-      emptyText: 'No active transfers. Requests you send appear here with each hospital\'s answer.',
+      emptyText: 'None active',
     });
     MB_TRANSFERS.renderWizard(document.getElementById('tc-wizard'), { onSent: () => outgoing.reload() });
   });

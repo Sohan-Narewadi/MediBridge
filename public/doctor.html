@@ -11,7 +11,9 @@
   .profile-layout { display:grid; grid-template-columns: 1fr 340px; gap: var(--space-6); align-items:start; }
   @media (max-width: 900px) { .profile-layout { grid-template-columns: 1fr; } }
   .profile-head { display:flex; gap: var(--space-5); align-items:flex-start; flex-wrap:wrap; }
-  .profile-photo { width:96px; height:96px; border-radius: var(--radius-lg); background: var(--color-primary-50); color: var(--color-primary-700); display:flex; align-items:center; justify-content:center; font-size:2rem; font-weight:800; flex-shrink:0; }
+  .profile-photo { width:96px; height:96px; border-radius: var(--radius-lg); background: var(--color-primary-50); color: var(--color-primary-700); display:flex; align-items:center; justify-content:center; font-family: var(--font-display); font-size:2rem; font-weight:400; flex-shrink:0; }
+  .chips { display:flex; gap: var(--space-2); flex-wrap:wrap; margin-top: var(--space-3); }
+  .chips .badge { font-size: 0.8rem; }
   .slot-grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); margin-top: var(--space-3); }
   .slot-btn { padding: 0.5rem; border-radius: var(--radius-sm); border: 1.5px solid var(--color-ink-200); background: var(--color-surface); cursor:pointer; font-size:0.82rem; font-weight:600; }
   .slot-btn.selected { background: var(--color-primary-600); color:#fff; border-color: var(--color-primary-600); }
@@ -28,6 +30,7 @@
 
 <div id="site-footer"></div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -62,10 +65,6 @@
   }
 
   function render(doctor, reviews, availability) {
-    const scheduleSummary = availability.length
-      ? [...new Set(availability.map((a) => DAY_NAMES[a.day_of_week]))].join(', ')
-      : 'No availability set';
-
     document.getElementById('page-content').innerHTML = `
       <div class="profile-layout">
         <div>
@@ -74,66 +73,60 @@
               <div class="profile-photo">${initials(doctor.full_name)}</div>
               <div style="flex:1; min-width:200px;">
                 <h2 style="margin-bottom:2px;">${doctor.full_name}</h2>
-                <p class="text-muted" style="margin-bottom:6px;">${doctor.specialization} &#8226; ${doctor.qualifications || ''}</p>
-                <div class="flex gap-3 text-sm text-muted" style="flex-wrap:wrap;">
-                  <span class="rating">&#9733; ${Number(doctor.rating_avg).toFixed(1)} (${doctor.rating_count} reviews)</span>
-                  <span>&#127891; ${doctor.experience_years} years experience</span>
-                  <span>&#8377;${doctor.consultation_fee} per visit</span>
+                <p class="text-muted" style="margin-bottom:0;">${doctor.specialization}</p>
+                <div class="chips">
+                  <span class="badge badge-plain badge-warning">${MB_ICON('star', 12)} ${Number(doctor.rating_avg).toFixed(1)} · ${doctor.rating_count}</span>
+                  <span class="badge badge-plain">${doctor.experience_years} yrs</span>
+                  <span class="badge badge-plain">&#8377;${doctor.consultation_fee}</span>
+                  ${doctor.consultation_modes.includes('video') ? `<span class="badge badge-plain badge-info">${MB_ICON('video', 12)} Video</span>` : ''}
                 </div>
               </div>
             </div>
+            ${doctor.bio ? `<hr class="divider"><p class="mb-0">${doctor.bio}</p>` : ''}
             <hr class="divider">
-            <h4>About</h4>
-            <p>${doctor.bio || 'No bio provided yet.'}</p>
-            <div class="form-row">
-              <div>
-                <h4>Clinic</h4>
-                <p class="text-sm mb-0">${doctor.clinic_name || '—'}</p>
-                <p class="text-sm text-muted">${doctor.clinic_address || ''}${doctor.city ? ', ' + doctor.city : ''}</p>
-                ${doctor.latitude ? '<div id="clinic-map"></div>' : ''}
-              </div>
-              <div>
-                <h4>Details</h4>
-                <p class="text-sm mb-0">Languages: ${doctor.languages}</p>
-                <p class="text-sm mb-0">Consultation: ${doctor.consultation_modes.split(',').join(', ')}</p>
-                <p class="text-sm text-muted">Available: ${scheduleSummary}</p>
-              </div>
+            <div class="flex items-center gap-2 text-sm" style="flex-wrap:wrap;">
+              ${MB_ICON('mapPin', 14)}<strong>${doctor.clinic_name || '—'}</strong>
+              <span class="text-muted">${doctor.city || ''}</span>
             </div>
+            <div class="chips" style="margin-top: var(--space-2);">
+              ${[...new Set(availability.map((a) => DAY_NAMES[a.day_of_week]))].map((d) => `<span class="badge badge-plain">${d}</span>`).join('') || '<span class="text-muted text-sm">No availability set</span>'}
+            </div>
+            ${doctor.latitude ? '<div id="clinic-map"></div>' : ''}
           </div>
 
           <div class="card" style="margin-top: var(--space-5);">
-            <h4>Patient reviews</h4>
+            <h4>Reviews</h4>
             ${reviews.length ? reviews.map((r) => `
               <div class="review-item">
-                <div class="flex justify-between"><strong class="text-sm">${r.patient_name}</strong><span class="rating">${'&#9733;'.repeat(r.rating)}</span></div>
+                <div class="flex justify-between"><strong class="text-sm">${r.patient_name}</strong><span class="rating">${MB_ICON('star', 12).repeat(r.rating)}</span></div>
                 ${r.comment ? `<p class="text-sm mb-0">${r.comment}</p>` : ''}
               </div>
-            `).join('') : '<p class="text-muted text-sm">No reviews yet.</p>'}
+            `).join('') : '<p class="text-muted text-sm mb-0">No reviews yet.</p>'}
           </div>
         </div>
 
         <div class="card" style="position:sticky; top: calc(var(--header-height) + 16px);">
-          <h4>Book an appointment</h4>
+          <h4>Book a visit</h4>
           <div class="field">
-            <label for="book-date">Select date</label>
+            <label for="book-date">Date</label>
             <input type="date" id="book-date" min="${new Date().toISOString().slice(0,10)}">
           </div>
           <div id="slots-wrap">
-            <p class="text-muted text-sm">Choose a date to see open slots.</p>
+            <p class="text-muted text-sm">Pick a date.</p>
           </div>
           <div class="field" style="margin-top: var(--space-4);">
-            <label for="book-mode">Consultation type</label>
+            <label for="book-mode">Type</label>
             <select id="book-mode">
               ${doctor.consultation_modes.includes('in_person') ? '<option value="in_person">In-person</option>' : ''}
               ${doctor.consultation_modes.includes('video') ? '<option value="video">Video</option>' : ''}
             </select>
           </div>
           <div class="field">
-            <label for="book-reason">Reason for visit (optional)</label>
-            <textarea id="book-reason" rows="2" placeholder="Briefly describe your concern"></textarea>
+            <label for="book-reason">Reason (optional)</label>
+            <textarea id="book-reason" rows="2" placeholder="e.g. chest pain"></textarea>
           </div>
           <div id="book-alert"></div>
-          <button class="btn btn-primary btn-block" id="book-btn" disabled>Select a slot to continue</button>
+          <button class="btn btn-primary btn-block" id="book-btn" disabled>Pick a time</button>
         </div>
       </div>
     `;
@@ -158,7 +151,7 @@
     try {
       const { slots } = await api.get(`/doctors/${doctorId}/slots?date=${date}`);
       if (!slots.length) {
-        wrap.innerHTML = '<p class="text-muted text-sm">No open slots on this date. Try another day.</p>';
+        wrap.innerHTML = '<p class="text-muted text-sm">No slots this day.</p>';
         return;
       }
       wrap.innerHTML = `<div class="slot-grid">${slots.map((s) => `<button type="button" class="slot-btn" data-start="${s.startTime}">${s.startTime.slice(0,5)}</button>`).join('')}</div>`;
@@ -176,27 +169,27 @@
   function updateBookButton() {
     const btn = document.getElementById('book-btn');
     btn.disabled = !selectedSlot;
-    btn.textContent = selectedSlot ? 'Request appointment' : 'Select a slot to continue';
+    btn.textContent = selectedSlot ? 'Book' : 'Pick a time';
   }
 
   async function bookAppointment() {
     const alertBox = document.getElementById('book-alert');
     alertBox.innerHTML = '';
     if (!isLoggedInPatient) {
-      alertBox.innerHTML = `<div class="alert alert-warning">Please <a href="/auth/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}">log in</a> as a patient to book.</div>`;
+      alertBox.innerHTML = `<div class="alert alert-warning"><a href="/auth/login.html?next=${encodeURIComponent(window.location.pathname + window.location.search)}">Log in</a> as a patient to book.</div>`;
       return;
     }
     const btn = document.getElementById('book-btn');
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span> Booking...';
+    btn.innerHTML = '<span class="spinner"></span>';
     try {
       const booking = await api.post('/appointments', {
         doctorId, date: document.getElementById('book-date').value, startTime: selectedSlot,
         consultationMode: document.getElementById('book-mode').value,
         reason: document.getElementById('book-reason').value.trim() || undefined,
       });
-      toast.success('Appointment requested!');
-      alertBox.innerHTML = '<div class="alert alert-success">Your request was sent. One last step: tell the doctor what\'s going on so they\'re ready before you arrive…</div>';
+      toast.success('Requested');
+      alertBox.innerHTML = '<div class="alert alert-success">Sent. One quick form for your doctor next…</div>';
       btn.textContent = 'Requested';
       // Smart Brief: go straight to the one-minute pre-visit intake for this booking.
       setTimeout(() => { window.location.href = `/patient/intake.html?appointment=${booking.id}`; }, 1200);

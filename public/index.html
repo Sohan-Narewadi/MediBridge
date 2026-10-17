@@ -47,69 +47,38 @@
   @media (max-width: 760px) { .search-strip { grid-template-columns: 1fr; } .search-strip form { flex-direction: column; } .search-strip select { max-width: none; } }
 
   /* ---------- Section heads ---------- */
-  .section-head { max-width: 680px; margin: 0 0 var(--space-7); }
-  .section-head.center { margin-inline: auto; text-align: center; }
-  .section-head .kicker { font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.09em; color: var(--color-primary-700); margin-bottom: var(--space-2); }
-  .section-head p:last-child { font-size: 1rem; color: var(--color-ink-500); margin-bottom: 0; }
+  .section-head { margin: 0 0 var(--space-6); }
+  .section-head h2 { margin: 0; }
   .band { background: var(--color-surface); border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
 
-  /* ---------- The gaps ---------- */
-  .gaps { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--color-line); border-radius: var(--radius-lg); background: var(--color-surface); overflow: hidden; }
-  .gap-item { padding: var(--space-5); border-left: 1px solid var(--color-line); }
-  .gap-item:first-child { border-left: 0; }
-  .gap-item .where { font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-ink-500); margin-bottom: var(--space-3); }
-  .gap-item h3 { font-size: 1.05rem; margin-bottom: var(--space-2); }
-  .gap-item p { font-size: 0.9rem; }
-  .gap-item .fix { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px dashed var(--color-ink-200); font-size: 0.84rem; color: var(--color-ink-900); display: flex; gap: 0.5rem; }
-  .gap-item .fix .mb-icon { color: var(--color-primary-600); margin-top: 2px; }
-  @media (max-width: 860px) { .gaps { grid-template-columns: 1fr; } .gap-item { border-left: 0; border-top: 1px solid var(--color-line); } .gap-item:first-child { border-top: 0; } }
+  /* ---------- Gaps + modules: icon cards ---------- */
+  .tiles { display: grid; gap: var(--space-4); }
+  .tiles.three { grid-template-columns: repeat(3, 1fr); }
+  .tiles.four { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 960px) { .tiles.four { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .tiles.three, .tiles.four { grid-template-columns: 1fr; } }
+  .tile { display: flex; flex-direction: column; gap: 0.35rem; padding: var(--space-5); text-decoration: none; color: inherit; }
+  .tile .ico { width: 40px; height: 40px; border-radius: 50%; background: var(--color-primary-50); color: var(--color-primary-600); display: flex; align-items: center; justify-content: center; margin-bottom: var(--space-3); }
+  .tile h3 { margin: 0; font-size: 1.02rem; }
+  .tile p { margin: 0; font-size: 0.88rem; color: var(--color-ink-500); }
+  .tile:hover { text-decoration: none; }
 
-  /* ---------- Pillars ---------- */
-  .pillars { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-4); }
-  @media (max-width: 860px) { .pillars { grid-template-columns: 1fr; } }
-  .pillar { display: grid; grid-template-rows: auto 1fr; padding: 0; overflow: hidden; }
-  .pillar .art { background: var(--color-ink-50); border-bottom: 1px solid var(--color-line); padding: var(--space-5); min-height: 196px; display: flex; align-items: center; justify-content: center; }
-  .pillar .txt { padding: var(--space-5); }
-  .pillar .txt .num { font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-ink-500); }
-  .pillar .txt h3 { font-size: 1.1rem; margin: 0.25rem 0 var(--space-2); }
-  .pillar .txt p { font-size: 0.9rem; margin-bottom: 0; }
-  .mini { width: 100%; max-width: 380px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 0.85rem; font-size: 0.78rem; box-shadow: var(--shadow-sm); }
-  .mini .row { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.32rem 0; }
-  .mini .row + .row { border-top: 1px solid var(--color-ink-150); }
-  .mini .hd { font-weight: 600; font-size: 0.84rem; }
-  .mini .mu { color: var(--color-ink-500); }
-  .mini .chips { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-top: 0.4rem; }
-  .mini .score { font-family: var(--font-mono); font-weight: 500; font-size: 0.78rem; color: var(--color-ink-900); background: var(--color-ink-100); border-radius: 4px; padding: 0.05rem 0.35rem; }
-  .mini .cb { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid var(--color-ink-300); display: inline-block; flex-shrink: 0; }
-  .mini .cb.on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
-  .mini .ck { display: flex; align-items: center; gap: 0.5rem; }
-  .mini .ck.done span:last-child { text-decoration: line-through; color: var(--color-ink-500); }
-
-  /* ---------- Roles ---------- */
-  .roles { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-4); }
-  @media (max-width: 960px) { .roles { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 560px) { .roles { grid-template-columns: 1fr; } }
-  .role-card h3 { display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; }
-  .role-card h3 .mb-icon { color: var(--color-primary-600); }
-  .role-card .no-more { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); font-weight: 600; margin: var(--space-3) 0 var(--space-2); }
-  .role-card ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 0.55rem; }
-  .role-card li { font-size: 0.86rem; color: var(--color-ink-700); display: flex; gap: 0.5rem; line-height: 1.45; }
-  .role-card li .mb-icon { color: var(--color-success-500); margin-top: 2px; }
-  .role-card .demo { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-ink-150); font-size: 0.76rem; color: var(--color-ink-500); font-family: var(--font-mono); }
+  /* ---------- Role switcher ---------- */
+  .role-tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--color-ink-100); border-radius: var(--radius-full); flex-wrap: wrap; }
+  .role-tabs button { border: 0; background: transparent; padding: 0.45rem 1.1rem; border-radius: var(--radius-full); font-weight: 500; font-size: 0.86rem; color: var(--color-ink-700); cursor: pointer; }
+  .role-tabs button.active { background: var(--color-surface); color: var(--color-primary-700); box-shadow: var(--shadow-md); }
+  .role-panel { margin-top: var(--space-5); display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
+  .role-panel .say { font-family: var(--font-display); font-size: clamp(1.3rem, 2.6vw, 1.8rem); line-height: 1.25; max-width: 640px; }
+  .role-panel .login { font-family: var(--font-mono); font-size: 0.82rem; color: var(--color-ink-500); margin-top: var(--space-2); }
 
   /* ---------- Specializations ---------- */
-  .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--space-3); }
-  .category-card { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0.85rem 1rem; text-decoration: none; color: inherit; }
-  .category-card h4 { margin: 0; font-size: 0.9rem; font-weight: 500; }
-  .category-card .c { font-family: var(--font-mono); font-size: 0.76rem; color: var(--color-ink-500); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .chip { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.4rem 0.9rem; border-radius: var(--radius-full); background: var(--color-surface); border: 1px solid var(--color-line); font-size: 0.86rem; font-weight: 500; color: var(--color-ink-900); text-decoration: none; }
+  .chip:hover { border-color: var(--color-primary-300); color: var(--color-primary-700); text-decoration: none; }
+  .chip .c { font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-ink-500); }
 
-  .emergency-banner { background: var(--color-surface); border: 1px solid var(--color-line); border-left: 3px solid var(--color-danger-500); border-radius: var(--radius-lg); padding: var(--space-5); display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; }
-  .emergency-banner h3 { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 4px; }
-  .emergency-banner h3 .mb-icon { color: var(--color-danger-500); }
-
-  .final-cta { text-align: center; }
-  .final-cta h2 { max-width: 640px; margin: 0 auto var(--space-3); }
-  .final-cta p { max-width: 520px; margin: 0 auto var(--space-5); }
+  .emergency-strip { display: flex; align-items: center; justify-content: center; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-5) 0; font-size: 0.88rem; color: var(--color-ink-700); }
+  .emergency-strip .mb-icon { color: var(--color-danger-500); }
 </style>
 </head>
 <body>
@@ -119,21 +88,11 @@
 <section class="hero">
   <div class="container hero-grid">
     <div>
-      <span class="hero-tag"><span class="live-dot"></span> Care-handoff platform for patients, doctors &amp; hospitals</span>
       <h1>Care that doesn't fall through <em>the gaps.</em></h1>
-      <p class="lede">
-        Most health software handles one visit at a time. Things go wrong in between: the doctor who has never seen
-        your history, the discharge stuck on a billing desk, the transfer arranged one phone call at a time.
-        MediBridge carries the patient's information across every one of those handoffs.
-      </p>
+      <p class="lede">One record that follows the patient through every handoff.</p>
       <div class="hero-cta">
-        <a href="/auth/register.html" class="btn btn-primary btn-lg">Create a patient account</a>
-        <a href="/auth/login.html" class="btn btn-outline btn-lg">Try the demo logins</a>
-      </div>
-      <div class="hero-proof">
-        <span><span data-icon="checkCircle"></span>Enter your details once</span>
-        <span><span data-icon="checkCircle"></span>See who you're waiting on</span>
-        <span><span data-icon="checkCircle"></span>No phone calls to find a bed</span>
+        <a href="/auth/register.html" class="btn btn-primary btn-lg">Get started</a>
+        <a href="/auth/login.html" class="btn btn-outline btn-lg">Try the demo</a>
       </div>
     </div>
 
@@ -162,7 +121,7 @@
         <div class="mock-task is-blocked"><span class="d">Insurance approval<small>Awaiting TPA pre-authorisation</small></span><span class="badge status-blocked">Blocked</span><span class="tm">2h 30m</span></div>
         <div class="mock-task"><span class="d">Take-home medicines<small>Pharmacy</small></span><span class="badge status-pending">Waiting</span><span class="tm">—</span></div>
       </div>
-      <div class="mock-foot"><span data-icon="alertCircle"></span> Bottleneck: <strong>Insurance desk</strong> — 2 staff notified, patient can see this status</div>
+      <div class="mock-foot"><span data-icon="alertCircle"></span> Bottleneck: <strong>Insurance desk</strong></div>
     </div>
   </div>
 </section>
@@ -171,8 +130,7 @@
 <section class="band">
   <div class="container search-strip">
     <div>
-      <div class="section-label" style="margin-bottom:2px;">Looking for a doctor?</div>
-      <div class="text-sm text-muted">Live availability, no double-booking.</div>
+      <div class="section-label" style="margin:0;">Find a doctor</div>
     </div>
     <form action="/doctors.html" method="get">
       <select name="specialization" id="hero-spec" aria-label="Specialization">
@@ -187,115 +145,24 @@
 <!-- ========================== THE GAPS ========================== -->
 <section class="section">
   <div class="container">
-    <div class="section-head">
-      <p class="kicker">The problem</p>
-      <h2>Care breaks at the handoffs, not during the visit.</h2>
-      <p>Each step works in isolation. Between the steps, information is re-typed, re-asked or simply lost,
-        and the patient is the one left waiting.</p>
-    </div>
-    <div class="gaps">
-      <div class="gap-item">
-        <div class="where">01 · Before &amp; after a visit</div>
-        <h3>The doctor starts from zero, the patient forgets the plan</h3>
-        <p>Consults are short. Time goes on re-asking history, allergies and current medicines. Afterwards,
-          instructions live in the patient's memory and nobody checks whether the follow-up test happened.</p>
-        <div class="fix"><span data-icon="arrowRight"></span><span>Smart Brief before the visit, Visit Loop after it.</span></div>
-      </div>
-      <div class="gap-item">
-        <div class="where">02 · Leaving the hospital</div>
-        <h3>Medically fit at noon, still in the bed at five</h3>
-        <p>Billing, insurance, pharmacy, nursing and records each run their own process. Nobody can see which
-          one is holding the patient back, so the bed stays blocked and the family keeps asking.</p>
-        <div class="fix"><span data-icon="arrowRight"></span><span>Discharge Flow names the department causing the delay.</span></div>
-      </div>
-      <div class="gap-item">
-        <div class="where">03 · Between hospitals</div>
-        <h3>Finding a bed one phone call at a time</h3>
-        <p>When a hospital can't provide the care a patient needs, staff phone around, read the case out over
-          the line, and wait. Minutes matter most in exactly these cases.</p>
-        <div class="fix"><span data-icon="arrowRight"></span><span>TransferConnect sends one request to the best-matched hospitals.</span></div>
-      </div>
+    <div class="section-head"><h2>Where care breaks</h2></div>
+    <div class="tiles three">
+      <div class="card tile"><span class="ico" data-icon="fileText"></span><h3>Starting from zero</h3><p>Doctors re-ask what the record already knows.</p></div>
+      <div class="card tile"><span class="ico" data-icon="bed"></span><h3>Waiting to go home</h3><p>Cleared patients stuck behind billing and insurance.</p></div>
+      <div class="card tile"><span class="ico" data-icon="transfer"></span><h3>Phone-call transfers</h3><p>Finding a bed means calling hospitals one by one.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ========================== PILLARS =========================== -->
+<!-- ========================== MODULES =========================== -->
 <section class="section band">
   <div class="container">
-    <div class="section-head">
-      <p class="kicker">How MediBridge closes them</p>
-      <h2>Four connected modules, one patient record underneath.</h2>
-      <p>Everything the patient or a clinician enters once is reused at every later step, so nobody types it twice.</p>
-    </div>
-    <div class="pillars">
-      <div class="card pillar">
-        <div class="art">
-          <div class="mini">
-            <div class="row"><span class="hd">Smart Brief · Riya K., 34F</span><span class="mu mono">10:30</span></div>
-            <div class="row"><span class="mu">Reason</span><span>Breathless on stairs · 2 weeks</span></div>
-            <div class="row"><span class="mu">Allergies</span><span>Penicillin</span></div>
-            <div class="row"><span class="mu">Adherence (7d)</span><span class="mono">57%</span></div>
-            <div class="chips"><span class="flag flag-danger">Missed 3 doses this week</span><span class="flag flag-warning">Follow-up test overdue</span></div>
-          </div>
-        </div>
-        <div class="txt">
-          <div class="num">01</div>
-          <h3>Smart Brief</h3>
-          <p>The patient answers a two-minute pre-visit form when booking. The doctor opens a one-page brief with
-            biodata, allergies, current medicines and adherence, recent records, and automatic flags.</p>
-        </div>
-      </div>
-
-      <div class="card pillar">
-        <div class="art">
-          <div class="mini">
-            <div class="row"><span class="hd">Bed C-12 · cleared 3h 04m ago</span><span class="badge status-blocked">Blocked</span></div>
-            <div class="segments" style="margin:0.45rem 0;"><span class="s-done"></span><span class="s-done"></span><span class="s-in_progress"></span><span class="s-blocked"></span><span class="s-pending"></span></div>
-            <div class="row"><span class="mu">Waiting on</span><span><strong>Insurance desk</strong> · <span class="mono">2h 30m</span></span></div>
-            <div class="row"><span class="mu">Avg. this month</span><span class="mono">Insurance 2h 41m · SLA 2h</span></div>
-          </div>
-        </div>
-        <div class="txt">
-          <div class="num">02</div>
-          <h3>Discharge Flow</h3>
-          <p>When the doctor marks a patient fit to leave, every department gets its task with a timer. The board
-            names the bottleneck, staff are nudged, and the family sees the same live status.</p>
-        </div>
-      </div>
-
-      <div class="card pillar">
-        <div class="art">
-          <div class="mini">
-            <div class="row"><span class="hd">Cardiology + ICU · Critical</span><span class="mu mono">sent 4m ago</span></div>
-            <div class="row"><span>Sunrise Heart &amp; Vascular</span><span class="flex items-center gap-2"><span class="score">96</span><span class="badge status-accepted">Accepted</span></span></div>
-            <div class="row"><span>Lakeview Multispeciality</span><span class="flex items-center gap-2"><span class="score">61</span><span class="badge status-withdrawn">Withdrawn</span></span></div>
-            <div class="row"><span>Cedar Valley Trauma</span><span class="flex items-center gap-2"><span class="score">40</span><span class="badge status-declined">Declined</span></span></div>
-          </div>
-        </div>
-        <div class="txt">
-          <div class="num">03</div>
-          <h3>TransferConnect</h3>
-          <p>Hospitals are ranked by specialty, free beds and ICU capacity. One request goes to several at once. The
-            first to accept wins, and the clinical summary is generated automatically and shared only with consent.</p>
-        </div>
-      </div>
-
-      <div class="card pillar">
-        <div class="art">
-          <div class="mini">
-            <div class="row"><span class="hd">Your plan · Dr. Ananya Iyer</span><span class="mu">6 days ago</span></div>
-            <div class="row"><span class="ck done"><span class="cb on"></span><span>Cut down on fried food</span></span><span class="mu">done</span></div>
-            <div class="row"><span class="ck"><span class="cb"></span><span>Book fasting blood sugar test</span></span><span class="mono mu">in 3d</span></div>
-            <div class="row"><span class="ck"><span class="cb"></span><span>Repeat lipid profile</span></span><span class="badge status-overdue">Overdue</span></div>
-          </div>
-        </div>
-        <div class="txt">
-          <div class="num">04</div>
-          <h3>Visit Loop</h3>
-          <p>After a visit or discharge the patient gets a plain-language plan and a checklist of commitments. The
-            doctor sees what's still open, and the admin sees where follow-up loops break across the platform.</p>
-        </div>
-      </div>
+    <div class="section-head"><h2>How we close them</h2></div>
+    <div class="tiles four">
+      <div class="card tile"><span class="ico" data-icon="clipboard"></span><h3>Smart Brief</h3><p>Doctors see a ready patient summary before the visit.</p></div>
+      <div class="card tile"><span class="ico" data-icon="timer"></span><h3>Discharge Flow</h3><p>Live timers show which desk is holding the patient.</p></div>
+      <div class="card tile"><span class="ico" data-icon="send"></span><h3>TransferConnect</h3><p>One request reaches the best-matched hospitals.</p></div>
+      <div class="card tile"><span class="ico" data-icon="listChecks"></span><h3>Visit Loop</h3><p>A plain plan and checklist after every visit.</p></div>
     </div>
   </div>
 </section>
@@ -303,53 +170,19 @@
 <!-- =========================== ROLES ============================ -->
 <section class="section">
   <div class="container">
-    <div class="section-head">
-      <p class="kicker">Less work for every role</p>
-      <h2>Each person sees what they need, already filled in.</h2>
-      <p>Bookings, records, prescriptions, medication tracking and the Care Score are the foundation. The new
-        modules sit on top of them, so the data each role needs is already there.</p>
+    <div class="section-head"><h2>Built for everyone in the loop</h2></div>
+    <div class="role-tabs" id="role-tabs" role="tablist">
+      <button type="button" class="active" data-role="patient">Patient</button>
+      <button type="button" data-role="doctor">Doctor</button>
+      <button type="button" data-role="staff">Staff</button>
+      <button type="button" data-role="admin">Admin</button>
     </div>
-    <div class="roles">
-      <div class="card role-card">
-        <h3><span data-icon="user"></span>Patient</h3>
-        <div class="no-more">No more</div>
-        <ul>
-          <li><span data-icon="check"></span><span>repeating your history at every clinic</span></li>
-          <li><span data-icon="check"></span><span>guessing why discharge is taking so long</span></li>
-          <li><span data-icon="check"></span><span>forgetting what the doctor asked you to do</span></li>
-        </ul>
-        <div class="demo">patient@medibridge.demo</div>
+    <div class="role-panel">
+      <div>
+        <div class="say" id="role-say"></div>
+        <div class="login" id="role-login"></div>
       </div>
-      <div class="card role-card">
-        <h3><span data-icon="stethoscope"></span>Doctor</h3>
-        <div class="no-more">No more</div>
-        <ul>
-          <li><span data-icon="check"></span><span>starting a consult with "what brings you here?"</span></li>
-          <li><span data-icon="check"></span><span>chasing departments to discharge a patient</span></li>
-          <li><span data-icon="check"></span><span>phoning hospitals one by one for a transfer</span></li>
-        </ul>
-        <div class="demo">doctor@medibridge.demo</div>
-      </div>
-      <div class="card role-card">
-        <h3><span data-icon="hospital"></span>Hospital staff</h3>
-        <div class="no-more">No more</div>
-        <ul>
-          <li><span data-icon="check"></span><span>hunting for which patients need you next</span></li>
-          <li><span data-icon="check"></span><span>being blamed for delays without a record</span></li>
-          <li><span data-icon="check"></span><span>taking transfer details down over the phone</span></li>
-        </ul>
-        <div class="demo">insurance@medibridge.demo</div>
-      </div>
-      <div class="card role-card">
-        <h3><span data-icon="activity"></span>Administrator</h3>
-        <div class="no-more">No more</div>
-        <ul>
-          <li><span data-icon="check"></span><span>anecdotes about "slow discharges"</span></li>
-          <li><span data-icon="check"></span><span>no view of transfer response times</span></li>
-          <li><span data-icon="check"></span><span>follow-ups silently going overdue</span></li>
-        </ul>
-        <div class="demo">admin@medibridge.demo</div>
-      </div>
+      <a href="/auth/login.html" class="btn btn-primary">Try it <span data-icon="arrowRight"></span></a>
     </div>
   </div>
 </section>
@@ -358,52 +191,25 @@
 <section class="section band">
   <div class="container">
     <div class="flex justify-between items-center flex-wrap gap-3" style="margin-bottom: var(--space-5);">
-      <div>
-        <div class="section-label">Book a consultation</div>
-        <h2 class="mb-0">Browse by specialization</h2>
-      </div>
+      <h2 class="mb-0">Find a doctor</h2>
       <a href="/doctors.html" class="btn btn-outline">All doctors <span data-icon="arrowRight"></span></a>
     </div>
-    <div class="category-grid" id="category-grid">
-      <div class="card skeleton" style="height:52px;"></div>
-      <div class="card skeleton" style="height:52px;"></div>
-      <div class="card skeleton" style="height:52px;"></div>
-      <div class="card skeleton" style="height:52px;"></div>
+    <div class="chip-row" id="category-grid">
+      <span class="chip skeleton" style="width:110px;height:34px;"></span>
+      <span class="chip skeleton" style="width:90px;height:34px;"></span>
+      <span class="chip skeleton" style="width:120px;height:34px;"></span>
     </div>
-
-    <div class="section-label" style="margin-top: var(--space-7);">Top-rated doctors</div>
-    <div class="doctor-grid" id="featured-doctors">
-      <div class="card skeleton" style="height:190px;"></div>
-      <div class="card skeleton" style="height:190px;"></div>
-      <div class="card skeleton" style="height:190px;"></div>
+    <div class="doctor-grid" id="featured-doctors" style="margin-top: var(--space-6);">
+      <div class="card skeleton" style="height:160px;"></div>
+      <div class="card skeleton" style="height:160px;"></div>
+      <div class="card skeleton" style="height:160px;"></div>
     </div>
   </div>
 </section>
 
-<!-- ========================= EMERGENCY ========================== -->
-<section class="section-tight" style="padding-top: var(--space-8);">
-  <div class="container">
-    <div class="emergency-banner">
-      <div>
-        <h3><span data-icon="siren"></span>Medical emergency?</h3>
-        <p class="mb-0" style="max-width: 600px;">MediBridge is not an emergency service. If someone has a life-threatening emergency, call your local emergency number immediately.</p>
-      </div>
-      <a href="/emergency.html" class="btn btn-outline">Emergency guidance</a>
-    </div>
-  </div>
-</section>
-
-<section class="section final-cta">
-  <div class="container">
-    <h2>See the handoffs work end to end.</h2>
-    <p>Log in as the patient, the doctor, a hospital desk and the admin with the one-click demo accounts.
-      The same case shows up for each of them.</p>
-    <div class="flex gap-3" style="justify-content:center; flex-wrap:wrap;">
-      <a href="/auth/login.html" class="btn btn-primary btn-lg">Open the demo</a>
-      <a href="/about.html" class="btn btn-outline btn-lg">How it's built</a>
-    </div>
-  </div>
-</section>
+<div class="container">
+  <div class="emergency-strip"><span data-icon="siren"></span>Emergency? Call your local emergency number. <a href="/emergency.html">Emergency help</a></div>
+</div>
 
 <div id="site-footer"></div>
 
@@ -425,9 +231,7 @@
         select.appendChild(opt);
       });
       document.getElementById('category-grid').innerHTML = specializations.slice(0, 12).map((s) => `
-        <a href="/doctors.html?specialization=${s.id}" class="card category-card card-interactive">
-          <h4>${esc(s.name)}</h4><span class="c">${s.doctor_count}</span>
-        </a>
+        <a href="/doctors.html?specialization=${s.id}" class="chip">${esc(s.name)} <span class="c">${s.doctor_count}</span></a>
       `).join('');
     } catch (e) {
       document.getElementById('category-grid').innerHTML = '<p class="text-muted text-sm">Specializations are unavailable right now.</p>';
@@ -443,11 +247,10 @@
           <h4>${esc(d.full_name)}</h4>
           <div class="spec">${esc(d.specialization)}</div>
           <div class="meta-row">
-            <span>${d.experience_years} yrs experience</span>
+            <span>${d.experience_years} yrs</span>
             <span>&#8377;${Number(d.consultation_fee).toFixed(0)}</span>
-            <span>${esc(d.city || '')}</span>
           </div>
-          <div class="rating">${MB_ICON('star', 13)} ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-sm" style="font-weight:400;">(${d.rating_count} reviews)</span></div>
+          <div class="rating">${MB_ICON('star', 13)} ${Number(d.rating_avg).toFixed(1)}</div>
         </a>
       `).join('');
     } catch (e) {
@@ -455,6 +258,20 @@
     }
   }
   loadHomeData();
+
+  const ROLES = {
+    patient: ['Fill one form. Know who you are waiting on.', 'patient@medibridge.demo'],
+    doctor: ['Open a ready brief. Clear a patient in one click.', 'doctor@medibridge.demo'],
+    staff: ['See your queue, your timers, your blockers.', 'insurance@medibridge.demo'],
+    admin: ['See exactly where handoffs break.', 'admin@medibridge.demo'],
+  };
+  function showRole(r) {
+    document.getElementById('role-say').textContent = ROLES[r][0];
+    document.getElementById('role-login').textContent = ROLES[r][1];
+    document.querySelectorAll('#role-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.role === r));
+  }
+  document.getElementById('role-tabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) showRole(b.dataset.role); });
+  showRole('patient');
 </script>
 </body>
 </html>

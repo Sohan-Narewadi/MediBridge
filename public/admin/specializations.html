@@ -16,11 +16,11 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">Specializations</h2><button class="btn btn-primary btn-sm" id="add-btn">+ Add specialization</button></div>
+    <div class="card-header"><h2 class="mb-0">Specializations</h2><button class="btn btn-primary btn-sm" id="add-btn">+ Add</button></div>
     <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Name</th><th>Description</th><th>Doctors</th><th></th></tr></thead>
-        <tbody id="s-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      <table class="data-table" style="min-width:0;">
+        <thead><tr><th>Name</th><th>Doctors</th><th></th></tr></thead>
+        <tbody id="s-body"><tr><td colspan="3"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
   </main>
@@ -39,10 +39,10 @@
     const { specializations } = await api.get('/specializations');
     body.innerHTML = specializations.map((s) => `
       <tr>
-        <td><strong>${s.name}</strong></td><td class="text-sm">${s.description || '—'}</td><td>${s.doctor_count}</td>
-        <td>
-          <button class="btn btn-outline btn-sm" onclick='openForm(${JSON.stringify(s).replace(/'/g, "&apos;")})'>Edit</button>
-          <button class="btn btn-danger btn-sm" onclick="remove(${s.id})">Delete</button>
+        <td><strong>${s.name}</strong>${s.description ? `<div class="text-xs text-muted truncate" style="max-width:420px;">${s.description}</div>` : ''}</td><td>${s.doctor_count}</td>
+        <td class="text-right">
+          <button class="btn btn-ghost btn-sm" onclick='openForm(${JSON.stringify(s).replace(/'/g, "&apos;")})'>Edit</button>
+          <button class="btn btn-ghost btn-sm" style="color:var(--color-danger-500);" onclick="remove(${s.id})">Delete</button>
         </td>
       </tr>
     `).join('');

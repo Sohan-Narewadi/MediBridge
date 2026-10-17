@@ -16,12 +16,11 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <h2>System Activity / Audit Log</h2>
-    <p class="text-muted">A lightweight trail of key platform events, most recent first.</p>
+    <h2>Audit log</h2>
     <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Details</th></tr></thead>
-        <tbody id="log-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      <table class="data-table" style="min-width:0;">
+        <thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>
+        <tbody id="log-body"><tr><td colspan="3"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
   </main>
@@ -36,10 +35,24 @@
   async function load() {
     const { logs } = await api.get('/admin/audit-logs');
     const body = document.getElementById('log-body');
-    if (!logs.length) { body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No activity recorded yet.</td></tr>'; return; }
-    body.innerHTML = logs.map((l) => `
-      <tr><td class="text-sm">${new Date(l.created_at).toLocaleString()}</td><td>${l.user_name || 'System'}</td><td><span class="badge badge-neutral">${l.action}</span></td><td class="text-sm">${l.details || ''}</td></tr>
-    `).join('');
+    if (!logs.length) { body.innerHTML = '<tr><td colspan="3" class="text-center text-muted">No activity yet.</td></tr>'; return; }
+    const rows = logs.map((l, i) => `
+      <tr${i >= 15 ? ' data-extra hidden' : ''}><td class="text-sm" style="white-space:nowrap;">${new Date(l.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td><td>${l.user_name || 'System'}</td><td><span class="badge badge-neutral badge-plain">${l.action}</span><div class="text-xs text-muted">${l.details || ''}</div></td></tr>
+    `);
+    body.innerHTML = rows.join('');
+    if (logs.length > 15) {
+      const more = document.createElement('div');
+      more.className = 'flex';
+      more.style.cssText = 'justify-content:center; margin-top:var(--space-3);';
+      more.innerHTML = `<button class="btn btn-ghost btn-sm">View all ${logs.length}</button>`;
+      document.querySelector('.table-wrap').after(more);
+      more.firstChild.addEventListener('click', (ev) => {
+        const open = ev.target.dataset.open !== '1';
+        ev.target.dataset.open = open ? '1' : '0';
+        body.querySelectorAll('[data-extra]').forEach((r) => { r.hidden = !open; });
+        ev.target.textContent = open ? 'Show less' : `View all ${logs.length}`;
+      });
+    }
   }
 </script>
 </body>

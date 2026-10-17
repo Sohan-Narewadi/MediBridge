@@ -12,6 +12,16 @@
   .plan-box { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-ink-200); }
   .plan-box .hint { font-size: 0.78rem; color: var(--color-ink-500); margin: 0 0 var(--space-3); }
   @media (max-width: 700px) { .rx-row, .cm-row { grid-template-columns: 1fr 1fr; } }
+  .ap-row { display: flex; align-items: center; gap: var(--space-4); padding: 0.8rem var(--space-5); background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-lg); margin-bottom: var(--space-2); flex-wrap: wrap; }
+  .ap-when { width: 56px; flex-shrink: 0; }
+  .ap-when .mono { font-size: 0.95rem; }
+  .ap-date { font-size: 0.72rem; color: var(--color-ink-500); }
+  .ap-who { flex: 1; min-width: 160px; }
+  .ap-who .nm { font-weight: 600; }
+  .ap-who .sub { font-size: 0.8rem; color: var(--color-ink-500); }
+  .ap-act { display: flex; gap: var(--space-2); align-items: center; }
+  .tick { color: var(--color-success-700); display: inline-flex; }
+  .tick.miss { color: var(--color-ink-400); }
 </style>
 </head>
 <body>
@@ -24,11 +34,11 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <h2>Appointments</h2>
-    <div class="pill-nav" id="tabs" style="margin: var(--space-4) 0;">
+    <div class="page-head"><div><h2>Appointments</h2></div></div>
+    <div class="pill-nav" id="tabs" style="margin: 0 0 var(--space-4);">
       <button data-tab="today" class="active">Today</button>
       <button data-tab="upcoming">Upcoming</button>
-      <button data-tab="pending">Pending requests</button>
+      <button data-tab="pending">Requests</button>
       <button data-tab="completed">Completed</button>
       <button data-tab="all">All</button>
     </div>
@@ -81,32 +91,33 @@
   function render() {
     const list = filtered();
     const el = document.getElementById('appt-list');
-    if (!list.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128197;</div><p>Nothing in this view.</p></div>'; return; }
-    el.innerHTML = list.map((a) => `
-      <div class="card" style="margin-bottom:var(--space-3);">
-        <div class="flex justify-between items-start" style="flex-wrap:wrap; gap:var(--space-3);">
-          <div>
-            <h4 style="margin-bottom:2px;">${a.patient_name}</h4>
-            <p class="text-sm mb-0">&#128197; ${a.appointment_date} at ${a.start_time.slice(0,5)} &#8226; ${a.consultation_mode.replace('_',' ')}</p>
-            ${a.reason ? `<p class="text-sm text-muted mb-0">Reason: ${a.reason}</p>` : ''}
-          </div>
-          <div class="flex gap-2 items-center" style="flex-wrap:wrap;">
-            ${['pending', 'confirmed'].includes(a.status) ? (intakeIds.has(a.id) ? '<span class="badge badge-success">Intake received</span>' : '<span class="badge badge-neutral">No intake yet</span>') : ''}
-            <span class="badge status-${a.status}">${a.status}</span>
-          </div>
+    if (!list.length) { el.innerHTML = '<div class="empty-state"><p>None</p></div>'; return; }
+    el.innerHTML = list.map((a) => {
+      const open = ['pending', 'confirmed'].includes(a.status);
+      const tick = open ? (intakeIds.has(a.id)
+        ? `<span class="tick" title="Intake received">${MB_LAYOUT.icon('checkCircle', 16)}</span>`
+        : `<span class="tick miss" title="No intake yet">${MB_LAYOUT.icon('clock', 16)}</span>`) : '';
+      return `
+      <div class="ap-row">
+        <div class="ap-when"><div class="mono">${a.start_time.slice(0, 5)}</div><div class="ap-date">${a.appointment_date.slice(5)}</div></div>
+        <div class="ap-who">
+          <div class="nm">${esc(a.patient_name)}</div>
+          <div class="sub">${a.consultation_mode === 'video' ? 'Video' : 'In person'}${a.reason ? ' · ' + esc(a.reason) : ''}</div>
         </div>
-        <div class="flex gap-2" style="margin-top:var(--space-3); flex-wrap:wrap;">
-          ${['pending', 'confirmed'].includes(a.status) ? `<a class="btn btn-outline btn-sm" href="/doctor/brief.html?appointment=${a.id}">Open Smart Brief</a>` : ''}
-          ${a.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="setStatus(${a.id},'confirmed')">Confirm</button><button class="btn btn-danger btn-sm" onclick="setStatus(${a.id},'cancelled')">Decline</button>` : ''}
-          ${a.status === 'confirmed' ? `<button class="btn btn-primary btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g,"\\'")}')">Complete + add notes</button><button class="btn btn-danger btn-sm" onclick="setStatus(${a.id},'cancelled')">Cancel</button>` : ''}
-          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g,"\\'")}')">View / add notes</button>` : ''}
+        ${tick}
+        <span class="badge status-${a.status}">${a.status}</span>
+        <div class="ap-act">
+          ${open ? `<a class="btn btn-outline btn-sm" href="/doctor/brief.html?appointment=${a.id}">Brief</a>` : ''}
+          ${a.status === 'pending' ? `<button class="btn btn-primary btn-sm" onclick="setStatus(${a.id},'confirmed')">Confirm</button><button class="btn btn-ghost btn-sm" onclick="setStatus(${a.id},'cancelled')">Decline</button>` : ''}
+          ${a.status === 'confirmed' ? `<button class="btn btn-primary btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g, "\\'")}')">Complete</button><button class="btn btn-ghost btn-sm" onclick="setStatus(${a.id},'cancelled')">Cancel</button>` : ''}
+          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openNotes(${a.id}, ${a.patient_id}, '${a.patient_name.replace(/'/g, "\\'")}')">Notes</button>` : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   async function setStatus(id, status) {
-    try { await api.patch(`/appointments/${id}/status`, { status, reason: status === 'cancelled' ? 'Cancelled by doctor' : undefined }); toast.success(`Appointment ${status}.`); load(); }
+    try { await api.patch(`/appointments/${id}/status`, { status, reason: status === 'cancelled' ? 'Cancelled by doctor' : undefined }); toast.success(`${status[0].toUpperCase()}${status.slice(1)}.`); load(); }
     catch (e) { toast.error(e.message); }
   }
 
@@ -114,29 +125,28 @@
     document.getElementById('modal-root').innerHTML = `
       <div class="modal-backdrop" id="notes-backdrop">
         <div class="modal" style="max-width:720px;">
-          <div class="modal-header"><h3 class="mb-0">Consultation notes — ${patientName}</h3><button class="modal-close" id="notes-close">&times;</button></div>
+          <div class="modal-header"><h3 class="mb-0">${patientName}</h3><button class="modal-close" id="notes-close">&times;</button></div>
           <div class="field"><label for="dx">Diagnosis</label><input id="dx" required></div>
-          <div class="field"><label for="summary">Consultation summary</label><textarea id="summary" rows="3"></textarea></div>
+          <div class="field"><label for="summary">Summary</label><textarea id="summary" rows="3"></textarea></div>
           <div class="form-row">
             <div class="field"><label for="bp">Blood pressure</label><input id="bp" placeholder="120/80"></div>
             <div class="field"><label for="pulse">Pulse</label><input id="pulse" placeholder="72 bpm"></div>
           </div>
-          <div class="field"><label for="fu">Follow-up date (optional)</label><input type="date" id="fu"><div class="hint">Setting a date automatically adds a follow-up step to the patient's care plan below.</div></div>
+          <div class="field"><label for="fu">Follow-up date</label><input type="date" id="fu"></div>
 
           <h4 style="margin-top:var(--space-4);">Prescriptions</h4>
           <div id="rx-rows"></div>
           <button type="button" class="btn btn-outline btn-sm" id="add-rx-row">+ Add medicine</button>
 
           <div class="plan-box">
-            <h4 class="mb-0">Plain-language plan for the patient <span class="text-sm text-muted" style="font-weight:500;">(optional)</span></h4>
-            <p class="hint">Written for the patient, not for the chart. They see it under "My Care Plan" with the steps below as a checklist.</p>
-            <div class="field"><textarea id="plain-plan" rows="3" placeholder="e.g. Your blood pressure is a little high. Take the new tablet every morning, cut down on salt, and come back in two weeks."></textarea></div>
+            <h4 class="mb-0">Plan for the patient <span class="text-sm text-muted" style="font-weight:500;">(plain words)</span></h4>
+            <div class="field"><textarea id="plain-plan" rows="3" placeholder="e.g. Take the tablet each morning, cut salt, come back in two weeks."></textarea></div>
             <div id="cm-rows"></div>
             <button type="button" class="btn btn-outline btn-sm" id="add-cm-row">+ Add step</button>
           </div>
 
           <div id="notes-alert" style="margin-top:var(--space-4);"></div>
-          <button class="btn btn-primary btn-block" id="notes-submit" style="margin-top:var(--space-3);">Save &amp; mark completed</button>
+          <button class="btn btn-primary btn-block" id="notes-submit" style="margin-top:var(--space-3);">Save</button>
         </div>
       </div>`;
     document.getElementById('notes-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');
@@ -180,7 +190,7 @@
             });
           } catch (planErr) { toast.error(`Record saved, but the care plan was not: ${planErr.message}`); }
         }
-        toast.success(steps.length ? `Consultation saved. ${steps.length} step${steps.length > 1 ? 's' : ''} added to the patient's care plan.` : 'Consultation saved and appointment marked completed.');
+        toast.success('Saved.');
         document.getElementById('modal-root').innerHTML = '';
         load();
       } catch (e) { document.getElementById('notes-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }

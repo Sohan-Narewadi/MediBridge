@@ -8,12 +8,12 @@
 <style>
   .cp-eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary-700); margin-bottom: var(--space-1); }
   .cp-plan-layout { display: grid; grid-template-columns: 1.25fr 1fr; gap: var(--space-5); align-items: start; }
-  .cp-progress-card { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: center; margin-bottom: var(--space-5); }
+  .cp-progress-card { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: center; margin: var(--space-4) 0; padding: var(--space-4) var(--space-5); }
   .cp-progress { height: 10px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; margin-top: var(--space-2); }
   .cp-progress > i { display: block; height: 100%; background: var(--color-primary-600); transition: width 0.3s ease; }
   .cp-counts { display: flex; gap: var(--space-5); }
   .cp-counts div { text-align: center; }
-  .cp-counts .cp-n { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; color: var(--color-ink-900); line-height: 1.1; }
+  .cp-counts .cp-n { font-family: var(--font-display); font-weight: 400; font-size: 1.6rem; color: var(--color-ink-900); line-height: 1.1; }
   .cp-counts .cp-n.danger { color: var(--color-danger-500); }
   .cp-counts .cp-l { font-size: 0.74rem; font-weight: 600; color: var(--color-ink-500); }
   .cp-group-title { display: flex; align-items: center; gap: var(--space-2); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-500); margin: var(--space-5) 0 var(--space-2); }
@@ -37,11 +37,13 @@
   .cp-plan-card .cp-who { font-size: 0.82rem; color: var(--color-ink-500); margin-bottom: var(--space-3); }
   .cp-plan-card blockquote { margin: 0; padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-primary-500); background: var(--color-primary-50); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--color-ink-900); font-size: 0.95rem; line-height: 1.6; }
   .cp-plan-card .cp-steps { font-size: 0.8rem; color: var(--color-ink-500); margin-top: var(--space-3); }
+  .cp-clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .cp-snooze { background: none; border: none; color: var(--color-ink-500); font-size: 0.75rem; cursor: pointer; padding: 0; text-decoration: underline; }
   @media (max-width: 900px) { .cp-plan-layout { grid-template-columns: 1fr; } .cp-progress-card { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -51,21 +53,15 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div style="margin-bottom: var(--space-5);">
-      <div class="cp-eyebrow">Visit Loop</div>
-      <h2 style="margin-bottom:2px;">My Care Plan</h2>
-      <p class="text-muted mb-0">What your doctors asked you to do, in plain words, and what's still open. Your doctor sees this list too.</p>
-    </div>
+    <h2>Care plan</h2>
 
     <div class="card cp-progress-card" id="progress"><div class="skeleton" style="height:56px;"></div></div>
 
     <div class="cp-plan-layout">
       <section>
-        <div class="card-header"><h3 class="mb-0">Next steps</h3></div>
         <div id="checklist"><div class="card skeleton" style="height:200px;"></div></div>
       </section>
       <section>
-        <div class="card-header"><h3 class="mb-0">From your doctors</h3></div>
         <div id="plans"><div class="card skeleton" style="height:200px;"></div></div>
       </section>
     </div>
@@ -113,14 +109,12 @@
     const pct = total ? Math.round((completed / total) * 100) : 0;
     document.getElementById('progress').innerHTML = `
       <div>
-        <strong>${total ? `${completed} of ${total} steps done` : 'No steps yet'}</strong>
-        <div class="text-sm text-muted">${overdue.length ? `${overdue.length} step${overdue.length > 1 ? 's are' : ' is'} overdue - your doctor can see this too.` : total ? "You're on track." : 'Steps appear here after a visit.'}</div>
+        <strong>${total ? `${completed} of ${total} done` : 'No steps yet'}</strong>
         <div class="cp-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
       </div>
       <div class="cp-counts">
         <div><div class="cp-n ${overdue.length ? 'danger' : ''}">${overdue.length}</div><div class="cp-l">Overdue</div></div>
         <div><div class="cp-n">${open.length}</div><div class="cp-l">Open</div></div>
-        <div><div class="cp-n">${completed}</div><div class="cp-l">Done</div></div>
       </div>`;
   }
 
@@ -140,11 +134,11 @@
         ${checkBtn}
         <div>
           <div class="cp-title">${esc(c.title)}</div>
-          <div class="cp-meta">${esc(KIND_LABEL[c.kind] || 'Step')} · ${esc(due)}${esc(doneNote)} · ${esc(c.doctor_name)}</div>
+          <div class="cp-meta">${esc(due)}${esc(doneNote)}</div>
         </div>
         <div class="cp-side">
-          <span class="cp-owner ${ownerCls}">${isMine ? 'You' : isDone ? ownerLabel : `Waiting on ${ownerLabel}`}</span>
-          ${!isDone && isMine && group === 'overdue' ? `<button class="cp-snooze" onclick="setStatus(${c.id}, 'skipped')">Can't do this</button>` : ''}
+          <span class="cp-owner ${ownerCls}">${ownerLabel}</span>
+          ${!isDone && isMine && group === 'overdue' ? `<button class="cp-snooze" onclick="setStatus(${c.id}, 'skipped')">Skip</button>` : ''}
         </div>
       </div>`;
   }
@@ -152,24 +146,25 @@
   function renderChecklist({ open, overdue, done }) {
     const el = document.getElementById('checklist');
     if (!open.length && !overdue.length && !done.length) {
-      el.innerHTML = '<div class="card empty-state"><h4>Nothing to do yet</h4><p>After your next visit, your doctor\'s plan and next steps will appear here.</p></div>';
+      el.innerHTML = '<div class="card empty-state"><div class="icon" data-icon="listChecks"></div><p>Nothing to do.</p></div>'; MB_LAYOUT.hydrate();
       return;
     }
     el.innerHTML = `
-      ${overdue.length ? `<div class="cp-group-title danger">Overdue · ${overdue.length}</div>${overdue.map((c) => taskRow(c, 'overdue')).join('')}` : ''}
-      ${open.length ? `<div class="cp-group-title">Coming up · ${open.length}</div>${open.map((c) => taskRow(c, 'open')).join('')}` : ''}
-      ${done.length ? `<div class="cp-group-title">Done · ${done.length}</div>${done.map((c) => taskRow(c, 'done')).join('')}` : ''}`;
+      ${overdue.length ? `<div class="cp-group-title danger">Overdue ${overdue.length}</div>${overdue.map((c) => taskRow(c, 'overdue')).join('')}` : ''}
+      ${open.length ? `<div class="cp-group-title">Open ${open.length}</div>${open.map((c) => taskRow(c, 'open')).join('')}` : ''}
+      ${done.length ? `<div class="cp-group-title">Done ${done.length}</div>${done.map((c) => taskRow(c, 'done')).join('')}` : ''}`;
   }
 
   function renderPlans(plans) {
     const el = document.getElementById('plans');
     if (!plans.length) {
-      el.innerHTML = '<div class="card empty-state"><p>No care plans yet.</p></div>';
+      el.innerHTML = '';
       return;
     }
     el.innerHTML = plans.slice(0, 6).map((p) => {
       const openSteps = p.commitments.filter((c) => c.status === 'open').length;
       const label = p.admission_id ? 'Hospital discharge plan' : (p.diagnosis ? esc(p.diagnosis) : 'Visit plan');
+      const long = (p.plain_summary || '').length > 150;
       return `
         <article class="card cp-plan-card">
           <div class="flex justify-between items-center" style="gap: var(--space-3); flex-wrap: wrap;">
@@ -177,10 +172,16 @@
             ${p.admission_id ? '<span class="badge badge-info">Discharge</span>' : ''}
           </div>
           <div class="cp-who">${esc(p.doctor_name)} · ${esc(fmtDate(p.created_at))}</div>
-          <blockquote>${esc(p.plain_summary)}</blockquote>
-          ${p.commitments.length ? `<div class="cp-steps">${p.commitments.length} step${p.commitments.length > 1 ? 's' : ''} · ${openSteps} still open</div>` : ''}
+          <blockquote><div class="cp-clamp" id="pl-${p.id}">${esc(p.plain_summary)}</div></blockquote>
+          ${long ? `<button class="cp-snooze" style="margin-top: var(--space-2);" onclick="togglePlan(${p.id}, this)">Read more</button>` : ''}
         </article>`;
     }).join('');
+  }
+
+  function togglePlan(id, btn) {
+    const el = document.getElementById(`pl-${id}`);
+    el.classList.toggle('cp-clamp');
+    btn.textContent = el.classList.contains('cp-clamp') ? 'Read more' : 'Show less';
   }
 
   async function setStatus(id, status) {

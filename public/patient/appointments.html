@@ -5,8 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>My Appointments — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<style>
+  .ap { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-4) var(--space-5); margin-bottom: var(--space-3); flex-wrap: wrap; }
+  .ap .dt { width: 52px; flex-shrink: 0; text-align: center; line-height: 1.1; }
+  .ap .dt .m { font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); }
+  .ap .dt .d { font-family: var(--font-display); font-size: 1.7rem; }
+  .ap .who { flex: 1; min-width: 180px; }
+  .ap .who .n { font-weight: 600; }
+  .ap .who .s { font-size: 0.82rem; color: var(--color-ink-500); }
+  .ap .acts { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+</style>
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -16,7 +27,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">My Appointments</h2><a href="/patient/doctors.html" class="btn btn-primary btn-sm">Book new</a></div>
+    <div class="card-header"><h2 class="mb-0">My Appointments</h2><a href="/patient/doctors.html" class="btn btn-primary btn-sm" style="color:var(--color-surface);">Book</a></div>
 
     <div class="pill-nav" id="tabs" style="margin: var(--space-4) 0;">
       <button data-tab="upcoming" class="active">Upcoming</button>
@@ -65,7 +76,7 @@
 
   function filtered() {
     const today = new Date().toISOString().slice(0, 10);
-    if (activeTab === 'upcoming') return allAppointments.filter((a) => ['pending', 'confirmed'].includes(a.status) && a.appointment_date >= today);
+    if (activeTab === 'upcoming') return allAppointments.filter((a) => ['pending', 'confirmed'].includes(a.status) && a.appointment_date >= today).sort((x, y) => (x.appointment_date + x.start_time).localeCompare(y.appointment_date + y.start_time));
     if (activeTab === 'completed') return allAppointments.filter((a) => a.status === 'completed');
     if (activeTab === 'cancelled') return allAppointments.filter((a) => a.status === 'cancelled');
     return allAppointments;
@@ -75,31 +86,31 @@
     const list = filtered();
     const el = document.getElementById('appt-list');
     if (!list.length) {
-      el.innerHTML = `<div class="empty-state"><div class="icon">&#128197;</div><h4>Nothing here yet</h4><p>No appointments in this view.</p></div>`;
+      el.innerHTML = `<div class="empty-state"><div class="icon" data-icon="calendar"></div><p>Nothing here.</p></div>`;
+      MB_LAYOUT.hydrate();
       return;
     }
-    el.innerHTML = list.map((a) => `
-      <div class="card" style="margin-bottom: var(--space-3);">
-        <div class="flex justify-between items-start" style="flex-wrap:wrap; gap: var(--space-3);">
-          <div>
-            <h4 style="margin-bottom:2px;">${a.doctor_name} <span class="text-muted text-sm">&#8226; ${a.specialization}</span></h4>
-            <p class="text-sm mb-0">&#128197; ${a.appointment_date} at ${a.start_time.slice(0,5)} &#8226; ${a.consultation_mode.replace('_',' ')}</p>
-            ${a.reason ? `<p class="text-sm text-muted mb-0">Reason: ${a.reason}</p>` : ''}
-            ${a.status === 'cancelled' && a.cancellation_reason ? `<p class="text-sm text-muted mb-0">Cancelled by ${a.cancelled_by}: ${a.cancellation_reason}</p>` : ''}
-          </div>
-          <span class="badge status-${a.status}">${a.status}</span>
+    const todayIso = new Date().toISOString().slice(0, 10);
+    el.innerHTML = list.map((a) => {
+      const d = new Date(`${a.appointment_date.slice(0, 10)}T00:00:00`);
+      const upcoming = ['pending', 'confirmed'].includes(a.status) && a.appointment_date >= todayIso;
+      return `
+      <div class="card ap">
+        <div class="dt"><div class="m">${d.toLocaleDateString(undefined, { month: 'short' })}</div><div class="d">${d.getDate()}</div></div>
+        <div class="who">
+          <div class="n">${a.doctor_name}</div>
+          <div class="s">${a.specialization} · ${a.start_time.slice(0,5)} · ${a.consultation_mode === 'video' ? 'Video' : 'In person'}</div>
         </div>
-        <div class="flex gap-2" style="margin-top: var(--space-3); flex-wrap: wrap;">
-          ${['pending', 'confirmed'].includes(a.status) && a.appointment_date >= new Date().toISOString().slice(0, 10)
-            ? (intakeIds.has(a.id)
-              ? `<span class="badge badge-success" style="align-self:center;">Pre-visit info sent</span><a class="btn btn-ghost btn-sm" href="/patient/intake.html?appointment=${a.id}">Edit</a>`
-              : `<a class="btn btn-primary btn-sm" href="/patient/intake.html?appointment=${a.id}">Add pre-visit info</a>`)
-            : ''}
-          ${['pending', 'confirmed'].includes(a.status) ? `<button class="btn btn-outline btn-sm" onclick="openReschedule(${a.id}, ${a.doctor_id})">Reschedule</button><button class="btn btn-danger btn-sm" onclick="cancelAppt(${a.id})">Cancel</button>` : ''}
-          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openReview(${a.id})">Leave a review</button>` : ''}
+        <span class="badge status-${a.status}">${a.status}</span>
+        <div class="acts">
+          ${upcoming ? (intakeIds.has(a.id)
+            ? `<a class="btn btn-ghost btn-sm" href="/patient/intake.html?appointment=${a.id}">Edit form</a>`
+            : `<a class="btn btn-primary btn-sm" href="/patient/intake.html?appointment=${a.id}">Fill form</a>`) : ''}
+          ${['pending', 'confirmed'].includes(a.status) ? `<button class="btn btn-outline btn-sm" onclick="openReschedule(${a.id}, ${a.doctor_id})">Reschedule</button><button class="btn btn-ghost btn-sm" onclick="cancelAppt(${a.id})">Cancel</button>` : ''}
+          ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openReview(${a.id})">Review</button>` : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   }
 
   async function cancelAppt(id) {
@@ -129,9 +140,9 @@
       wrap.innerHTML = '<div class="skeleton" style="height:70px;"></div>';
       const { slots } = await api.get(`/doctors/${doctorId}/slots?date=${e.target.value}`);
       if (!slots.length) { wrap.innerHTML = '<p class="text-muted text-sm">No open slots that day.</p>'; return; }
-      wrap.innerHTML = `<div class="slot-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${slots.map((s) => `<button type="button" class="slot-btn" style="padding:0.5rem;border-radius:8px;border:1.5px solid var(--color-ink-200);background:#fff;cursor:pointer;" data-start="${s.startTime}">${s.startTime.slice(0,5)}</button>`).join('')}</div>`;
+      wrap.innerHTML = `<div class="slot-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${slots.map((s) => `<button type="button" class="slot-btn" style="padding:0.5rem;border-radius:8px;border:1.5px solid var(--color-ink-200);background:var(--color-surface);cursor:pointer;" data-start="${s.startTime}">${s.startTime.slice(0,5)}</button>`).join('')}</div>`;
       wrap.querySelectorAll('.slot-btn').forEach((b) => b.addEventListener('click', () => {
-        wrap.querySelectorAll('.slot-btn').forEach((x) => { x.style.background = '#fff'; x.style.color = 'inherit'; });
+        wrap.querySelectorAll('.slot-btn').forEach((x) => { x.style.background = 'var(--color-surface)'; x.style.color = 'inherit'; });
         b.style.background = 'var(--color-primary-600)'; b.style.color = '#fff';
         newSlot = b.dataset.start;
         document.getElementById('rs-submit').disabled = false;

@@ -6,24 +6,32 @@
 <title>Operations Center — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .ops-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
-  .ops-section { margin-top: var(--space-7); }
-  .ops-section:first-of-type { margin-top: 0; }
-  .section-title { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
-    border-bottom: 1px solid var(--color-ink-200); padding-bottom: var(--space-2); margin-bottom: var(--space-4); }
-  .section-title h3 { margin: 0; }
-  .section-title .num { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; color: var(--color-ink-500); margin-right: var(--space-2); }
-  .ops-callout { display: flex; gap: var(--space-4); align-items: center; padding: var(--space-4) var(--space-5); border-radius: var(--radius-md);
-    background: var(--color-warning-100); border: 1px solid var(--color-warning-500); margin: var(--space-4) 0; }
-  .ops-callout .big { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; color: var(--color-ink-900); }
-
-
-  .wait-cell { font-variant-numeric: tabular-nums; font-weight: 700; }
+  .ops-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
+  .ops-top h2 { margin: 0; }
+  .ops-tabs { display: inline-flex; gap: 2px; padding: 3px; background: var(--color-ink-100); border: 1px solid var(--color-line); border-radius: var(--radius-full); }
+  .ops-tabs button { border: 0; background: transparent; padding: 0.4rem 1.05rem; border-radius: var(--radius-full); font: inherit; font-size: 0.84rem; font-weight: 500; color: var(--color-ink-700); cursor: pointer; }
+  .ops-tabs button:hover { color: var(--color-ink-900); }
+  .ops-tabs button.active { background: var(--color-surface); color: var(--color-primary-700); box-shadow: 0 1px 2px rgba(43, 35, 33, 0.08); }
+  .ops-tabs .n { display: inline-block; min-width: 18px; margin-left: 0.35rem; padding: 0 5px; border-radius: 9px; background: var(--color-ink-150); font-size: 0.7rem; font-variant-numeric: tabular-nums; }
+  .ops-tabs button.active .n { background: var(--color-primary-50); color: var(--color-primary-700); }
+  .kpi .kpi-value { font-size: 2.1rem; }
+  .insight { display: flex; gap: var(--space-3); align-items: center; margin: var(--space-4) 0; padding: 0.8rem 1.1rem; border-radius: var(--radius-md); background: var(--color-warning-100); color: var(--color-warning-700); font-weight: 500; font-size: 0.9rem; }
+  .insight .mb-icon { flex-shrink: 0; }
+  .panel-grid { display: grid; gap: var(--space-4); margin-top: var(--space-4); }
+  .more { display: flex; justify-content: center; margin-top: var(--space-3); }
+  .wait-cell { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 500; white-space: nowrap; }
   .wait-cell.over { color: var(--color-danger-500); }
-  .unavailable { padding: var(--space-5); border: 1px dashed var(--color-ink-300); border-radius: var(--radius-md); color: var(--color-ink-500); font-size: 0.9rem; }
-  .jump { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-  .progress-mini { display: inline-block; width: 70px; height: 5px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; vertical-align: middle; margin-right: var(--space-2); }
-  .progress-mini > span { display: block; height: 100%; background: var(--color-primary-600); }
+  .unavailable { padding: var(--space-4); border: 1px dashed var(--color-ink-300); border-radius: var(--radius-md); color: var(--color-ink-500); font-size: 0.88rem; }
+  .steps-mini { font-size: 0.74rem; color: var(--color-ink-500); font-family: var(--font-mono); margin-left: 0.35rem; }
+  .stack-bar { display: flex; height: 14px; border-radius: var(--radius-full); overflow: hidden; background: var(--color-ink-150); gap: 2px; }
+  .stack-bar span { display: block; height: 100%; }
+  .stack-legend { display: flex; gap: var(--space-5); flex-wrap: wrap; margin-top: var(--space-3); font-size: 0.82rem; color: var(--color-ink-700); }
+  .stack-legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 0.4rem; }
+  .ring-row { display: flex; align-items: center; gap: var(--space-6); flex-wrap: wrap; }
+  .ring-row .chips { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+  .chart-wrap { position: relative; height: 230px; }
+  .tbl-sub { font-size: 0.78rem; color: var(--color-ink-500); }
+  @media (max-width: 520px) { .ops-tabs { width: 100%; } .ops-tabs button { flex: 1; padding: 0.4rem 0.4rem; } }
 </style>
 </head>
 <body>
@@ -36,47 +44,39 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="ops-head">
-      <div>
-        <h2 style="margin-bottom:2px;">Operations Center</h2>
-        <p class="text-muted mb-0">Where patients are getting stuck between handoffs: discharges, hospital transfers and post-visit follow-through.</p>
-      </div>
-      <div class="jump">
-        <a class="btn btn-ghost btn-sm" href="#discharge">Discharge</a>
-        <a class="btn btn-ghost btn-sm" href="#transfers">Transfers</a>
-        <a class="btn btn-ghost btn-sm" href="#loops">Visit Loop</a>
+    <div class="ops-top">
+      <h2>Operations</h2>
+      <div class="ops-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="discharge" class="active">Discharge<span class="n" id="n-discharge">–</span></button>
+        <button type="button" role="tab" data-tab="transfers">Transfers<span class="n" id="n-transfers">–</span></button>
+        <button type="button" role="tab" data-tab="loops">Follow-ups<span class="n" id="n-loops">–</span></button>
       </div>
     </div>
 
-    <!-- 1. Discharge -->
-    <section class="ops-section" id="discharge">
-      <div class="section-title"><h3><span class="num">01</span>Discharge Flow</h3><span class="text-sm text-muted" id="discharge-updated"></span></div>
-      <div class="stat-grid" id="discharge-stats">
-        <div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div>
-        <div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div>
+    <section id="tab-discharge" role="tabpanel">
+      <div class="kpi-row" id="discharge-kpis" style="--kpi-cols:4;">
+        <div class="kpi"><div class="skeleton" style="height:56px;"></div></div><div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
+        <div class="kpi"><div class="skeleton" style="height:56px;"></div></div><div class="kpi"><div class="skeleton" style="height:56px;"></div></div>
       </div>
       <div id="bottleneck-callout"></div>
-      <div class="card">
-        <div class="card-header"><h4 class="mb-0">Live board: cleared patients still in a bed</h4></div>
-        <div id="board"><div class="skeleton" style="height:140px;"></div></div>
-      </div>
-      <div class="card" style="margin-top: var(--space-4);">
-        <h4>Average time per department vs target (last 30 days)</h4>
-        <p class="text-sm text-muted">Minutes from "medically cleared" to the department signing off. Red bars missed their target on average.</p>
-        <div id="dept-chart-wrap"><canvas id="dept-chart" height="90"></canvas></div>
+      <div class="panel-grid">
+        <div class="card">
+          <div class="card-header"><h3>Waiting now</h3><span class="text-xs text-muted" id="discharge-updated"></span></div>
+          <div id="board"><div class="skeleton" style="height:140px;"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Delay by desk</h3><span class="text-xs text-muted">minutes, 30 days</span></div>
+          <div class="chart-wrap" id="dept-chart-wrap"><canvas id="dept-chart"></canvas></div>
+        </div>
       </div>
     </section>
 
-    <!-- 2. Transfers -->
-    <section class="ops-section" id="transfers">
-      <div class="section-title"><h3><span class="num">02</span>TransferConnect</h3></div>
-      <div id="transfers-body"><div class="card skeleton" style="height:120px;"></div></div>
+    <section id="tab-transfers" role="tabpanel" hidden>
+      <div id="transfers-body"><div class="skeleton" style="height:180px;"></div></div>
     </section>
 
-    <!-- 3. Visit Loop -->
-    <section class="ops-section" id="loops">
-      <div class="section-title"><h3><span class="num">03</span>Visit Loop: follow-through after care</h3></div>
-      <div id="loops-body"><div class="card skeleton" style="height:120px;"></div></div>
+    <section id="tab-loops" role="tabpanel" hidden>
+      <div id="loops-body"><div class="skeleton" style="height:180px;"></div></div>
     </section>
   </main>
 </div>
@@ -87,15 +87,49 @@
   const fmtMins = (m) => (m == null ? '—' : m >= 60 ? `${Math.floor(m / 60)}h ${String(Math.round(m) % 60).padStart(2, '0')}m` : `${Math.round(m)}m`);
   const fmtWhen = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
   const cssVar = (name, fallback) => (getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback);
-  const unavailable = (what, err) => `<div class="unavailable">${esc(what)} is unavailable right now${err ? ` (${esc(err.message)})` : ''}.</div>`;
-  const stat = (value, label) => `<div class="card stat-card"><span class="value">${value}</span><span class="label">${label}</span></div>`;
-  const KIND = { follow_up: 'Follow-up visit', test: 'Test', medication: 'Medication', lifestyle: 'Lifestyle', other: 'Other' };
+  const unavailable = (what, err) => `<div class="unavailable">${esc(what)} unavailable${err ? ` (${esc(err.message)})` : ''}.</div>`;
+  const kpi = (label, value, sub, cls = '') => `<div class="kpi ${cls}"><div class="kpi-label">${esc(label)}</div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub || '&nbsp;'}</div></div>`;
+  const KIND = { follow_up: 'Follow-up', test: 'Test', medication: 'Medication', lifestyle: 'Lifestyle', other: 'Other' };
+  const TABS = ['discharge', 'transfers', 'loops'];
+  const LIMIT = 5;
 
   let deptChart = null;
+  let deptRows = null;
+  let currentTab = 'discharge';
+
+  // ---- tabs (remembered in the URL hash) ----
+  function showTab(name) {
+    if (!TABS.includes(name)) name = 'discharge';
+    currentTab = name;
+    TABS.forEach((t) => { document.getElementById(`tab-${t}`).hidden = t !== name; });
+    document.querySelectorAll('.ops-tabs button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+    history.replaceState(null, '', `#${name}`);
+    if (name === 'discharge' && deptRows) renderDeptChart(deptRows); // a hidden canvas has no size, so draw once visible
+  }
+  document.querySelectorAll('.ops-tabs button').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+  window.addEventListener('hashchange', () => showTab(location.hash.slice(1)));
+
+  // A table that shows the first few rows with a "View all" toggle.
+  function limited(rowsHtml, total, id) {
+    if (total <= LIMIT) return rowsHtml.join('');
+    return rowsHtml.map((r, i) => i < LIMIT ? r : r.replace('<tr', `<tr data-extra="${id}" hidden`)).join('');
+  }
+  function bindMore(root, id, total) {
+    const btn = root.querySelector(`[data-more="${id}"]`);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const open = btn.dataset.open !== '1';
+      btn.dataset.open = open ? '1' : '0';
+      root.querySelectorAll(`[data-extra="${id}"]`).forEach((r) => { r.hidden = !open; });
+      btn.textContent = open ? 'Show less' : `View all ${total}`;
+    });
+  }
+  const moreBtn = (id, total) => total > LIMIT ? `<div class="more"><button type="button" class="btn btn-ghost btn-sm" data-more="${id}">View all ${total}</button></div>` : '';
 
   function init(user) {
-    MB_LAYOUT.renderDashboardShell('admin', 'Operations Center');
+    MB_LAYOUT.renderDashboardShell('admin', 'Operations');
     MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    showTab(location.hash.slice(1));
     loadDischargeAnalytics();
     loadBoard();
     loadTransfers();
@@ -111,75 +145,74 @@
   async function loadDischargeAnalytics() {
     try {
       const a = await api.get('/discharge/analytics');
-      document.getElementById('discharge-stats').innerHTML =
-        stat(a.currentWaiting, 'Cleared, still waiting') +
-        stat(fmtMins(a.avgWaitMinutes), 'Avg clearance-to-exit (30d)') +
-        stat(a.dischargesLast30, 'Discharges (30d)') +
-        stat(a.topBottleneck ? esc(a.topBottleneck.department_label) : 'None', 'Biggest bottleneck');
-      document.getElementById('bottleneck-callout').innerHTML = a.topBottleneck ? `
-        <div class="ops-callout"><div>
-          <div class="big">${esc(a.topBottleneck.department_label)} causes the most delay: avg ${fmtMins(a.topBottleneck.avg_minutes)} vs ${fmtMins(a.topBottleneck.sla_minutes)} target</div>
-          <div class="text-sm">${a.topBottleneck.breach_pct}% of recent discharges missed the ${esc(a.topBottleneck.department_label.toLowerCase())} target. Fixing this one desk shortens every patient's wait the most.</div>
-        </div></div>` : '';
-      renderDeptChart(a.deptAvg);
+      const top = a.topBottleneck;
+      document.getElementById('discharge-kpis').innerHTML =
+        kpi('Waiting', a.currentWaiting, 'cleared, still in bed', a.currentWaiting ? 'is-warning' : '') +
+        kpi('Avg wait', fmtMins(a.avgWaitMinutes), 'last 30 days') +
+        kpi('Discharged', a.dischargesLast30, 'last 30 days') +
+        kpi('Slowest desk', top ? `<span style="font-size:1.7rem;">${esc(top.department_label)}</span>` : '–', top ? `avg ${fmtMins(top.avg_minutes)}` : '', top ? 'is-danger' : '');
+      document.getElementById('n-discharge').textContent = a.currentWaiting;
+      document.getElementById('bottleneck-callout').innerHTML = top
+        ? `<div class="insight">${MB_LAYOUT.icon('alertCircle', 16)}<span>${esc(top.department_label)} causes the most delay: avg ${fmtMins(top.avg_minutes)} vs ${fmtMins(top.sla_minutes)} target</span></div>` : '';
+      deptRows = a.deptAvg || [];
+      if (currentTab === 'discharge') renderDeptChart(deptRows);
     } catch (err) {
-      document.getElementById('discharge-stats').innerHTML = unavailable('Discharge analytics', err);
-      document.getElementById('dept-chart-wrap').innerHTML = unavailable('Department timing');
+      document.getElementById('discharge-kpis').innerHTML = `<div class="kpi">${unavailable('Discharge data', err)}</div>`;
+      document.getElementById('dept-chart-wrap').innerHTML = unavailable('Chart');
     }
   }
 
   function renderDeptChart(rows) {
-    if (!window.Chart) { document.getElementById('dept-chart-wrap').innerHTML = unavailable('Chart library'); return; }
-    const over = cssVar('--color-danger-500', 'crimson');
+    const wrap = document.getElementById('dept-chart-wrap');
+    if (!window.Chart) { wrap.innerHTML = unavailable('Chart library'); return; }
+    if (!rows.length) { wrap.innerHTML = '<p class="text-muted text-sm mb-0">No data yet.</p>'; return; }
+    const over = cssVar('--color-danger-500', '#c2402d');
     const ok = cssVar('--color-success-500', '#5c6e3b');
-    const target = cssVar('--color-ink-300', 'silver');
+    const target = cssVar('--color-ink-300', '#d6cabb');
     if (deptChart) deptChart.destroy();
     deptChart = new Chart(document.getElementById('dept-chart'), {
       type: 'bar',
       data: {
         labels: rows.map((r) => r.department_label),
         datasets: [
-          { label: 'Average (min)', data: rows.map((r) => r.avg_minutes), backgroundColor: rows.map((r) => (r.avg_minutes > r.sla_minutes ? over : ok)), borderRadius: 4 },
-          { label: 'Target (min)', data: rows.map((r) => r.sla_minutes), backgroundColor: target, borderRadius: 4 },
+          { label: 'Average', data: rows.map((r) => r.avg_minutes), backgroundColor: rows.map((r) => (r.avg_minutes > r.sla_minutes ? over : ok)), borderRadius: 4, maxBarThickness: 14 },
+          { label: 'Target', data: rows.map((r) => r.sla_minutes), backgroundColor: target, borderRadius: 4, maxBarThickness: 14 },
         ],
       },
       options: {
-        indexAxis: 'y',
-        responsive: true,
-        animation: false,
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false, animation: false,
         plugins: {
-          legend: { position: 'bottom' },
-          tooltip: { callbacks: { afterBody: (items) => { const r = rows[items[0].dataIndex]; return `${r.breach_pct}% missed target (${r.completed} discharges)`; } } },
+          legend: { position: 'bottom', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle' } },
+          tooltip: { callbacks: { afterBody: (items) => { const r = rows[items[0].dataIndex]; return `${r.breach_pct}% missed target`; } } },
         },
-        scales: { x: { beginAtZero: true, title: { display: true, text: 'minutes after clearance' } } },
+        scales: { x: { beginAtZero: true, grid: { color: cssVar('--color-ink-150', '#ebe2d3') }, border: { display: false } }, y: { grid: { display: false } } },
       },
     });
   }
 
-  let boardData = null;
   let boardFetchedAt = Date.now();
   async function loadBoard() {
     const el = document.getElementById('board');
     try {
-      boardData = await api.get('/discharge/board');
+      const data = await api.get('/discharge/board');
       boardFetchedAt = Date.now();
-      document.getElementById('discharge-updated').textContent = `${boardData.inTreatment} in treatment · updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-      if (!boardData.admissions.length) { el.innerHTML = '<div class="empty-state"><p class="mb-0">No cleared patients are waiting. Every bed is turning over.</p></div>'; return; }
-      const live = (m) => m + Math.floor((Date.now() - boardFetchedAt) / 60000);
-      el.innerHTML = `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Patient</th><th>Waiting</th><th>Progress</th><th>Held up by</th><th></th></tr></thead>
-        <tbody>${boardData.admissions.map((a) => {
-          const w = live(a.waiting_minutes || 0);
-          const b = a.bottleneck;
-          return `<tr>
-            <td><strong>${esc(a.patient_name)}</strong><div class="text-sm text-muted">${esc(a.ward || '')} ${esc(a.bed || '')} &middot; ${esc(a.doctor_name)}</div></td>
-            <td class="wait-cell ${w > 120 ? 'over' : ''}">${fmtMins(w)}</td>
-            <td><span class="progress-mini"><span style="width:${a.tasks_total ? Math.round(a.tasks_done / a.tasks_total * 100) : 0}%"></span></span>${a.tasks_done}/${a.tasks_total}</td>
-            <td>${b ? `<span class="badge ${b.status === 'blocked' ? 'badge-danger' : b.overdue ? 'badge-warning' : 'badge-neutral'}">${esc(b.department_label)}</span>
-              ${b.reason ? `<div class="text-sm text-muted">${esc(b.reason)}</div>` : ''}` : '<span class="badge badge-success">Ready to go</span>'}</td>
-            <td>${b ? `<button class="btn btn-ghost btn-sm" data-nudge="${b.task_id}">Nudge</button>` : ''}</td>
-          </tr>`;
-        }).join('')}</tbody></table></div>`;
+      document.getElementById('discharge-updated').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const list = data.admissions || [];
+      if (!list.length) { el.innerHTML = '<div class="empty-state"><p class="mb-0">Nobody is waiting.</p></div>'; return; }
+      const rows = list.map((a) => {
+        const w = (a.waiting_minutes || 0) + Math.floor((Date.now() - boardFetchedAt) / 60000);
+        const b = a.bottleneck;
+        return `<tr>
+          <td><strong>${esc(a.patient_name)}</strong><div class="tbl-sub">${esc(a.ward || '')} ${esc(a.bed || '')}</div></td>
+          <td class="wait-cell ${w > 120 ? 'over' : ''}">${fmtMins(w)}</td>
+          <td>${b ? `<span class="badge ${b.status === 'blocked' ? 'badge-danger' : b.overdue ? 'badge-warning' : 'badge-neutral'}" title="${esc(b.reason || '')}">${esc(b.department_label)}</span><span class="steps-mini">${a.tasks_done}/${a.tasks_total}</span>` : '<span class="badge badge-success">Ready</span>'}</td>
+          <td class="text-right">${b ? `<button class="btn btn-ghost btn-sm" data-nudge="${b.task_id}">Nudge</button>` : ''}</td>
+        </tr>`;
+      });
+      el.innerHTML = `<div class="table-wrap"><table class="data-table" style="min-width:0;">
+        <thead><tr><th>Patient</th><th>Waiting</th><th>Held up by</th><th></th></tr></thead>
+        <tbody>${limited(rows, rows.length, 'board')}</tbody></table></div>${moreBtn('board', rows.length)}`;
+      bindMore(el, 'board', rows.length);
       el.querySelectorAll('[data-nudge]').forEach((btn) => btn.addEventListener('click', async () => {
         btn.disabled = true;
         try { const r = await api.post(`/discharge/tasks/${btn.dataset.nudge}/nudge`); toast.success(r.message); }
@@ -187,7 +220,7 @@
         finally { btn.disabled = false; }
       }));
     } catch (err) {
-      el.innerHTML = unavailable('The live discharge board', err);
+      el.innerHTML = unavailable('Live board', err);
     }
   }
 
@@ -196,25 +229,37 @@
     const el = document.getElementById('transfers-body');
     try {
       const t = await api.get('/transfers/analytics');
-      const rate = t.acceptanceRate == null ? '—' : `${Math.round(t.acceptanceRate)}%`;
+      const rate = t.acceptanceRate == null ? '–' : `${Math.round(t.acceptanceRate)}%`;
+      document.getElementById('n-transfers').textContent = t.open ?? 0;
+      const open = t.open || 0, acc = t.accepted || 0, done = t.completed || 0;
+      const total = open + acc + done;
+      const seg = (n, c) => (n ? `<span style="width:${(n / total) * 100}%; background:${c};"></span>` : '');
+      const recent = t.recent || [];
+      const rows = recent.map((r) => `<tr>
+        <td><strong>${esc(r.patient_name)}</strong><div class="tbl-sub">${esc(r.specialization)}</div></td>
+        <td><span class="badge status-${esc(r.urgency)}">${esc(r.urgency)}</span></td>
+        <td><span class="badge status-${esc(r.status)}">${esc(r.status)}</span></td>
+        <td>${esc(r.accepted_hospital || '–')}</td></tr>`);
       el.innerHTML = `
-        <div class="stat-grid">
-          ${stat(t.open ?? 0, 'Open requests')}${stat(t.accepted ?? 0, 'Accepted, in transit')}
-          ${stat(fmtMins(t.avgResponseMinutes), 'Avg time to a hospital reply')}${stat(rate, 'Acceptance rate')}
+        <div class="kpi-row" style="--kpi-cols:4;">
+          ${kpi('Open', open, 'awaiting reply', open ? 'is-warning' : '')}${kpi('In transit', acc, 'accepted')}
+          ${kpi('Reply time', fmtMins(t.avgResponseMinutes), 'average')}${kpi('Accepted', rate, 'of offers')}
         </div>
         <div class="card" style="margin-top:var(--space-4);">
-          <h4>Recent transfer requests</h4>
-          ${(t.recent || []).length ? `<div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Patient</th><th>Care needed</th><th>Urgency</th><th>Status</th><th>Receiving hospital</th><th>Requested</th></tr></thead>
-            <tbody>${t.recent.map((r) => `<tr>
-              <td>${esc(r.patient_name)}</td><td>${esc(r.specialization)}</td>
-              <td><span class="badge status-${esc(r.urgency)}">${esc(r.urgency)}</span></td>
-              <td><span class="badge status-${esc(r.status)}">${esc(r.status)}</span></td>
-              <td>${esc(r.accepted_hospital || '—')}</td><td>${fmtWhen(r.created_at)}</td></tr>`).join('')}</tbody></table></div>`
-            : '<p class="text-sm text-muted mb-0">No transfer requests yet.</p>'}
+          <div class="card-header"><h3>Pipeline</h3></div>
+          ${total ? `<div class="stack-bar">${seg(open, cssVar('--color-warning-500', '#a06b1a'))}${seg(acc, cssVar('--color-info-500', '#4f6682'))}${seg(done, cssVar('--color-success-500', '#5c6e3b'))}</div>
+          <div class="stack-legend"><span><i style="background:var(--color-warning-500)"></i>Open ${open}</span><span><i style="background:var(--color-info-500)"></i>In transit ${acc}</span><span><i style="background:var(--color-success-500)"></i>Done ${done}</span></div>`
+            : '<p class="text-muted text-sm mb-0">No requests yet.</p>'}
+        </div>
+        <div class="card" style="margin-top:var(--space-4);">
+          <div class="card-header"><h3>Recent</h3></div>
+          ${rows.length ? `<div class="table-wrap"><table class="data-table" style="min-width:0;">
+            <thead><tr><th>Patient</th><th>Urgency</th><th>Status</th><th>Hospital</th></tr></thead>
+            <tbody>${limited(rows, rows.length, 'tr')}</tbody></table></div>${moreBtn('tr', rows.length)}` : '<p class="text-muted text-sm mb-0">Nothing yet.</p>'}
         </div>`;
+      bindMore(el, 'tr', rows.length);
     } catch (err) {
-      el.innerHTML = unavailable('Transfer analytics', err);
+      el.innerHTML = unavailable('Transfer data', err);
     }
   }
 
@@ -223,23 +268,42 @@
     const el = document.getElementById('loops-body');
     try {
       const v = await api.get('/visit-loop/analytics');
-      const rate = v.completionRate == null ? '—' : `${Math.round(v.completionRate)}%`;
-      const byKind = (v.overdueByKind || []).map((k) => `<span class="badge badge-neutral">${esc(KIND[k.kind] || k.kind)}: ${k.count}</span>`).join(' ');
+      const pct = v.completionRate == null ? 0 : Math.round(v.completionRate);
+      document.getElementById('n-loops').textContent = v.overdueCount ?? 0;
+      const byKind = (v.overdueByKind || []).map((k) => `<span class="badge badge-neutral badge-plain">${esc(KIND[k.kind] || k.kind)} ${k.count}</span>`).join('');
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const late = (d) => { const [y, m, dd] = String(d).slice(0, 10).split('-').map(Number); return Math.round((today - new Date(y, m - 1, dd)) / 86400000); };
+      const list = v.overdueList || [];
+      const rows = list.map((o) => `<tr>
+        <td><strong>${esc(o.patient_name)}</strong><div class="tbl-sub">${esc(o.doctor_name || '')}</div></td>
+        <td>${esc(o.title)}</td>
+        <td class="text-right"><span class="badge status-overdue">${late(o.due_date)}d late</span></td></tr>`);
+      const r = 34, c = 2 * Math.PI * r;
       el.innerHTML = `
-        <div class="stat-grid">
-          ${stat(v.openCount ?? 0, 'Open commitments')}${stat(v.overdueCount ?? 0, 'Overdue (loop broken)')}
-          ${stat(rate, 'Completion rate')}${stat((v.overdueList || []).length, 'Patients to call')}
+        <div class="kpi-row" style="--kpi-cols:4;">
+          ${kpi('Open', v.openCount ?? 0, 'commitments')}${kpi('Overdue', v.overdueCount ?? 0, 'loops broken', v.overdueCount ? 'is-danger' : '')}
+          ${kpi('Done', `${pct}%`, 'completion')}${kpi('To call', list.length, 'patients')}
         </div>
         <div class="card" style="margin-top:var(--space-4);">
-          <div class="card-header"><h4 class="mb-0">Overdue commitments</h4><div>${byKind}</div></div>
-          ${(v.overdueList || []).length ? `<div class="table-wrap"><table class="data-table">
-            <thead><tr><th>Patient</th><th>Commitment</th><th>Was due</th><th>Doctor</th></tr></thead>
-            <tbody>${v.overdueList.map((o) => `<tr><td>${esc(o.patient_name)}</td><td>${esc(o.title)}</td>
-              <td><span class="badge badge-danger">${esc(o.due_date)}</span></td><td>${esc(o.doctor_name)}</td></tr>`).join('')}</tbody></table></div>`
-            : '<p class="text-sm text-muted mb-0">Nothing overdue. Every loop is closed.</p>'}
+          <div class="ring-row">
+            <svg width="86" height="86" viewBox="0 0 86 86" role="img" aria-label="${pct}% completed">
+              <circle cx="43" cy="43" r="${r}" fill="none" stroke="var(--color-ink-150)" stroke-width="8"/>
+              <circle cx="43" cy="43" r="${r}" fill="none" stroke="var(--color-primary-600)" stroke-width="8" stroke-linecap="round"
+                stroke-dasharray="${(c * pct) / 100} ${c}" transform="rotate(-90 43 43)"/>
+              <text x="43" y="48" text-anchor="middle" font-family="var(--font-display)" font-size="20" fill="var(--color-ink-900)">${pct}%</text>
+            </svg>
+            <div><div class="section-label">Overdue by type</div><div class="chips">${byKind || '<span class="text-muted text-sm">None</span>'}</div></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:var(--space-4);">
+          <div class="card-header"><h3>Overdue</h3></div>
+          ${rows.length ? `<div class="table-wrap"><table class="data-table" style="min-width:0;">
+            <thead><tr><th>Patient</th><th>Task</th><th></th></tr></thead>
+            <tbody>${limited(rows, rows.length, 'lp')}</tbody></table></div>${moreBtn('lp', rows.length)}` : '<p class="text-muted text-sm mb-0">All caught up.</p>'}
         </div>`;
+      bindMore(el, 'lp', rows.length);
     } catch (err) {
-      el.innerHTML = unavailable('Visit Loop analytics', err);
+      el.innerHTML = unavailable('Follow-up data', err);
     }
   }
 </script>

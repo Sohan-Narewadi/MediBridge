@@ -16,7 +16,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Mark all read</button></div>
+    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Read all</button></div>
     <div id="notif-list"><div class="card skeleton" style="height:70px;"></div></div>
   </main>
 </div>
@@ -33,16 +33,16 @@
     const el = document.getElementById('notif-list');
     try {
       const { notifications } = await api.get('/notifications');
-      if (!notifications.length) { el.innerHTML = '<div class="empty-state"><p>No notifications yet.</p></div>'; return; }
+      if (!notifications.length) { el.innerHTML = '<div class="empty-state"><p>None</p></div>'; return; }
       el.innerHTML = notifications.map((n) => `
-        <div class="card" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
+        <div class="card card-compact" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
           <div class="flex justify-between items-start gap-3">
             <div>
               <strong class="text-sm">${esc(n.title)}</strong>
               <p class="text-sm text-muted mb-0">${esc(n.message)}</p>
               <p class="text-sm text-muted mb-0">${new Date(n.created_at.replace(' ', 'T')).toLocaleString()}${LINKS[n.related_type] ? ` &middot; <a href="${LINKS[n.related_type]}">Open</a>` : ''}</p>
             </div>
-            ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+            ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Read</button>` : ''}
           </div>
         </div>
       `).join('');
