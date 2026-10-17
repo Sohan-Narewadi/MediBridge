@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hospital Stay — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .status { padding: var(--space-6); border-left: 3px solid var(--color-warning-500); }
+  .status.is-blocked { border-left-color: var(--color-danger-500); }
+  .status.is-ready { border-left-color: var(--color-success-500); }
+  .status .label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); }
+  .status .big { font-family: var(--font-display); font-size: clamp(1.8rem, 5vw, 2.8rem); line-height: 1.1; letter-spacing: -0.03em; margin: 0.35rem 0; }
+  .status .big .time { color: var(--color-ink-500); }
+  .status .sub { color: var(--color-ink-700); font-size: 0.92rem; }
+
+  /* Horizontal step tracker */
+  .track { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; margin-top: var(--space-5); }
+  .track .st { position: relative; text-align: center; padding-top: 0; }
+  .track .st::before { content: ''; position: absolute; top: 15px; left: -50%; right: 50%; height: 2px; background: var(--color-ink-200); }
+  .track .st:first-child::before { display: none; }
+  .track .st.done::before, .track .st.in_progress::before, .track .st.blocked::before { background: var(--color-success-500); }
+  .track .dot-n { position: relative; z-index: 1; width: 32px; height: 32px; border-radius: 50%; margin: 0 auto; display: flex; align-items: center; justify-content: center; border: 2px solid var(--color-ink-300); background: var(--color-surface); color: var(--color-ink-500); }
+  .track .st.done .dot-n { background: var(--color-success-500); border-color: var(--color-success-500); color: var(--color-surface); }
+  .track .st.in_progress .dot-n { border-color: var(--color-warning-500); color: var(--color-warning-700); }
+  .track .st.blocked .dot-n { border-color: var(--color-danger-500); background: var(--color-danger-100); color: var(--color-danger-700); }
+  .track .nm { font-size: 0.8rem; font-weight: 500; margin-top: 0.5rem; }
+  .track .sm { font-size: 0.72rem; color: var(--color-ink-500); }
+  @media (max-width: 520px) { .track .nm { font-size: 0.7rem; } .track .dot-n { width: 28px; height: 28px; } .track .st::before { top: 13px; } }
+
+  details.fold { margin-top: var(--space-4); }
+  details.fold summary { cursor: pointer; font-weight: 500; font-size: 0.9rem; }
+  details.fold ul { margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+  details.fold li { font-size: 0.84rem; color: var(--color-ink-700); padding: 0.3rem 0; border-top: 1px solid var(--color-ink-150); }
+  details.fold li:first-child { border-top: 0; }
+  details.fold li span { font-family: var(--font-mono); color: var(--color-ink-500); margin-right: 0.5rem; font-size: 0.76rem; }
+  .plan-text { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .plan-text.open { display: block; }
+</style>
+</head>
+<body>
+<script src="/js/icons.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" id="stay-root">
+    <div class="skeleton" style="height:150px;"></div>
+  </main>
+</div>
+
+<script>
+  const { esc, icon } = MB_LAYOUT;
+  const SHORT = { documentation: 'Records', billing: 'Bill', insurance: 'Insurance', pharmacy: 'Medicines', nursing: 'Nurse' };
+  const ICON = { documentation: 'fileText', billing: 'tag', insurance: 'shield', pharmacy: 'pill', nursing: 'stethoscope' };
+  const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
+  const fmtClock = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+  let data = null;
+  let fetchedAt = Date.now();
+  const live = (m) => m + Math.floor((Date.now() - fetchedAt) / 60000);
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'Hospital Stay');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+    setInterval(load, 30000);
+    setInterval(() => { if (data && data.admission && data.admission.status === 'cleared') render(); }, 15000);
+  });
+
+  async function load() {
+    try { data = await api.get('/discharge/my-stay'); fetchedAt = Date.now(); render(); }
+    catch (err) { document.getElementById('stay-root').innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`; }
+  }
+
+  function render() {
+    const root = document.getElementById('stay-root');
+    const foldOpen = !!(document.querySelector('details.fold') || {}).open;
+    const a = data.admission;
+    if (!a) {
+      root.innerHTML = `<div class="card empty-state"><div class="icon">${icon('hospital', 28)}</div><p class="mb-0">Not admitted.</p></div>`;
+      MB_LAYOUT.hydrate();
+      return;
+    }
+    const where = `${esc(a.hospital_name)} · ${esc(a.ward || '')}${a.bed ? ` · bed ${esc(a.bed)}` : ''}`;
+    if (a.status === 'admitted') {
+      root.innerHTML = `
+        <div class="card status"><div class="label">${where}</div>
+          <div class="big">In care</div>
+          <div class="sub">${esc(a.doctor_name)}</div></div>
+        ${planCard()}`;
+      wirePlan(); MB_LAYOUT.hydrate();
+      return;
+    }
+
+    const tasks = data.tasks || [];
+    const done = tasks.filter((t) => t.status === 'done').length;
+    const discharged = a.status === 'discharged';
+    const b = data.bottleneck;
+    const wait = discharged ? a.waiting_minutes : live(a.waiting_minutes || 0);
+
+    let cls = '', label = '', big = '', sub = '';
+    if (discharged) { cls = 'is-ready'; label = 'Discharged'; big = `Home at ${fmtClock(a.discharged_at)}`; sub = 'Follow-ups are in <a href="/patient/care-plan.html">My Care Plan</a>.'; }
+    else if (done === tasks.length) { cls = 'is-ready'; label = 'All steps done'; big = 'Ready to go home'; sub = `Waiting for ${esc(a.doctor_name)} to sign off.`; }
+    else if (b) {
+      cls = b.status === 'blocked' ? 'is-blocked' : '';
+      label = 'Waiting on';
+      big = `${esc(SHORT[b.department] || b.department_label)} <span class="time">· ${fmtMins(live(b.minutes))}</span>`;
+      sub = b.reason ? esc(b.reason) : `Cleared at ${fmtClock(a.cleared_at)}`;
+    }
+
+    root.innerHTML = `
+      <div class="card status ${cls}">
+        <div class="label">${label} · ${where}</div>
+        <div class="big">${big}</div>
+        <div class="sub">${sub}</div>
+        <div class="track">
+          ${tasks.map((t, i) => `
+            <div class="st ${esc(t.status)}">
+              <div class="dot-n">${t.status === 'done' ? icon('check', 16) : icon(ICON[t.department] || 'clock', 16)}</div>
+              <div class="nm">${esc(SHORT[t.department] || t.department)}</div>
+              <div class="sm">${t.status === 'done' ? fmtClock(t.completed_at) : t.status === 'blocked' ? 'Delayed' : t.status === 'in_progress' ? 'Working' : ''}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      ${planCard()}
+      <details class="fold card" ${foldOpen ? 'open' : ''}>
+        <summary>Activity</summary>
+        <ul>${(data.events || []).slice(0, 12).map((ev) => `<li><span>${fmtClock(ev.created_at)}</span>${esc(ev.message)}</li>`).join('')}</ul>
+      </details>`;
+    wirePlan();
+    MB_LAYOUT.hydrate();
+  }
+
+  function planCard() {
+    const p = data.carePlan;
+    if (!p) return '';
+    const long = (p.plain_summary || '').length > 210;
+    return `
+      <div class="card" style="margin-top: var(--space-4);">
+        <div class="card-header"><h3>Going-home plan</h3><span class="text-xs text-muted">${esc(p.doctor_name)}</span></div>
+        <div class="plan-text" id="plan-text">${esc(p.plain_summary)}</div>
+        ${long ? '<button class="btn btn-ghost btn-sm" id="plan-more" style="margin-top: var(--space-2); padding-left:0;">Read more</button>' : ''}
+      </div>`;
+  }
+  function wirePlan() {
+    const btn = document.getElementById('plan-more');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const t = document.getElementById('plan-text');
+      t.classList.toggle('open');
+      btn.textContent = t.classList.contains('open') ? 'Show less' : 'Read more';
+    });
+  }
+</script>
+</body>
+</html>

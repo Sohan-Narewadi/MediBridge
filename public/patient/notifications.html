@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -16,7 +17,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Mark all read</button></div>
+    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Read all</button></div>
     <div id="notif-list"><div class="card skeleton" style="height:70px;"></div></div>
   </main>
 </div>
@@ -28,27 +29,27 @@
     load();
   });
 
-  const ICONS = { appointment: '&#128197;', reminder: '&#9201;', record: '&#128203;', tip: '&#128161;', cancellation: '&#10060;' };
+  const ICONS = { appointment: 'calendar', reminder: 'alarm', record: 'clipboard', tip: 'sun', cancellation: 'x' };
 
   async function load() {
     const el = document.getElementById('notif-list');
     const { notifications } = await api.get('/notifications');
-    if (!notifications.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128276;</div><p>No notifications yet.</p></div>'; return; }
+    if (!notifications.length) { el.innerHTML = '<div class="empty-state"><div class="icon" data-icon="bell"></div><p>All caught up.</p></div>'; MB_LAYOUT.hydrate(); return; }
     el.innerHTML = notifications.map((n) => `
-      <div class="card" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
-        <div class="flex justify-between items-start">
-          <div class="flex gap-3">
-            <span style="font-size:1.2rem;">${ICONS[n.type] || '&#128276;'}</span>
-            <div>
-              <strong class="text-sm">${n.title}</strong>
-              <p class="text-sm text-muted mb-0">${n.message}</p>
-              <p class="text-sm text-muted mb-0">${new Date(n.created_at).toLocaleString()}</p>
+      <div class="card card-compact" style="margin-bottom:var(--space-2); ${n.is_read ? 'opacity:0.7;' : 'border-left:3px solid var(--color-primary-600);'}">
+        <div class="flex justify-between items-center gap-3">
+          <div class="flex gap-3 items-center min-w-0">
+            <span data-icon="${ICONS[n.type] || 'bell'}" style="color:var(--color-primary-600);"></span>
+            <div class="min-w-0">
+              <div style="font-weight:500; font-size:0.9rem;">${n.title}</div>
+              <div class="text-xs text-muted">${new Date(n.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
             </div>
           </div>
-          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Read</button>` : ''}
         </div>
       </div>
     `).join('');
+    MB_LAYOUT.hydrate();
   }
   async function markRead(id) { await api.patch(`/notifications/${id}/read`); load(); }
   document.getElementById('mark-all').addEventListener('click', async () => { await api.patch('/notifications/read-all'); load(); });

@@ -6,10 +6,14 @@
 <title>Log in — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .auth-shell { min-height: calc(100vh - var(--header-height)); display:flex; align-items:center; justify-content:center; padding: var(--space-6) var(--space-4); }
-  .auth-card { max-width: 420px; width: 100%; }
-  .demo-box { background: linear-gradient(135deg, var(--color-primary-50), var(--color-accent-50)); border: 1px solid var(--color-primary-200); border-radius: var(--radius-md); padding: var(--space-3) var(--space-4); font-size: 0.8rem; margin-top: var(--space-5); }
-  .demo-box button { display:block; width:100%; text-align:left; background:none; border:none; padding: 0.3rem 0; cursor:pointer; color: var(--color-primary-800); font-weight:600; }
+  .auth-shell { min-height: calc(100vh - var(--header-height)); display:flex; align-items:center; justify-content:center; padding: var(--space-7) var(--space-4); }
+  .auth-card { max-width: 440px; width: 100%; padding: var(--space-6); }
+  .auth-card h2 { font-size: 1.4rem; margin-bottom: 4px; }
+  .demo-box { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--color-line); }
+  .demo-box strong { display:block; font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); margin-bottom: var(--space-2); }
+  .demo-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+  .demo-box button { background: var(--color-ink-50); border: 1px solid var(--color-line); border-radius: var(--radius-full); padding: 0.35rem 0.85rem; cursor: pointer; color: var(--color-ink-900); font-weight: 500; font-size: 0.82rem; font-family: inherit; }
+  .demo-box button:hover { border-color: var(--color-primary-300); color: var(--color-primary-700); background: var(--color-primary-50); }
 </style>
 </head>
 <body>
@@ -18,7 +22,6 @@
 <div class="auth-shell">
   <div class="card auth-card">
     <h2>Welcome back</h2>
-    <p class="text-muted">Log in to manage appointments, records and more.</p>
 
     <div id="form-alert"></div>
 
@@ -35,14 +38,18 @@
     </form>
 
     <p class="text-sm text-center" style="margin-top: var(--space-5);">
-      New to MediBridge? <a href="/auth/register.html">Create an account</a>
+      New here? <a href="/auth/register.html">Create an account</a>
     </p>
 
     <div class="demo-box">
-      <strong>Demo accounts</strong> (password shown on click auto-fills):
-      <button type="button" data-email="patient@medibridge.demo" data-password="Patient@123">Patient — patient@medibridge.demo</button>
-      <button type="button" data-email="doctor@medibridge.demo" data-password="Doctor@123">Doctor — doctor@medibridge.demo</button>
-      <button type="button" data-email="admin@medibridge.demo" data-password="Admin@123">Admin — admin@medibridge.demo</button>
+      <strong>Demo</strong>
+      <div class="demo-chips">
+        <button type="button" data-email="patient@medibridge.demo" data-password="Patient@123">Patient</button>
+        <button type="button" data-email="doctor@medibridge.demo" data-password="Doctor@123">Doctor</button>
+        <button type="button" data-email="admin@medibridge.demo" data-password="Admin@123">Admin</button>
+        <button type="button" data-email="insurance@medibridge.demo" data-password="Staff@123">Staff</button>
+        <button type="button" data-email="desk.agnes@medibridge.demo" data-password="Staff@123">Transfer desk</button>
+      </div>
     </div>
   </div>
 </div>
@@ -52,7 +59,7 @@
 <script src="/js/layout.js"></script>
 <script src="/js/nav.js"></script>
 <script>
-  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html' };
+  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html', staff: '/staff/dashboard.html' };
 
   document.querySelectorAll('.demo-box button').forEach((btn) => {
     btn.addEventListener('click', () => {

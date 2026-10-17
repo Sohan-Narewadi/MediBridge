@@ -16,11 +16,11 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">Healthcare Resources</h2><button class="btn btn-primary btn-sm" id="add-btn">+ Add article</button></div>
+    <div class="card-header"><h2 class="mb-0">Resources</h2><button class="btn btn-primary btn-sm" id="add-btn">+ Add</button></div>
     <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Title</th><th>Category</th><th>Read time</th><th></th></tr></thead>
-        <tbody id="r-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      <table class="data-table" style="min-width:0;">
+        <thead><tr><th>Article</th><th>Read</th><th></th></tr></thead>
+        <tbody id="r-body"><tr><td colspan="3"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
   </main>
@@ -40,8 +40,8 @@
     cache = resources;
     document.getElementById('r-body').innerHTML = resources.map((r) => `
       <tr>
-        <td><strong>${r.title}</strong></td><td>${r.category}</td><td>${r.read_mins} min</td>
-        <td><button class="btn btn-outline btn-sm" onclick="edit(${r.id})">Edit</button> <button class="btn btn-danger btn-sm" onclick="remove(${r.id})">Delete</button></td>
+        <td><strong>${r.title}</strong><div class="text-xs text-muted">${r.category}</div></td><td class="text-sm">${r.read_mins} min</td>
+        <td class="text-right"><button class="btn btn-ghost btn-sm" onclick="edit(${r.id})">Edit</button> <button class="btn btn-ghost btn-sm" style="color:var(--color-danger-500);" onclick="remove(${r.id})">Delete</button></td>
       </tr>
     `).join('');
   }

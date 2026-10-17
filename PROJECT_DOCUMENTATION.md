@@ -27,6 +27,7 @@ For a shorter, presentation-style overview (problem statement, SDG mapping, quic
 12. [A real bug we found and fixed (case study)](#12-a-real-bug-we-found-and-fixed-case-study)
 13. [Deployment](#13-deployment)
 14. [Future scope — what is not implemented yet](#14-future-scope--what-is-not-implemented-yet)
+15. [v2: care-handoff modules (Smart Brief, Discharge Flow, TransferConnect, Visit Loop)](#15-v2-care-handoff-modules)
 
 ---
 
@@ -633,10 +634,9 @@ Honest gaps, in the order they'd most improve the product:
 1. **Real-time updates.** Notifications and dashboard data are fetched on page load only — there's
    no WebSocket/SSE push. A new appointment request doesn't appear for the doctor until they
    reload. Adding Socket.IO (or plain SSE) for notifications would be the highest-impact addition.
-2. **Audit logging isn't actually instrumented.** The `audit_logs` table and the admin "Audit Log"
-   page exist and work, but no controller currently writes to that table — the only rows in it
-   come from the demo seed script. A real implementation would insert a row from key actions
-   (login, status changes, doctor verification, report resolution, etc.).
+2. **Audit logging is only partly instrumented.** The v2 modules (§15) write audit rows for every
+   state change (intake, care plans, discharge tasks, transfer requests, summary access). The
+   original controllers (login, appointment status, doctor verification, reports) still don't.
 3. **File/document uploads.** `medical_records.document_url` exists in the schema for attaching a
    scanned report or image, but there's no upload endpoint yet — a natural next step with
    `multer` plus local disk or object storage (S3/Cloudinary).
@@ -669,6 +669,90 @@ Honest gaps, in the order they'd most improve the product:
 13. **Mobile app / PWA.** The frontend is responsive down to ~360px but is not an installable PWA
     (no manifest/service worker) and there is no native mobile app.
 14. **Multi-language support.** All UI text is hardcoded English; there's no i18n layer.
+
+---
+
+## 15. v2: care-handoff modules
+
+After the first evaluation ("the features already exist on other sites"), MediBridge was
+repositioned from a booking site into a **care-handoff platform**: the value is in the gaps
+*between* visits, departments and hospitals, where information is normally re-typed, re-asked or
+lost. One rule drives every module: **anything entered once is reused at every later step.**
+
+### Schema additions (`database/migrate_v2.sql`, applied by `npm run db:v2`)
+
+| Table | Purpose |
+|---|---|
+| `users.role` | now also `staff` (hospital department users) |
+| `hospitals`, `hospital_capabilities` | the home hospital plus partner hospitals; beds/ICU free per specialization (TransferConnect input) |
+| `staff` | staff login → hospital + department (`billing`, `insurance`, `pharmacy`, `nursing`, `documentation`, `transfer_desk`) |
+| `intake_forms` | the patient's pre-visit answers, 1:1 with an appointment |
+| `care_plans`, `commitments` | plain-language plan after a visit/discharge, and the trackable items in it (owner, kind, due date, status) |
+| `admissions`, `discharge_tasks`, `discharge_events` | inpatient stays; one task per department with an SLA once the doctor clears the patient; an event timeline |
+| `transfer_requests`, `transfer_offers` | one request fanned out to several hospitals; each offer has a match score and its own response |
+
+### Smart Brief + Visit Loop — `visitLoopController.js`
+
+- `saveIntake` upserts the pre-visit form for the patient's own upcoming appointment.
+- `getBrief` compiles the doctor's one-page brief from `patients`, `medications` + `medication_logs`
+  (7-day adherence per medicine), `medical_records`, open `commitments`, visit history, the intake
+  and the Care Score, and computes **flags** from that data (allergies, new allergy in intake,
+  severity ≥ 4, missed doses, overdue follow-ups/commitments, recent hospital stay, medication
+  changes, first visit, no intake). Access: the appointment's doctor, or admin.
+- `createCarePlan` stores the plan and its commitments in one transaction; the doctor's
+  "document visit" form posts it right after the medical record, pre-filling a follow-up
+  commitment from the follow-up date so it's entered once.
+- `analytics` gives the admin open/overdue counts, completion rate and the overdue ("broken loop")
+  list.
+- A doctor may read a patient's plans only with a care relationship: a non-cancelled appointment
+  **or** an admission they attend.
+
+### Discharge Flow — `dischargeController.js`, `staffController.js`
+
+- `clear` (attending doctor) sets `cleared_at`, creates the five department tasks (self-pay
+  admissions skip insurance) and notifies each department's staff and the patient.
+- `queue` is a staff member's department worklist, most urgent first, with minutes since
+  clearance vs SLA and which other departments the patient is still waiting on.
+- `updateTask` lets staff start / block (reason required) / complete their own department's tasks;
+  `nudge` notifies a department (rate-limited to once per 5 minutes per task).
+- **Bottleneck rule:** an explicitly blocked task first; otherwise the task furthest past its SLA;
+  otherwise the one closest to breaching.
+- `discharge` is refused until every task is done; `myStay` is the patient's live view;
+  `board`/`analytics` feed the admin Operations Center (average time per department vs target,
+  breach %, top bottleneck).
+
+### TransferConnect — `transfersController.js`
+
+- `match` scores each hospital that has the specialization out of 100: specialty 30, free beds 20,
+  ICU 15 (−25 if ICU is needed but none free), distance 20 (haversine from the sending hospital),
+  response history 15 — each part returned as a plain-English reason.
+- `create` requires consent, auto-generates the clinical summary from the patient's record
+  (biodata, allergies, chronic conditions, active medicines, latest vitals/diagnosis, admission),
+  and creates one offer per chosen hospital.
+- Receiving desks see only initials/age/sex until they open a request; opening sets
+  `summary_viewed_at` and writes an audit row. `respond`: the first accept wins, reserves a bed
+  (and ICU bed if needed), withdraws the other offers and notifies sender and patient.
+- `complete`/`cancel` close the request (cancel releases the reserved bed; complete marks the
+  admission `transferred`).
+
+### Pages
+
+| Role | Page | What it shows |
+|---|---|---|
+| Patient | `patient/intake.html` | pre-visit form, with "already on file" data shown so nothing is repeated |
+| Patient | `patient/care-plan.html` | plans from doctors + Overdue / Coming up / Done checklist |
+| Patient | `patient/hospital-stay.html` | live discharge tracker: "currently waiting on …" |
+| Doctor | `doctor/brief.html` | the Smart Brief |
+| Doctor | `doctor/inpatients.html` | admitted patients, "medically fit" button, live task checklist, nudge, complete discharge, request transfer |
+| Doctor | `doctor/transfers.html` | transfer wizard (match → select → summary preview → consent → send) + live request tracker |
+| Staff | `staff/dashboard.html` | department discharge queue with timers, blocker reporting |
+| Staff | `staff/transfers.html` | partner desk: incoming queue, summary, accept/decline; home desk: outgoing requests |
+| Admin | `admin/operations.html` | Operations Center: discharge board + department delays, transfer stats, broken loops |
+
+The dashboards for patient, doctor and admin were rebuilt around these modules, and the design
+system (`public/css/main.css`, `public/js/icons.js`, `public/js/layout.js`) was redone: IBM Plex
+type, one accent colour, hairline borders, an inline SVG icon set instead of emoji, grouped sidebar
+navigation and a topbar with notifications.
 
 ---
 

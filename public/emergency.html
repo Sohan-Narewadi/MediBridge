@@ -5,52 +5,59 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Emergency Guidance — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<style>
+  .sos { text-align: center; padding: var(--space-8) var(--space-5); background: var(--color-danger-100); border: 1px solid #ecc4ba; border-radius: var(--radius-lg); }
+  .sos-label { font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 2rem); color: var(--color-danger-700); }
+  .sos-numbers { display: flex; justify-content: center; gap: var(--space-4); margin: var(--space-5) 0 var(--space-4); flex-wrap: wrap; }
+  .sos-numbers a { display: flex; flex-direction: column; align-items: center; min-width: 120px; padding: var(--space-4) var(--space-5); background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid #ecc4ba; text-decoration: none; }
+  .sos-numbers a:hover { background: var(--color-danger-500); text-decoration: none; }
+  .sos-numbers a:hover span, .sos-numbers a:hover small { color: #fff; }
+  .sos-numbers span { font-family: var(--font-display); font-size: 2.6rem; line-height: 1; color: var(--color-danger-700); }
+  .sos-numbers small { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); margin-top: 4px; }
+  .sos-note { font-size: 0.86rem; color: var(--color-ink-700); }
+  .grid.two { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 720px) { .grid.two { grid-template-columns: 1fr; } }
+  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
+  .chip-s { padding: 0.35rem 0.8rem; border-radius: var(--radius-full); background: var(--color-ink-100); font-size: 0.86rem; }
+  .steps { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: 0.92rem; display: flex; flex-direction: column; gap: 0.4rem; }
+</style>
 </head>
 <body>
 <div id="site-header"></div>
 
 <div class="container section-tight">
-  <div class="alert alert-danger" style="font-size:1rem;">
-    <strong>If this is a life-threatening emergency, stop reading and call your local emergency number
-    (e.g. 112 / 911 / 108) or go to the nearest emergency room immediately.</strong> MediBridge is not an
-    emergency response service and cannot dispatch help.
+  <div class="sos">
+    <div class="sos-label">Life-threatening emergency?</div>
+    <div class="sos-numbers">
+      <a href="tel:112"><span>112</span><small>India</small></a>
+      <a href="tel:108"><span>108</span><small>Ambulance</small></a>
+      <a href="tel:911"><span>911</span><small>US</small></a>
+    </div>
+    <div class="sos-note">Call now. MediBridge cannot dispatch help.</div>
   </div>
 
-  <h1>Recognizing when to seek emergency care</h1>
-  <p class="text-muted" style="max-width:680px;">These are general warning signs, not a diagnostic checklist. When in doubt, seek care immediately rather than waiting.</p>
-
-  <div class="grid" style="grid-template-columns: repeat(2,1fr); margin-top:var(--space-5);">
+  <div class="grid two" style="margin-top: var(--space-6);">
     <div class="card">
-      <h4>&#10060; Seek emergency care for</h4>
-      <ul class="text-sm">
-        <li>Severe chest pain or pressure</li>
-        <li>Difficulty breathing or shortness of breath</li>
-        <li>Sudden weakness, numbness or slurred speech</li>
-        <li>Uncontrolled bleeding</li>
-        <li>Loss of consciousness or severe confusion</li>
-        <li>Severe allergic reaction (swelling, trouble breathing)</li>
-        <li>Suspected poisoning or overdose</li>
-      </ul>
+      <h4 class="flex items-center gap-2"><span class="dot dot-danger"></span>Go to the ER for</h4>
+      <div class="chips">
+        <span class="chip-s">Chest pain</span><span class="chip-s">Trouble breathing</span><span class="chip-s">Stroke signs</span>
+        <span class="chip-s">Heavy bleeding</span><span class="chip-s">Unconscious</span><span class="chip-s">Severe allergy</span>
+        <span class="chip-s">Poisoning</span>
+      </div>
     </div>
     <div class="card">
-      <h4>&#128222; Before help arrives</h4>
-      <ul class="text-sm">
-        <li>Call your local emergency number right away</li>
-        <li>Stay calm and keep the person still and comfortable</li>
-        <li>Note known allergies, medications and conditions</li>
-        <li>Do not give food, water or medication unless instructed</li>
-        <li>Keep your home first-aid kit and emergency contacts handy</li>
-      </ul>
+      <h4 class="flex items-center gap-2"><span class="dot dot-warning"></span>While you wait</h4>
+      <ol class="steps">
+        <li>Call the number</li>
+        <li>Keep the person still</li>
+        <li>Note allergies and medicines</li>
+        <li>No food or drink</li>
+      </ol>
     </div>
-  </div>
-
-  <div class="card" style="margin-top:var(--space-5);">
-    <h4>Home first-aid kit checklist</h4>
-    <p class="text-sm">Adhesive bandages &#8226; antiseptic wipes &#8226; sterile gauze &#8226; adhesive tape &#8226; digital thermometer &#8226; disposable gloves &#8226; any personal emergency medication. Review and restock every 6 months.</p>
   </div>
 
   <div class="text-center" style="margin-top:var(--space-6);">
-    <a href="/resources.html" class="btn btn-outline">More health resources</a>
+    <a href="/resources.html" class="btn btn-outline">Health resources</a>
   </div>
 </div>
 

@@ -6,10 +6,10 @@
 <title>Find Doctors — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
 <style>
-  .discover-layout { display:grid; grid-template-columns: 260px 1fr; gap: var(--space-6); align-items:start; }
-  @media (max-width: 860px) { .discover-layout { grid-template-columns: 1fr; } }
-  .filters-card .field { margin-bottom: var(--space-4); }
+  .toolbar { display: grid; grid-template-columns: 2fr 1.3fr 1fr 1fr 1fr auto; gap: var(--space-2); margin: var(--space-5) 0 var(--space-4); }
+  @media (max-width: 960px) { .toolbar { grid-template-columns: 1fr 1fr; } .toolbar .wide { grid-column: 1 / -1; } }
   .results-head { display:flex; justify-content:space-between; align-items:center; margin-bottom: var(--space-4); flex-wrap:wrap; gap: var(--space-3); }
+  .results-head select { width: auto; }
   .pagination { display:flex; justify-content:center; gap: var(--space-2); margin-top: var(--space-6); }
 </style>
 </head>
@@ -17,74 +17,54 @@
 <div id="site-header"></div>
 
 <div class="container section-tight">
-  <h1>Find the right doctor</h1>
-  <p class="text-muted">Search, filter and compare verified doctors across 15 specializations.</p>
+  <h1 style="margin-bottom:0;">Find a doctor</h1>
 
-  <div class="discover-layout">
-    <aside class="card filters-card">
-      <h4>Filters</h4>
-      <div class="field">
-        <label for="f-q">Name or specialization</label>
-        <input type="text" id="f-q" placeholder="e.g. cardiology, Mehta">
-      </div>
-      <div class="field">
-        <label for="f-spec">Specialization</label>
-        <select id="f-spec"><option value="">All specializations</option></select>
-      </div>
-      <div class="field">
-        <label for="f-city">City / area</label>
-        <input type="text" id="f-city" placeholder="e.g. Indiranagar">
-      </div>
-      <div class="field">
-        <label for="f-mode">Consultation type</label>
-        <select id="f-mode">
-          <option value="">Any</option>
-          <option value="in_person">In-person</option>
-          <option value="video">Video</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-exp">Minimum experience</label>
-        <select id="f-exp">
-          <option value="">Any</option>
-          <option value="5">5+ years</option>
-          <option value="10">10+ years</option>
-          <option value="15">15+ years</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="f-rating">Minimum rating</label>
-        <select id="f-rating">
-          <option value="">Any</option>
-          <option value="4">4+ stars</option>
-          <option value="4.5">4.5+ stars</option>
-        </select>
-      </div>
-      <button class="btn btn-outline btn-block" id="clear-filters">Clear filters</button>
-    </aside>
+  <div class="toolbar">
+    <input type="text" id="f-q" class="wide" placeholder="Search name or condition" aria-label="Search">
+    <select id="f-spec" aria-label="Specialization"><option value="">All specializations</option></select>
+    <select id="f-mode" aria-label="Consultation type">
+      <option value="">Any visit type</option>
+      <option value="in_person">In-person</option>
+      <option value="video">Video</option>
+    </select>
+    <select id="f-exp" aria-label="Experience">
+      <option value="">Any experience</option>
+      <option value="5">5+ years</option>
+      <option value="10">10+ years</option>
+      <option value="15">15+ years</option>
+    </select>
+    <select id="f-rating" aria-label="Rating">
+      <option value="">Any rating</option>
+      <option value="4">4+ stars</option>
+      <option value="4.5">4.5+ stars</option>
+    </select>
+    <input type="text" id="f-city" placeholder="Area" aria-label="City or area" style="max-width:140px;">
+  </div>
 
-    <div>
-      <div class="results-head">
-        <span id="result-count" class="text-muted text-sm">Loading results...</span>
-        <select id="sort-select" aria-label="Sort by">
-          <option value="rating">Top rated</option>
-          <option value="experience">Most experienced</option>
-          <option value="fee_low">Fee: low to high</option>
-          <option value="fee_high">Fee: high to low</option>
-          <option value="name">Name A-Z</option>
-        </select>
-      </div>
-      <div class="doctor-grid" id="doctor-results">
-        <div class="card skeleton" style="height:280px;"></div>
-        <div class="card skeleton" style="height:280px;"></div>
-        <div class="card skeleton" style="height:280px;"></div>
-      </div>
-      <div class="pagination" id="pagination"></div>
+  <div class="results-head">
+    <span id="result-count" class="text-muted text-sm">Loading…</span>
+    <div class="flex items-center gap-2">
+      <button class="btn btn-ghost btn-sm" id="clear-filters">Clear</button>
+      <select id="sort-select" aria-label="Sort by">
+        <option value="rating">Top rated</option>
+        <option value="experience">Most experienced</option>
+        <option value="fee_low">Fee: low to high</option>
+        <option value="fee_high">Fee: high to low</option>
+        <option value="name">Name A-Z</option>
+      </select>
     </div>
   </div>
+
+  <div class="doctor-grid" id="doctor-results">
+    <div class="card skeleton" style="height:180px;"></div>
+    <div class="card skeleton" style="height:180px;"></div>
+    <div class="card skeleton" style="height:180px;"></div>
+  </div>
+  <div class="pagination" id="pagination"></div>
 </div>
 
 <div id="site-footer"></div>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -135,10 +115,10 @@
 
     try {
       const { doctors, total, pageSize } = await api.get(`/doctors?${buildQuery()}`);
-      countLabel.textContent = `${total} doctor${total === 1 ? '' : 's'} found`;
+      countLabel.textContent = `${total} doctor${total === 1 ? '' : 's'}`;
 
       if (!doctors.length) {
-        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="icon">&#128269;</div><h4>No doctors match your filters</h4><p>Try widening your search.</p></div>`;
+        grid.innerHTML = `<div class="empty-state" style="grid-column:1/-1;"><div class="icon">${MB_ICON('search', 28)}</div><h4>No matches</h4></div>`;
         document.getElementById('pagination').innerHTML = '';
         return;
       }
@@ -149,13 +129,12 @@
           <h4>${d.full_name}</h4>
           <div class="spec">${d.specialization}</div>
           <div class="meta-row">
-            <span>&#127891; ${d.experience_years} yrs</span>
+            <span>${d.experience_years} yrs</span>
             <span>&#8377;${d.consultation_fee}</span>
-            ${d.city ? `<span>&#128205; ${d.city}</span>` : ''}
           </div>
           <div class="flex justify-between items-center">
-            <span class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-sm">(${d.rating_count})</span></span>
-            <span class="badge badge-info">${d.consultation_modes.includes('video') ? 'Video available' : 'In-person'}</span>
+            <span class="rating">${MB_ICON('star', 13)} ${Number(d.rating_avg).toFixed(1)}</span>
+            ${d.consultation_modes.includes('video') ? `<span class="badge badge-plain badge-info">${MB_ICON('video', 12)} Video</span>` : ''}
           </div>
         </a>
       `).join('');
@@ -171,7 +150,7 @@
         pag.appendChild(btn);
       }
     } catch (e) {
-      grid.innerHTML = `<div class="alert alert-danger" style="grid-column:1/-1;">Could not load doctors. Please try again.</div>`;
+      grid.innerHTML = `<div class="alert alert-danger" style="grid-column:1/-1;">Could not load doctors.</div>`;
     }
   }
 

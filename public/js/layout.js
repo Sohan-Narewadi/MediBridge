@@ -1,12 +1,53 @@
 // Renders the shared marketing header/footer and the dashboard shell
-// (sidebar + topbar) into placeholder elements, so every page markup file
-// stays short and the chrome stays perfectly consistent.
+// (fixed sidebar + topbar) into placeholder elements, so every page markup
+// file stays short and the chrome stays perfectly consistent.
+// Icons come from /js/icons.js (MB_ICON); it is loaded automatically if a
+// page did not include it, and placeholders are filled once it arrives.
+(function ensureIcons() {
+  if (window.MB_ICON) return;
+  const s = document.createElement('script');
+  s.src = '/js/icons.js';
+  s.onload = () => window.MB_ICON && window.MB_ICON.hydrate();
+  document.head.appendChild(s);
+})();
+
 const MB_LAYOUT = (() => {
+  const BRAND_SVG = `
+    <svg width="26" height="26" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+      <rect width="28" height="28" rx="7" fill="currentColor"/>
+      <path d="M7.5 19v-4.5a6.5 6.5 0 0 1 13 0V19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      <path d="M5.5 19.5h17" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+      <path d="M14 11.2v4.6M11.7 13.5h4.6" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/>
+    </svg>`;
+  const brand = (href = '/index.html') =>
+    `<a href="${href}" class="brand" aria-label="MediBridge home"><span class="mark">${BRAND_SVG}</span>MediBridge</a>`;
+
+  // Icon helper: real SVG when icons.js is ready, otherwise a placeholder hydrated later.
+  function icon(name, size = 16) {
+    if (window.MB_ICON) return window.MB_ICON(name, size);
+    return `<span data-icon="${name}"${size !== 16 ? ` data-icon-size="${size}"` : ''}></span>`;
+  }
+  function hydrate(root) { if (window.MB_ICON) window.MB_ICON.hydrate(root || document); }
+
+  function esc(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // 130 -> "2h 10m", 45 -> "45m", 2000 -> "1d 9h"
+  function fmtMinutes(mins) {
+    const m = Math.max(0, Math.round(Number(mins) || 0));
+    if (m < 60) return `${m}m`;
+    if (m < 60 * 24) return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+    return `${Math.floor(m / 1440)}d ${Math.floor((m % 1440) / 60)}h`;
+  }
+
   const MARKETING_LINKS = [
     ['/index.html', 'Home'],
     ['/doctors.html', 'Find Doctors'],
     ['/resources.html', 'Health Resources'],
-    ['/emergency.html', 'Emergency Help'],
+    ['/emergency.html', 'Emergency'],
     ['/about.html', 'About'],
   ];
 
@@ -16,15 +57,13 @@ const MB_LAYOUT = (() => {
     el.innerHTML = `
       <header class="site-header">
         <div class="container">
-          <a href="/index.html" class="brand" aria-label="MediBridge home">
-            <span class="mark">+</span> MediBridge
-          </a>
+          ${brand()}
           <nav id="main-nav" class="main-nav" hidden>
             ${MARKETING_LINKS.map(([href, label]) => `<a href="${href}" data-nav>${label}</a>`).join('')}
           </nav>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2">
             <div id="nav-auth-area" class="flex items-center gap-2"></div>
-            <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">&#9776;</button>
+            <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">${icon('menu', 18)}</button>
           </div>
         </div>
       </header>
@@ -38,135 +77,231 @@ const MB_LAYOUT = (() => {
     const el = document.getElementById('site-footer');
     if (!el) return;
     el.innerHTML = `
-      <footer style="background:linear-gradient(160deg, var(--color-ink-900), #1e1b4b); color:var(--color-ink-300); padding: var(--space-8) 0 var(--space-6);">
-        <div class="container">
-          <div class="grid" style="grid-template-columns: 2fr 1fr 1fr 1fr; gap: var(--space-6);">
-            <div>
-              <div class="brand" style="color:#fff;"><span class="mark">+</span> MediBridge</div>
-              <p style="color:var(--color-ink-300); max-width: 320px; margin-top: var(--space-3); font-size: 0.88rem;">
-                A smart healthcare access &amp; management platform connecting patients, doctors and care teams.
-                Built to support SDG 3 (Good Health &amp; Well-being).
-              </p>
-            </div>
-            <div>
-              <h4 style="color:#fff; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em;">Platform</h4>
-              <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem; margin-top:0.75rem;">
-                <li><a href="/doctors.html" style="color:var(--color-ink-300);">Find Doctors</a></li>
-                <li><a href="/resources.html" style="color:var(--color-ink-300);">Health Resources</a></li>
-                <li><a href="/emergency.html" style="color:var(--color-ink-300);">Emergency Help</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 style="color:#fff; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em;">Account</h4>
-              <ul style="list-style:none; padding:0; display:flex; flex-direction:column; gap:0.5rem; margin-top:0.75rem;">
-                <li><a href="/auth/login.html" style="color:var(--color-ink-300);">Log in</a></li>
-                <li><a href="/auth/register.html" style="color:var(--color-ink-300);">Create account</a></li>
-                <li><a href="/about.html" style="color:var(--color-ink-300);">About MediBridge</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 style="color:#fff; font-size:0.85rem; text-transform:uppercase; letter-spacing:0.04em;">Disclaimer</h4>
-              <p style="color:var(--color-ink-300); font-size:0.8rem; margin-top:0.75rem;">
-                MediBridge provides general health information and appointment coordination. It is not a diagnostic
-                tool. Always consult a qualified healthcare professional for medical decisions. In an emergency,
-                contact local emergency services immediately.
-              </p>
-            </div>
-          </div>
-          <hr class="divider" style="border-color: #1e293b; background: #1e293b;">
-          <p style="color:var(--color-ink-500); font-size:0.8rem; margin:0;">&copy; ${new Date().getFullYear()} MediBridge. A student full-stack project. All data is fictional.</p>
+      <footer class="site-footer" style="padding:var(--space-5) 0;">
+        <div class="container flex items-center justify-between flex-wrap gap-4">
+          ${brand()}
+          <nav class="flex gap-5 text-sm" aria-label="Footer">
+            <a href="/doctors.html">Doctors</a>
+            <a href="/resources.html">Resources</a>
+            <a href="/emergency.html">Emergency</a>
+            <a href="/about.html">About</a>
+          </nav>
+          <span class="text-xs text-muted">Demo project &middot; fictional data &middot; not medical advice</span>
         </div>
       </footer>
     `;
   }
 
-  const SIDEBAR_LINKS = {
+  // Grouped sidebar navigation. Paths are relied on by every page - keep them stable.
+  const SIDEBAR = {
     patient: [
-      ['/patient/dashboard.html', 'Dashboard', '&#9733;'],
-      ['/patient/doctors.html', 'Find Doctors', '&#128269;'],
-      ['/patient/appointments.html', 'Appointments', '&#128197;'],
-      ['/patient/medical-records.html', 'Medical Records', '&#128203;'],
-      ['/patient/prescriptions.html', 'Prescriptions', '&#128138;'],
-      ['/patient/medications.html', 'Medications', '&#9201;'],
-      ['/patient/notifications.html', 'Notifications', '&#128276;'],
-      ['/patient/profile.html', 'Profile', '&#128100;'],
+      ['Overview', [
+        ['/patient/dashboard.html', 'Dashboard', 'dashboard'],
+      ]],
+      ['Care', [
+        ['/patient/care-plan.html', 'My Care Plan', 'listChecks'],
+        ['/patient/hospital-stay.html', 'Hospital Stay', 'hospital'],
+        ['/patient/appointments.html', 'Appointments', 'calendar'],
+        ['/patient/doctors.html', 'Find Doctors', 'search'],
+      ]],
+      ['Records', [
+        ['/patient/medical-records.html', 'Medical Records', 'clipboard'],
+        ['/patient/prescriptions.html', 'Prescriptions', 'fileText'],
+        ['/patient/medications.html', 'Medications', 'pill'],
+      ]],
+      ['Account', [
+        ['/patient/notifications.html', 'Notifications', 'bell'],
+        ['/patient/profile.html', 'Profile', 'user'],
+      ]],
     ],
     doctor: [
-      ['/doctor/dashboard.html', 'Dashboard', '&#9733;'],
-      ['/doctor/appointments.html', 'Appointments', '&#128197;'],
-      ['/doctor/patients.html', 'My Patients', '&#129658;'],
-      ['/doctor/availability.html', 'Availability', '&#128336;'],
-      ['/doctor/notifications.html', 'Notifications', '&#128276;'],
-      ['/doctor/profile.html', 'Profile', '&#128100;'],
+      ['Today', [
+        ['/doctor/dashboard.html', 'Dashboard', 'dashboard'],
+        ['/doctor/appointments.html', 'Appointments', 'calendar'],
+      ]],
+      ['Patients', [
+        ['/doctor/patients.html', 'My Patients', 'users'],
+        ['/doctor/inpatients.html', 'Inpatients & Discharge', 'bed'],
+        ['/doctor/transfers.html', 'TransferConnect', 'transfer'],
+      ]],
+      ['Practice', [
+        ['/doctor/availability.html', 'Availability', 'clock'],
+        ['/doctor/notifications.html', 'Notifications', 'bell'],
+        ['/doctor/profile.html', 'Profile', 'user'],
+      ]],
     ],
     admin: [
-      ['/admin/dashboard.html', 'Dashboard', '&#9733;'],
-      ['/admin/patients.html', 'Patients', '&#129658;'],
-      ['/admin/doctors.html', 'Doctors', '&#129657;'],
-      ['/admin/appointments.html', 'Appointments', '&#128197;'],
-      ['/admin/specializations.html', 'Specializations', '&#127891;'],
-      ['/admin/resources.html', 'Resources', '&#128218;'],
-      ['/admin/reports.html', 'Reported Issues', '&#9888;'],
-      ['/admin/audit-log.html', 'Audit Log', '&#128272;'],
+      ['Overview', [
+        ['/admin/dashboard.html', 'Dashboard', 'dashboard'],
+        ['/admin/operations.html', 'Operations Center', 'activity'],
+      ]],
+      ['People', [
+        ['/admin/patients.html', 'Patients', 'users'],
+        ['/admin/doctors.html', 'Doctors', 'stethoscope'],
+      ]],
+      ['Activity', [
+        ['/admin/appointments.html', 'Appointments', 'calendar'],
+        ['/admin/reports.html', 'Reported Issues', 'alert'],
+        ['/admin/audit-log.html', 'Audit Log', 'shield'],
+      ]],
+      ['Content', [
+        ['/admin/specializations.html', 'Specializations', 'tag'],
+        ['/admin/resources.html', 'Resources', 'book'],
+      ]],
+    ],
+    staff: [
+      ['Work', [
+        ['/staff/dashboard.html', 'My Queue', 'inbox'],
+        ['/staff/transfers.html', 'Transfers', 'transfer'],
+      ]],
+      ['Account', [
+        ['/staff/notifications.html', 'Notifications', 'bell'],
+      ]],
     ],
   };
+  // Flat view kept for any code that still reads SIDEBAR_LINKS[role].
+  const SIDEBAR_LINKS = Object.fromEntries(Object.entries(SIDEBAR).map(([role, groups]) => [role, groups.flatMap(([, links]) => links)]));
+
+  // Pages that are not in the sidebar highlight their logical parent.
+  const ACTIVE_ALIASES = {
+    '/doctor/brief.html': '/doctor/dashboard.html',
+    '/patient/intake.html': '/patient/appointments.html',
+  };
+  const ROLE_LABEL = { patient: 'Patient', doctor: 'Doctor', admin: 'Administrator', staff: 'Hospital staff' };
+  const NOTIFICATIONS_PAGE = { patient: '/patient/notifications.html', doctor: '/doctor/notifications.html', staff: '/staff/notifications.html' };
+  const PROFILE_PAGE = { patient: '/patient/profile.html', doctor: '/doctor/profile.html' };
+  const DEPT_LABEL = { billing: 'Billing', insurance: 'Insurance desk', pharmacy: 'Pharmacy', nursing: 'Nursing', documentation: 'Medical records', transfer_desk: 'Transfer desk' };
 
   function renderDashboardShell(role, title) {
     const topbar = document.getElementById('dash-topbar');
     const sidebar = document.getElementById('dash-sidebar');
+    const cleanTitle = String(title || '').replace(/^(patient|doctor|admin|staff)\s+/i, '') || 'Dashboard';
+    const today = new Date().toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+
     if (topbar) {
+      const bellHref = NOTIFICATIONS_PAGE[role];
       topbar.innerHTML = `
-        <header class="site-header">
-          <div class="container">
-            <a href="/index.html" class="brand"><span class="mark">+</span> MediBridge</a>
-            <h2 style="margin:0; font-size:1.05rem; color:var(--color-ink-700);">${title || ''}</h2>
-            <div class="flex items-center gap-3">
-              <button id="sidebar-toggle" class="nav-toggle" style="display:inline-flex;" aria-label="Toggle menu">&#9776;</button>
-              <div id="nav-auth-area" class="flex items-center gap-2"></div>
-            </div>
+        <header class="app-topbar">
+          <button id="sidebar-toggle" class="icon-btn" aria-label="Open menu">${icon('menu', 18)}</button>
+          <div class="crumbs">
+            <span class="role">${ROLE_LABEL[role] || ''}</span><span class="sep">/</span>
+            <span class="title">${esc(cleanTitle)}</span>
+          </div>
+          <div class="topbar-actions">
+            <span class="topbar-date">${today}</span>
+            ${bellHref ? `<a href="${bellHref}" class="icon-btn" id="topbar-bell" aria-label="Notifications">${icon('bell', 17)}<span class="dot" hidden></span></a>` : ''}
+            <div id="nav-auth-area" class="flex items-center gap-2"></div>
           </div>
         </header>
       `;
+      if (bellHref) refreshBell();
     }
+
     if (sidebar) {
-      const links = SIDEBAR_LINKS[role] || [];
-      const current = window.location.pathname;
+      const groups = SIDEBAR[role] || [];
+      const current = ACTIVE_ALIASES[window.location.pathname] || window.location.pathname;
+      const user = window.MB_USER;
       sidebar.innerHTML = `
         <aside class="dash-sidebar" id="dash-sidebar-aside">
-          <nav>
-            ${links.map(([href, label, icon]) => `<a href="${href}" class="${current === href ? 'active' : ''}"><span aria-hidden="true">${icon}</span> ${label}</a>`).join('')}
+          <div class="side-brand">${brand(DASHBOARD_FOR(role))}</div>
+          <nav aria-label="${ROLE_LABEL[role] || ''} navigation">
+            ${groups.map(([label, links]) => `
+              <div class="nav-group-label">${label}</div>
+              ${links.map(([href, text, ic]) => `<a href="${href}" class="${current === href ? 'active' : ''}"${current === href ? ' aria-current="page"' : ''}>${icon(ic)}<span>${text}</span></a>`).join('')}
+            `).join('')}
           </nav>
+          ${user ? `
+            <div class="side-user">
+              <div class="avatar">${initials(user.fullName)}</div>
+              <div class="who">
+                <div class="name" title="${esc(user.fullName)}">${esc(user.fullName)}</div>
+                <div class="role" id="side-user-role">${ROLE_LABEL[user.role] || user.role}</div>
+              </div>
+              <button class="icon-btn" id="side-logout" title="Log out" aria-label="Log out">${icon('logout')}</button>
+            </div>` : ''}
         </aside>
+        <div class="sidebar-scrim" id="sidebar-scrim"></div>
       `;
       const toggle = document.getElementById('sidebar-toggle');
       const aside = document.getElementById('dash-sidebar-aside');
-      if (toggle) toggle.addEventListener('click', () => aside.classList.toggle('open'));
+      const scrim = document.getElementById('sidebar-scrim');
+      const setOpen = (open) => { aside.classList.toggle('open', open); scrim.classList.toggle('open', open); };
+      if (toggle) toggle.addEventListener('click', () => setOpen(!aside.classList.contains('open')));
+      scrim.addEventListener('click', () => setOpen(false));
+      const logout = document.getElementById('side-logout');
+      if (logout) logout.addEventListener('click', doLogout);
+      if (user && user.role === 'staff') describeStaff();
     }
+    hydrate();
   }
 
-  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html' };
+  async function refreshBell() {
+    try {
+      const data = await api.get('/notifications');
+      const unread = Number(data && (data.unread != null ? data.unread : data.unreadCount)) || 0;
+      const dot = document.querySelector('#topbar-bell .dot');
+      if (dot) dot.hidden = unread === 0;
+      const bell = document.getElementById('topbar-bell');
+      if (bell) bell.setAttribute('aria-label', unread ? `Notifications (${unread} unread)` : 'Notifications');
+    } catch (e) { /* the bell is decorative if notifications fail */ }
+  }
+
+  async function describeStaff() {
+    try {
+      const { staff } = await api.get('/staff/me');
+      const el = document.getElementById('side-user-role');
+      if (el && staff) el.textContent = `${DEPT_LABEL[staff.department] || staff.department} · ${staff.hospital_name}`;
+    } catch (e) { /* keep the generic label */ }
+  }
+
+  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html', staff: '/staff/dashboard.html' };
+  function DASHBOARD_FOR(role) { return ROLE_DASHBOARD[role] || '/index.html'; }
+
   function initials(name) {
     if (!name) return '?';
-    return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+    return name.replace(/^Dr\.?\s+/i, '').split(/\s+/).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
   }
+
+  async function doLogout() {
+    try { await api.post('/auth/logout'); } catch (e) { /* ignore */ }
+    window.location.href = '/index.html';
+  }
+
   function renderUserMenu(user, { showDashboardLink = true } = {}) {
     const area = document.getElementById('nav-auth-area');
     if (!area) return;
+    const inApp = !!area.closest('.app-topbar');
+    if (inApp) {
+      // Dashboard pages: the sidebar holds name + logout; the topbar shows a compact avatar.
+      const profile = PROFILE_PAGE[user.role];
+      area.innerHTML = profile
+        ? `<a href="${profile}" class="avatar" title="${esc(user.fullName)} — profile" style="text-decoration:none;">${initials(user.fullName)}</a>`
+        : `<div class="avatar" title="${esc(user.fullName)}">${initials(user.fullName)}</div>`;
+      return;
+    }
     area.innerHTML = `
-      ${showDashboardLink ? `<a href="${ROLE_DASHBOARD[user.role] || '/'}" class="btn btn-outline btn-sm">Dashboard</a>` : ''}
-      <div class="avatar" title="${user.fullName}">${initials(user.fullName)}</div>
+      ${showDashboardLink ? `<a href="${DASHBOARD_FOR(user.role)}" class="btn btn-outline btn-sm">Open dashboard</a>` : ''}
+      <div class="avatar" title="${esc(user.fullName)}">${initials(user.fullName)}</div>
       <button id="nav-logout" class="btn btn-ghost btn-sm">Log out</button>
     `;
-    document.getElementById('nav-logout').addEventListener('click', async () => {
-      await api.post('/auth/logout');
-      window.location.href = '/index.html';
-    });
+    document.getElementById('nav-logout').addEventListener('click', doLogout);
   }
 
-  return { renderHeader, renderFooter, renderDashboardShell, renderUserMenu };
+  // Runs fn({ detail: user }) once guard.js has confirmed the session - even if
+  // 'mb:auth-ready' already fired (e.g. while a slow CDN script was blocking the parser).
+  function onAuthReady(fn) {
+    if (window.MB_USER && !document.documentElement.classList.contains('mb-auth-pending')) {
+      fn({ detail: window.MB_USER });
+    } else {
+      document.addEventListener('mb:auth-ready', fn, { once: true });
+    }
+  }
+
+  return { renderHeader, renderFooter, renderDashboardShell, renderUserMenu, onAuthReady, icon, hydrate, esc, fmtMinutes, initials, SIDEBAR_LINKS, ROLE_DASHBOARD };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
   MB_LAYOUT.renderHeader();
   MB_LAYOUT.renderFooter();
+  MB_LAYOUT.hydrate();
 });
