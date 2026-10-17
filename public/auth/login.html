@@ -43,6 +43,8 @@
       <button type="button" data-email="patient@medibridge.demo" data-password="Patient@123">Patient — patient@medibridge.demo</button>
       <button type="button" data-email="doctor@medibridge.demo" data-password="Doctor@123">Doctor — doctor@medibridge.demo</button>
       <button type="button" data-email="admin@medibridge.demo" data-password="Admin@123">Admin — admin@medibridge.demo</button>
+      <button type="button" data-email="insurance@medibridge.demo" data-password="Staff@123">Hospital staff (Insurance desk) — insurance@medibridge.demo</button>
+      <button type="button" data-email="desk.agnes@medibridge.demo" data-password="Staff@123">Partner hospital transfer desk — desk.agnes@medibridge.demo</button>
     </div>
   </div>
 </div>
@@ -52,7 +54,7 @@
 <script src="/js/layout.js"></script>
 <script src="/js/nav.js"></script>
 <script>
-  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html' };
+  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html', staff: '/staff/dashboard.html' };
 
   document.querySelectorAll('.demo-box button').forEach((btn) => {
     btn.addEventListener('click', () => {

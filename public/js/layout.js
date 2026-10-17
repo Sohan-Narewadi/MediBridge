@@ -85,6 +85,8 @@ const MB_LAYOUT = (() => {
       ['/patient/dashboard.html', 'Dashboard', '&#9733;'],
       ['/patient/doctors.html', 'Find Doctors', '&#128269;'],
       ['/patient/appointments.html', 'Appointments', '&#128197;'],
+      ['/patient/care-plan.html', 'My Care Plan', '&#9989;'],
+      ['/patient/hospital-stay.html', 'Hospital Stay', '&#127973;'],
       ['/patient/medical-records.html', 'Medical Records', '&#128203;'],
       ['/patient/prescriptions.html', 'Prescriptions', '&#128138;'],
       ['/patient/medications.html', 'Medications', '&#9201;'],
@@ -95,12 +97,15 @@ const MB_LAYOUT = (() => {
       ['/doctor/dashboard.html', 'Dashboard', '&#9733;'],
       ['/doctor/appointments.html', 'Appointments', '&#128197;'],
       ['/doctor/patients.html', 'My Patients', '&#129658;'],
+      ['/doctor/inpatients.html', 'Inpatients & Discharge', '&#127973;'],
+      ['/doctor/transfers.html', 'TransferConnect', '&#128657;'],
       ['/doctor/availability.html', 'Availability', '&#128336;'],
       ['/doctor/notifications.html', 'Notifications', '&#128276;'],
       ['/doctor/profile.html', 'Profile', '&#128100;'],
     ],
     admin: [
       ['/admin/dashboard.html', 'Dashboard', '&#9733;'],
+      ['/admin/operations.html', 'Operations Center', '&#128200;'],
       ['/admin/patients.html', 'Patients', '&#129658;'],
       ['/admin/doctors.html', 'Doctors', '&#129657;'],
       ['/admin/appointments.html', 'Appointments', '&#128197;'],
@@ -108,6 +113,11 @@ const MB_LAYOUT = (() => {
       ['/admin/resources.html', 'Resources', '&#128218;'],
       ['/admin/reports.html', 'Reported Issues', '&#9888;'],
       ['/admin/audit-log.html', 'Audit Log', '&#128272;'],
+    ],
+    staff: [
+      ['/staff/dashboard.html', 'My Queue', '&#9733;'],
+      ['/staff/transfers.html', 'Transfers', '&#128657;'],
+      ['/staff/notifications.html', 'Notifications', '&#128276;'],
     ],
   };
 
@@ -144,7 +154,7 @@ const MB_LAYOUT = (() => {
     }
   }
 
-  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html' };
+  const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html', staff: '/staff/dashboard.html' };
   function initials(name) {
     if (!name) return '?';
     return name.split(' ').map((p) => p[0]).slice(0, 2).join('').toUpperCase();

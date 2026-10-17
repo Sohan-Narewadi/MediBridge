@@ -29,6 +29,11 @@ app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/care', require('./routes/care'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/admin', require('./routes/admin'));
+// v2 modules: Smart Brief + Visit Loop, Discharge Flow, TransferConnect
+app.use('/api/visit-loop', require('./routes/visitLoop'));
+app.use('/api/discharge', require('./routes/discharge'));
+app.use('/api/transfers', require('./routes/transfers'));
+app.use('/api/staff', require('./routes/staff'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
