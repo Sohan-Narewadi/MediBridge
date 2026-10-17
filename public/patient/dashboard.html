@@ -5,8 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<style>
+  .stay-card { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4) var(--space-6); align-items: center; }
+  .stay-card .stay-clock { text-align: right; }
+  .stay-card .stay-clock .v { font-family: var(--font-mono); font-size: 1.6rem; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
+  .stay-card .stay-clock .l { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-500); }
+  .stay-card .waiting-on { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font-size: 0.9rem; margin-top: 0.4rem; }
+  .stay-card .segments { margin-top: var(--space-3); max-width: 520px; }
+  .stay-card .seg-legend { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: 0.5rem; font-size: 0.76rem; color: var(--color-ink-500); }
+  .stay-card .seg-legend span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  @media (max-width: 640px) { .stay-card { grid-template-columns: 1fr; } .stay-card .stay-clock { text-align: left; } }
+
+  .intake-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .intake-row + .intake-row { border-top: 1px solid var(--color-ink-150); margin-top: var(--space-3); padding-top: var(--space-3); }
+
+  .appt-main { display: flex; gap: var(--space-4); align-items: flex-start; }
+  .date-tile { width: 54px; flex-shrink: 0; border: 1px solid var(--color-line); border-radius: var(--radius-md); text-align: center; overflow: hidden; background: var(--color-surface); }
+  .date-tile .m { font-size: 0.66rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; background: var(--color-ink-50); border-bottom: 1px solid var(--color-line); padding: 2px 0; color: var(--color-ink-500); }
+  .date-tile .d { font-size: 1.35rem; font-weight: 600; padding: 4px 0 5px; font-variant-numeric: tabular-nums; }
+  .appt-meta { display: flex; flex-wrap: wrap; gap: 0.35rem 0.9rem; font-size: 0.82rem; color: var(--color-ink-500); margin-top: 0.35rem; }
+  .appt-meta span { display: inline-flex; align-items: center; gap: 0.35rem; }
+  .mini-stats { display: flex; gap: var(--space-5); font-size: 0.8rem; color: var(--color-ink-500); }
+  .mini-stats strong { color: var(--color-ink-900); font-variant-numeric: tabular-nums; font-size: 0.95rem; margin-right: 3px; }
+
+  .score-wrap { display: flex; gap: var(--space-5); align-items: center; }
+  .score-ring { position: relative; width: 108px; height: 108px; flex-shrink: 0; }
+  .score-ring .center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .score-ring .center .n { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.04em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .score-ring .center .o { font-size: 0.7rem; color: var(--color-ink-500); margin-top: 2px; }
+  .breakdown { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+  .breakdown .b-head { display: flex; justify-content: space-between; font-size: 0.8rem; gap: var(--space-2); }
+  .breakdown .b-head .w { color: var(--color-ink-400); font-family: var(--font-mono); font-size: 0.72rem; }
+  .breakdown .bar { height: 4px; background: var(--color-ink-150); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+  .breakdown .bar span { display: block; height: 100%; border-radius: 2px; background: var(--color-primary-500); }
+  .breakdown .b-label { font-size: 0.74rem; color: var(--color-ink-500); margin-top: 3px; }
+  @media (max-width: 420px) { .score-wrap { flex-direction: column; align-items: flex-start; } .breakdown { width: 100%; } }
+
+  .commit-meta { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-top: 2px; font-size: 0.76rem; color: var(--color-ink-500); }
+  .med-time { font-family: var(--font-mono); font-size: 0.78rem; color: var(--color-ink-500); min-width: 44px; }
+</style>
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -16,142 +56,333 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div id="welcome-block" style="margin-bottom: var(--space-5);">
-      <div class="skeleton" style="height:32px; width:280px;"></div>
+    <div class="page-head" id="welcome-block">
+      <div><div class="skeleton" style="height:28px; width:260px;"></div></div>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1.4fr 1fr; align-items:start;" id="dash-top-grid">
-      <div class="card skeleton" style="height:160px;"></div>
-      <div class="card skeleton" style="height:160px;"></div>
+    <div id="stay-slot"></div>
+    <div id="intake-slot"></div>
+
+    <div class="grid" style="grid-template-columns: 1.35fr 1fr; align-items:stretch;">
+      <div class="card" id="next-appt-card"><div class="skeleton" style="height:130px;"></div></div>
+      <div class="card" id="care-score-card"><div class="skeleton" style="height:130px;"></div></div>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(4,1fr); margin-top: var(--space-5);" id="quick-actions"></div>
+    <div class="grid" style="grid-template-columns: 1.35fr 1fr; margin-top: var(--space-4); align-items:start;">
+      <div class="card">
+        <div class="card-header">
+          <h3>My commitments</h3>
+          <a href="/patient/care-plan.html">Care plan</a>
+        </div>
+        <div id="commitments"><div class="skeleton" style="height:96px;"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Medications today</h3><a href="/patient/medications.html">All medications</a></div>
+        <div id="meds-today"><div class="skeleton" style="height:96px;"></div></div>
+      </div>
+    </div>
 
-    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-5); align-items:start;">
-      <div class="card">
-        <div class="card-header"><h3>Medications today</h3><a href="/patient/medications.html" class="text-sm">View all</a></div>
-        <div id="meds-today"><div class="skeleton" style="height:80px;"></div></div>
-      </div>
-      <div class="card">
-        <div class="card-header"><h3>Recent medical records</h3><a href="/patient/medical-records.html" class="text-sm">View all</a></div>
-        <div id="recent-records"><div class="skeleton" style="height:80px;"></div></div>
-      </div>
+    <div class="card" style="margin-top: var(--space-4);">
+      <div class="card-header"><h3>Recent medical records</h3><a href="/patient/medical-records.html">All records</a></div>
+      <div id="recent-records"><div class="skeleton" style="height:60px;"></div></div>
     </div>
   </main>
 </div>
 
 <script>
-  document.addEventListener('mb:auth-ready', async (e) => {
-    const user = e.detail;
-    MB_LAYOUT.renderDashboardShell('patient', 'Patient Dashboard');
-    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
-    document.getElementById('welcome-block').innerHTML = `<h2 style="margin-bottom:2px;">Welcome back, ${user.fullName.split(' ')[0]}</h2><p class="text-muted">Here's what's happening with your health today.</p>`;
+  const { esc, fmtMinutes, icon } = MB_LAYOUT;
+  const DEPT = { billing: 'Billing', insurance: 'Insurance desk', pharmacy: 'Pharmacy', nursing: 'Nursing', documentation: 'Medical records' };
+  let pendingIntakeIds = new Set();
 
-    try {
-      const data = await api.get('/dashboard/patient');
-      renderTopGrid(data);
-      renderQuickActions();
-      renderMedsToday(data.medicationsToday);
-      renderRecentRecords(data.recentRecords);
-    } catch (err) {
-      toast.error('Could not load dashboard data.');
-    }
+  function parseDate(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
+  function fmtDate(iso, opts = { weekday: 'short', day: 'numeric', month: 'short' }) { return parseDate(iso).toLocaleDateString(undefined, opts); }
+  function daysFromToday(iso) { const t = new Date(); t.setHours(0, 0, 0, 0); return Math.round((parseDate(iso) - t) / 86400000); }
+  function relDay(iso) {
+    const n = daysFromToday(iso);
+    if (n === 0) return 'today'; if (n === 1) return 'tomorrow'; if (n === -1) return 'yesterday';
+    return n > 0 ? `in ${n} days` : `${-n} days ago`;
+  }
+
+  MB_LAYOUT.onAuthReady(async (e) => {
+    const user = e.detail;
+    MB_LAYOUT.renderDashboardShell('patient', 'Dashboard');
+    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('welcome-block').innerHTML = `
+      <div>
+        <h2>${greet}, ${esc((user.fullName || '').split(' ')[0])}</h2>
+        <p>${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })} · here's what needs your attention.</p>
+      </div>
+      <div class="actions">
+        <a href="/patient/doctors.html" class="btn btn-primary">${icon('plus')}Book appointment</a>
+      </div>`;
+
+    // Independent loads: one failing widget never blanks the others.
+    loadStay();
+    await loadIntakes();
+    loadCore();
+    loadCommitments();
   });
 
-  function statusBadge(status) {
-    return `<span class="badge status-${status}">${status}</span>`;
+  // ---------------------------------------------------------------- core
+  async function loadCore() {
+    try {
+      const data = await api.get('/dashboard/patient');
+      renderNextAppt(data.nextAppointment, data.counts || {});
+      renderCareScore(data.careScore);
+      renderMedsToday(data.medicationsToday || []);
+      renderRecentRecords(data.recentRecords || []);
+    } catch (err) {
+      toast.error('Could not load dashboard data.');
+      ['next-appt-card', 'care-score-card'].forEach((id) => { document.getElementById(id).innerHTML = '<p class="text-muted text-sm mb-0">Unavailable right now.</p>'; });
+    }
   }
 
-  function careScoreRing(score) {
-    const radius = 46, stroke = 10;
-    const circumference = 2 * Math.PI * radius;
-    const offset = circumference - (score / 100) * circumference;
+  function renderNextAppt(appt, counts) {
+    const el = document.getElementById('next-appt-card');
+    if (!appt) {
+      el.innerHTML = `
+        <div class="card-header"><h3>Next appointment</h3><a href="/patient/appointments.html">All appointments</a></div>
+        <div class="empty-state" style="padding: var(--space-4);"><p>No upcoming appointments.</p><a href="/patient/doctors.html" class="btn btn-outline btn-sm">Find a doctor</a></div>`;
+      return;
+    }
+    const d = parseDate(appt.appointment_date);
+    const intakeMissing = pendingIntakeIds.has(appt.id);
+    el.innerHTML = `
+      <div class="card-header"><h3>Next appointment</h3><a href="/patient/appointments.html">All appointments</a></div>
+      <div class="appt-main">
+        <div class="date-tile"><div class="m">${d.toLocaleDateString(undefined, { month: 'short' })}</div><div class="d">${d.getDate()}</div></div>
+        <div class="min-w-0" style="flex:1;">
+          <div class="flex justify-between items-start gap-3">
+            <div class="min-w-0">
+              <div style="font-weight:600;">${esc(appt.doctor_name)}</div>
+              <div class="text-sm text-muted">${esc(appt.specialization)}</div>
+            </div>
+            <span class="badge status-${esc(appt.status)}">${esc(appt.status)}</span>
+          </div>
+          <div class="appt-meta">
+            <span>${icon('clock', 14)}${fmtDate(appt.appointment_date)} · <span class="mono">${appt.start_time.slice(0, 5)}</span></span>
+            <span>${icon(appt.consultation_mode === 'video' ? 'video' : 'mapPin', 14)}${appt.consultation_mode === 'video' ? 'Video consult' : 'In person'}</span>
+            <span>${intakeMissing ? `<span class="dot dot-warning"></span>Pre-visit form not sent` : `<span class="dot dot-success"></span>Pre-visit form sent`}</span>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between items-center flex-wrap gap-3" style="margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--color-ink-150);">
+        <div class="mini-stats">
+          <span><strong>${counts.upcoming || 0}</strong>upcoming</span>
+          <span><strong>${counts.completed || 0}</strong>completed</span>
+          <span><strong>${counts.cancelled || 0}</strong>cancelled</span>
+        </div>
+        ${intakeMissing
+          ? `<a href="/patient/intake.html?appointment=${appt.id}" class="btn btn-primary btn-sm">Fill pre-visit form</a>`
+          : `<a href="/patient/appointments.html" class="btn btn-outline btn-sm">Manage</a>`}
+      </div>`;
+  }
+
+  function scoreRing(score) {
+    const r = 46, c = 2 * Math.PI * r;
+    const off = c - (Math.max(0, Math.min(100, score)) / 100) * c;
     const color = score >= 75 ? 'var(--color-success-500)' : score >= 50 ? 'var(--color-warning-500)' : 'var(--color-danger-500)';
     return `
-      <svg width="120" height="120" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r="${radius}" fill="none" stroke="var(--color-ink-100)" stroke-width="${stroke}"></circle>
-        <circle cx="60" cy="60" r="${radius}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 60 60)"></circle>
-        <text x="60" y="66" text-anchor="middle" font-size="26" font-weight="800" fill="var(--color-ink-900)">${score}</text>
-      </svg>`;
+      <div class="score-ring">
+        <svg width="108" height="108" viewBox="0 0 108 108" aria-hidden="true">
+          <circle cx="54" cy="54" r="${r}" fill="none" stroke="var(--color-ink-150)" stroke-width="7"></circle>
+          <circle cx="54" cy="54" r="${r}" fill="none" stroke="${color}" stroke-width="7" stroke-dasharray="${c}" stroke-dashoffset="${off}" stroke-linecap="round" transform="rotate(-90 54 54)"></circle>
+        </svg>
+        <div class="center"><span class="n">${score}</span><span class="o">of 100</span></div>
+      </div>`;
   }
 
-  function renderTopGrid(data) {
-    const grid = document.getElementById('dash-top-grid');
-    const appt = data.nextAppointment;
-    const cs = data.careScore;
-
-    grid.innerHTML = `
-      <div class="card">
-        <div class="card-header"><h3>Upcoming appointment</h3><a href="/patient/appointments.html" class="text-sm">See all</a></div>
-        ${appt ? `
-          <div class="flex justify-between items-start">
-            <div>
-              <h4 style="margin-bottom:2px;">${appt.doctor_name}</h4>
-              <p class="text-sm text-muted mb-0">${appt.specialization}</p>
-              <p class="text-sm" style="margin-top:6px;">&#128197; ${appt.appointment_date} at ${appt.start_time.slice(0,5)} &#8226; ${appt.consultation_mode.replace('_',' ')}</p>
-            </div>
-            ${statusBadge(appt.status)}
-          </div>
-          <a href="/patient/appointments.html" class="btn btn-outline btn-sm" style="margin-top:var(--space-3);">Manage appointment</a>
-        ` : `<div class="empty-state"><div class="icon">&#128197;</div><p>No upcoming appointments.</p><a href="/patient/doctors.html" class="btn btn-primary btn-sm">Book one now</a></div>`}
-        <hr class="divider">
-        <div class="flex gap-5 text-sm text-muted">
-          <span><strong style="color:var(--color-ink-900);">${data.counts.upcoming || 0}</strong> upcoming</span>
-          <span><strong style="color:var(--color-ink-900);">${data.counts.completed || 0}</strong> completed</span>
-          <span><strong style="color:var(--color-ink-900);">${data.counts.cancelled || 0}</strong> cancelled</span>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header"><h3>Your Care Score</h3></div>
-        <div class="care-score-gauge">
-          ${careScoreRing(cs.score)}
-          <div style="font-size:0.8rem;">
-            <p class="mb-0"><strong>Adherence:</strong> ${cs.breakdown.adherence.label}</p>
-            <p class="mb-0" style="margin-top:4px;"><strong>Checkups:</strong> ${cs.breakdown.recency.label}</p>
-            <p class="mb-0" style="margin-top:4px;"><strong>Follow-ups:</strong> ${cs.breakdown.followUp.label}</p>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderQuickActions() {
-    const actions = [
-      ['/patient/doctors.html', '&#128269;', 'Find a doctor'],
-      ['/patient/appointments.html', '&#128197;', 'Book appointment'],
-      ['/patient/medications.html', '&#9201;', 'Log medication'],
-      ['/patient/medical-records.html', '&#128203;', 'View records'],
+  function renderCareScore(cs) {
+    const el = document.getElementById('care-score-card');
+    if (!cs) { el.innerHTML = '<p class="text-muted text-sm mb-0">Care Score unavailable.</p>'; return; }
+    const parts = [
+      ['Medication adherence', '40%', cs.breakdown.adherence],
+      ['Checkup recency', '35%', cs.breakdown.recency],
+      ['Follow-ups kept', '25%', cs.breakdown.followUp],
     ];
-    document.getElementById('quick-actions').innerHTML = actions.map(([href, icon, label]) => `
-      <a href="${href}" class="card card-interactive text-center" style="text-decoration:none; color:inherit; padding: var(--space-4);">
-        <div style="font-size:1.6rem;">${icon}</div>
-        <div class="text-sm" style="font-weight:700; margin-top:4px;">${label}</div>
-      </a>
-    `).join('');
+    el.innerHTML = `
+      <div class="card-header"><h3>Care Score</h3><span class="text-xs text-muted">Engagement, not a diagnosis</span></div>
+      <div class="score-wrap">
+        ${scoreRing(cs.score)}
+        <div class="breakdown">
+          ${parts.map(([name, weight, p]) => {
+            const v = p && p.value != null ? Math.round(p.value) : null;
+            return `
+              <div>
+                <div class="b-head"><span>${name}</span><span class="w">${weight}</span></div>
+                <div class="bar"><span style="width:${v == null ? 0 : v}%;"></span></div>
+                <div class="b-label">${esc(p ? p.label : '')}</div>
+              </div>`;
+          }).join('')}
+        </div>
+      </div>`;
   }
 
   function renderMedsToday(meds) {
     const el = document.getElementById('meds-today');
-    if (!meds.length) { el.innerHTML = '<p class="text-muted text-sm">No medications scheduled for today.</p>'; return; }
+    if (!meds.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">Nothing scheduled for today.</p>'; return; }
     el.innerHTML = meds.map((m) => `
-      <div class="flex justify-between items-center" style="padding: var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
-        <div><strong class="text-sm">${m.medicine_name}</strong><div class="text-sm text-muted">${m.dosage} &#8226; ${m.frequency}</div></div>
-        <span class="badge ${m.today_status === 'taken' ? 'badge-success' : m.today_status ? 'badge-warning' : 'badge-neutral'}">${m.today_status || 'pending'}</span>
-      </div>
-    `).join('');
+      <div class="list-row">
+        <span class="med-time">${esc(String(m.reminder_times || '').split(',')[0].slice(0, 5))}</span>
+        <div class="min-w-0" style="flex:1;">
+          <div class="primary truncate">${esc(m.medicine_name)}</div>
+          <div class="secondary truncate">${esc(m.dosage)} · ${esc(m.frequency)}</div>
+        </div>
+        ${m.today_status
+          ? `<span class="badge status-${esc(m.today_status)}">${esc(m.today_status)}</span>`
+          : `<button class="btn btn-outline btn-sm" data-take="${m.id}">${icon('check', 14)}Taken</button>`}
+      </div>`).join('');
+    el.querySelectorAll('[data-take]').forEach((btn) => btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await api.post(`/medications/${btn.dataset.take}/log`, { status: 'taken' });
+        btn.outerHTML = '<span class="badge status-taken">taken</span>';
+        toast.success('Dose logged.');
+      } catch (err) { btn.disabled = false; toast.error(err.message); }
+    }));
   }
 
   function renderRecentRecords(records) {
     const el = document.getElementById('recent-records');
-    if (!records.length) { el.innerHTML = '<p class="text-muted text-sm">No medical records yet.</p>'; return; }
+    if (!records.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No medical records yet.</p>'; return; }
     el.innerHTML = records.map((r) => `
-      <div style="padding: var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
-        <strong class="text-sm">${r.diagnosis}</strong>
-        <div class="text-sm text-muted">${r.doctor_name} &#8226; ${r.record_date}</div>
-      </div>
-    `).join('');
+      <div class="list-row">
+        <div class="min-w-0">
+          <div class="primary truncate">${esc(r.diagnosis || 'Consultation')}</div>
+          <div class="secondary">${esc(r.doctor_name)}</div>
+        </div>
+        <span class="text-sm text-muted mono">${fmtDate(r.record_date, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+      </div>`).join('');
   }
+
+  // ------------------------------------------------------- hospital stay
+  async function loadStay() {
+    const slot = document.getElementById('stay-slot');
+    try {
+      const data = await api.get('/discharge/my-stay');
+      if (!data || !data.admission) { slot.innerHTML = ''; return; }
+      const a = data.admission;
+      const tasks = data.tasks || [];
+      const b = data.bottleneck;
+      const cleared = a.status === 'cleared' || !!a.cleared_at;
+      const done = tasks.filter((t) => t.status === 'done').length;
+      const tone = b && b.status === 'blocked' ? 'callout-danger' : 'callout-warning';
+      slot.innerHTML = `
+        <div class="card callout ${cleared ? tone : 'callout-info'}" style="margin-bottom: var(--space-4);">
+          <div class="stay-card">
+            <div class="min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="section-label mb-0" style="margin:0;">Hospital stay</span>
+                <span class="badge ${cleared ? 'status-cleared' : 'status-admitted'}">${cleared ? 'Cleared for discharge' : 'Admitted'}</span>
+              </div>
+              <div style="font-weight:600; margin-top:0.35rem;">${esc(a.hospital_name || 'MediBridge City Hospital')} · ${esc(a.ward || '')}${a.bed ? `, bed ${esc(a.bed)}` : ''}</div>
+              ${cleared ? `
+                <div class="waiting-on">
+                  ${b ? `<span>Waiting on <strong>${esc(DEPT[b.department] || b.department)}</strong></span>
+                         <span class="badge status-${esc(b.status)}">${esc(String(b.status).replace('_', ' '))}${b.minutes != null ? ` · ${fmtMinutes(b.minutes)}` : ''}</span>
+                         ${b.reason ? `<span class="text-sm text-muted">${esc(b.reason)}</span>` : ''}`
+                      : '<span>All departments have finished. You can leave once your doctor signs the discharge.</span>'}
+                </div>
+                <div class="segments" aria-label="${done} of ${tasks.length} discharge steps done">
+                  ${tasks.map((t) => `<span class="s-${esc(t.status)}" title="${esc(DEPT[t.department] || t.department)}: ${esc(t.status)}"></span>`).join('')}
+                </div>
+                <div class="seg-legend"><span>${done} of ${tasks.length} steps done</span><span><span class="dot dot-danger"></span>blocked</span><span><span class="dot dot-warning"></span>in progress</span></div>
+              ` : `<p class="text-sm text-muted mb-0" style="margin-top:0.35rem;">${esc(a.diagnosis || '')}. Your discharge checklist starts as soon as your doctor marks you medically fit.</p>`}
+            </div>
+            <div class="stay-clock">
+              ${cleared ? `<div class="v">${fmtMinutes(data.waiting_minutes)}</div><div class="l">since cleared</div>` : ''}
+              <a href="/patient/hospital-stay.html" class="btn btn-outline btn-sm" style="margin-top: var(--space-3);">Track discharge ${icon('arrowRight', 14)}</a>
+            </div>
+          </div>
+        </div>`;
+    } catch (e) { slot.innerHTML = ''; }
+  }
+
+  // --------------------------------------------------- pre-visit intakes
+  async function loadIntakes() {
+    const slot = document.getElementById('intake-slot');
+    try {
+      const { appointments } = await api.get('/visit-loop/pending-intakes');
+      pendingIntakeIds = new Set((appointments || []).map((a) => a.id));
+      if (!appointments || !appointments.length) { slot.innerHTML = ''; return; }
+      slot.innerHTML = `
+        <div class="card callout" style="margin-bottom: var(--space-4);">
+          <div class="flex items-center gap-2" style="margin-bottom: var(--space-3);">
+            <span class="section-label" style="margin:0;">Before your next visit</span>
+            <span class="count-chip">${appointments.length}</span>
+          </div>
+          ${appointments.slice(0, 3).map((a) => `
+            <div class="intake-row">
+              <div class="min-w-0">
+                <div style="font-weight:500;">Tell ${esc(a.doctor_name)} why you're coming</div>
+                <div class="text-sm text-muted">${esc(a.specialization || '')} · ${fmtDate(a.appointment_date)} at <span class="mono">${String(a.start_time).slice(0, 5)}</span> (${relDay(a.appointment_date)}) · takes about 2 minutes. Your doctor reads it before the consult.</div>
+              </div>
+              <a href="/patient/intake.html?appointment=${a.id}" class="btn btn-primary btn-sm">Fill pre-visit form</a>
+            </div>`).join('')}
+        </div>`;
+    } catch (e) { slot.innerHTML = ''; }
+  }
+
+  // --------------------------------------------------------- commitments
+  async function loadCommitments() {
+    const el = document.getElementById('commitments');
+    try {
+      const data = await api.get('/visit-loop/commitments');
+      renderCommitments(data || {});
+    } catch (e) {
+      el.innerHTML = '<p class="text-muted text-sm mb-0">Your care-plan checklist will appear here after your next visit.</p>';
+    }
+  }
+
+  function commitmentRow(c, kind) {
+    const mine = !c.owner_role || c.owner_role === 'patient';
+    const due = c.due_date ? daysFromToday(c.due_date) : null;
+    const dueText = c.due_date
+      ? (kind === 'overdue' ? `${-due} day${-due === 1 ? '' : 's'} overdue` : kind === 'done' ? 'done' : `due ${relDay(c.due_date)}`)
+      : 'no due date';
+    return `
+      <div class="check-row ${kind === 'done' ? 'is-done' : ''}">
+        ${mine
+          ? `<button class="check-box ${kind === 'done' ? 'checked' : ''}" data-commit="${c.id}" data-next="${kind === 'done' ? 'open' : 'done'}" aria-label="${kind === 'done' ? 'Mark as not done' : 'Mark as done'}">${kind === 'done' ? icon('check', 12) : ''}</button>`
+          : `<span class="check-box" style="cursor:default; border-style:dashed;" title="Owned by ${esc(c.owner_role)}"></span>`}
+        <div class="min-w-0" style="flex:1;">
+          <div class="check-title" style="font-size:0.88rem; font-weight:500;">${esc(c.title)}</div>
+          <div class="commit-meta">
+            ${kind === 'overdue' ? `<span class="badge status-overdue">${dueText}</span>` : `<span>${dueText}</span>`}
+            ${!mine ? `<span>· ${c.owner_role === 'doctor' ? 'your doctor will arrange this' : 'hospital will arrange this'}</span>` : ''}
+            ${c.doctor_name ? `<span>· ${esc(c.doctor_name)}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderCommitments(data) {
+    const el = document.getElementById('commitments');
+    const overdue = data.overdue || [], open = (data.open || []).slice().sort((a, b) => String(a.due_date || '9').localeCompare(String(b.due_date || '9'))), done = data.done || [];
+    if (!overdue.length && !open.length && !done.length) {
+      el.innerHTML = '<p class="text-muted text-sm mb-0">No commitments yet. After your next visit, your doctor\'s plan will show up here as a checklist.</p>';
+      return;
+    }
+    const shown = [...overdue.map((c) => [c, 'overdue']), ...open.map((c) => [c, 'open'])].slice(0, 6);
+    el.innerHTML = `
+      ${shown.length ? shown.map(([c, k]) => commitmentRow(c, k)).join('') : '<p class="text-sm text-muted mb-0">Everything on your plan is done.</p>'}
+      <div class="text-xs text-muted" style="margin-top: var(--space-3);">
+        ${overdue.length ? `<span style="color:var(--color-danger-700);">${overdue.length} overdue</span> · ` : ''}${open.length} open · ${done.length} done
+      </div>`;
+    el.querySelectorAll('[data-commit]').forEach((btn) => btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try {
+        await api.patch(`/visit-loop/commitments/${btn.dataset.commit}`, { status: btn.dataset.next });
+        toast.success(btn.dataset.next === 'done' ? 'Nice — marked as done.' : 'Marked as open again.');
+        loadCommitments();
+      } catch (err) { btn.disabled = false; toast.error(err.message); }
+    }));
+  }
+
+  // Keep the live discharge card fresh while the page is open.
+  setInterval(() => { if (document.visibilityState === 'visible' && window.MB_USER) loadStay(); }, 60000);
 </script>
 </body>
 </html>

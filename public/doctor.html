@@ -190,14 +190,16 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner"></span> Booking...';
     try {
-      await api.post('/appointments', {
+      const booking = await api.post('/appointments', {
         doctorId, date: document.getElementById('book-date').value, startTime: selectedSlot,
         consultationMode: document.getElementById('book-mode').value,
         reason: document.getElementById('book-reason').value.trim() || undefined,
       });
       toast.success('Appointment requested!');
-      alertBox.innerHTML = '<div class="alert alert-success">Your request was sent. The doctor will confirm shortly — check your appointments page.</div>';
+      alertBox.innerHTML = '<div class="alert alert-success">Your request was sent. One last step: tell the doctor what\'s going on so they\'re ready before you arrive…</div>';
       btn.textContent = 'Requested';
+      // Smart Brief: go straight to the one-minute pre-visit intake for this booking.
+      setTimeout(() => { window.location.href = `/patient/intake.html?appointment=${booking.id}`; }, 1200);
     } catch (err) {
       alertBox.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
       btn.disabled = false;

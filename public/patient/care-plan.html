@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Care Plan — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .cp-eyebrow { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary-700); margin-bottom: var(--space-1); }
+  .cp-plan-layout { display: grid; grid-template-columns: 1.25fr 1fr; gap: var(--space-5); align-items: start; }
+  .cp-progress-card { display: grid; grid-template-columns: 1fr auto; gap: var(--space-4); align-items: center; margin-bottom: var(--space-5); }
+  .cp-progress { height: 10px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; margin-top: var(--space-2); }
+  .cp-progress > i { display: block; height: 100%; background: var(--color-primary-600); transition: width 0.3s ease; }
+  .cp-counts { display: flex; gap: var(--space-5); }
+  .cp-counts div { text-align: center; }
+  .cp-counts .cp-n { font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; color: var(--color-ink-900); line-height: 1.1; }
+  .cp-counts .cp-n.danger { color: var(--color-danger-500); }
+  .cp-counts .cp-l { font-size: 0.74rem; font-weight: 600; color: var(--color-ink-500); }
+  .cp-group-title { display: flex; align-items: center; gap: var(--space-2); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-500); margin: var(--space-5) 0 var(--space-2); }
+  .cp-group-title:first-child { margin-top: 0; }
+  .cp-group-title.danger { color: var(--color-danger-500); }
+  .cp-task { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-3); align-items: center; padding: var(--space-3) var(--space-4); border: 1px solid var(--color-ink-200); border-radius: var(--radius-md); background: var(--color-surface); margin-bottom: var(--space-2); }
+  .cp-task.overdue { border-color: var(--color-danger-100); box-shadow: inset 3px 0 0 var(--color-danger-500); }
+  .cp-task.done .cp-title { text-decoration: line-through; color: var(--color-ink-500); }
+  .cp-check { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--color-ink-300); background: var(--color-surface); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; color: var(--color-surface); font-size: 0.85rem; font-weight: 800; padding: 0; }
+  .cp-check:hover { border-color: var(--color-primary-600); }
+  .cp-check.on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
+  .cp-check.cp-locked { cursor: default; border-style: dashed; }
+  .cp-task .cp-title { font-weight: 600; color: var(--color-ink-900); }
+  .cp-task .cp-meta { font-size: 0.8rem; color: var(--color-ink-500); margin-top: 2px; }
+  .cp-task .cp-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .cp-owner { font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.55rem; border-radius: var(--radius-full); border: 1px solid var(--color-ink-200); color: var(--color-ink-700); background: var(--color-ink-100); white-space: nowrap; }
+  .cp-owner.you { background: var(--color-primary-50); border-color: var(--color-primary-200); color: var(--color-primary-800); }
+  .cp-owner.doctor { background: var(--color-info-100); border-color: var(--color-info-100); color: var(--color-info-500); }
+  .cp-owner.hospital { background: var(--color-warning-100); border-color: var(--color-warning-100); color: var(--color-warning-500); }
+  .cp-plan-card { margin-bottom: var(--space-4); }
+  .cp-plan-card .cp-who { font-size: 0.82rem; color: var(--color-ink-500); margin-bottom: var(--space-3); }
+  .cp-plan-card blockquote { margin: 0; padding: var(--space-3) var(--space-4); border-left: 3px solid var(--color-primary-500); background: var(--color-primary-50); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; color: var(--color-ink-900); font-size: 0.95rem; line-height: 1.6; }
+  .cp-plan-card .cp-steps { font-size: 0.8rem; color: var(--color-ink-500); margin-top: var(--space-3); }
+  .cp-snooze { background: none; border: none; color: var(--color-ink-500); font-size: 0.75rem; cursor: pointer; padding: 0; text-decoration: underline; }
+  @media (max-width: 900px) { .cp-plan-layout { grid-template-columns: 1fr; } .cp-progress-card { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="patient"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div style="margin-bottom: var(--space-5);">
+      <div class="cp-eyebrow">Visit Loop</div>
+      <h2 style="margin-bottom:2px;">My Care Plan</h2>
+      <p class="text-muted mb-0">What your doctors asked you to do, in plain words, and what's still open. Your doctor sees this list too.</p>
+    </div>
+
+    <div class="card cp-progress-card" id="progress"><div class="skeleton" style="height:56px;"></div></div>
+
+    <div class="cp-plan-layout">
+      <section>
+        <div class="card-header"><h3 class="mb-0">Next steps</h3></div>
+        <div id="checklist"><div class="card skeleton" style="height:200px;"></div></div>
+      </section>
+      <section>
+        <div class="card-header"><h3 class="mb-0">From your doctors</h3></div>
+        <div id="plans"><div class="card skeleton" style="height:200px;"></div></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script>
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const KIND_LABEL = { follow_up: 'Follow-up visit', test: 'Test', medication: 'Medicine', lifestyle: 'Lifestyle', other: 'Other' };
+  const OWNER = { patient: ['you', 'You'], doctor: ['doctor', 'Doctor'], hospital: ['hospital', 'Hospital'] };
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('patient', 'My Care Plan');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+
+  async function load() {
+    try {
+      const [commitments, { plans }] = await Promise.all([api.get('/visit-loop/commitments'), api.get('/visit-loop/care-plans')]);
+      renderProgress(commitments);
+      renderChecklist(commitments);
+      renderPlans(plans);
+    } catch (err) {
+      document.getElementById('checklist').innerHTML = `<div class="alert alert-danger">${esc(err.message || 'Could not load your care plan.')}</div>`;
+      document.getElementById('plans').innerHTML = '';
+      document.getElementById('progress').hidden = true;
+    }
+  }
+
+  function fmtDate(d) {
+    return new Date(`${String(d).slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function relDays(d) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((new Date(`${d.slice(0, 10)}T00:00:00`) - today) / 86400000);
+    if (diff === 0) return 'Due today';
+    if (diff === 1) return 'Due tomorrow';
+    return diff > 0 ? `Due in ${diff} days` : `${-diff} day${diff < -1 ? 's' : ''} overdue`;
+  }
+
+  function renderProgress({ open, overdue, done }) {
+    const total = open.length + overdue.length + done.length;
+    const completed = done.filter((d) => d.status === 'done').length;
+    const pct = total ? Math.round((completed / total) * 100) : 0;
+    document.getElementById('progress').innerHTML = `
+      <div>
+        <strong>${total ? `${completed} of ${total} steps done` : 'No steps yet'}</strong>
+        <div class="text-sm text-muted">${overdue.length ? `${overdue.length} step${overdue.length > 1 ? 's are' : ' is'} overdue - your doctor can see this too.` : total ? "You're on track." : 'Steps appear here after a visit.'}</div>
+        <div class="cp-progress" role="progressbar" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pct}%"></i></div>
+      </div>
+      <div class="cp-counts">
+        <div><div class="cp-n ${overdue.length ? 'danger' : ''}">${overdue.length}</div><div class="cp-l">Overdue</div></div>
+        <div><div class="cp-n">${open.length}</div><div class="cp-l">Open</div></div>
+        <div><div class="cp-n">${completed}</div><div class="cp-l">Done</div></div>
+      </div>`;
+  }
+
+  function taskRow(c, group) {
+    const [ownerCls, ownerLabel] = OWNER[c.owner_role] || OWNER.patient;
+    const isMine = c.owner_role === 'patient';
+    const isDone = group === 'done';
+    let checkBtn;
+    if (isDone) checkBtn = `<button class="cp-check ${c.status === 'done' ? 'on' : ''}" title="Reopen" aria-label="Reopen ${esc(c.title)}" onclick="setStatus(${c.id}, 'open')">${c.status === 'done' ? '&#10003;' : ''}</button>`;
+    else if (isMine) checkBtn = `<button class="cp-check" title="Mark as done" aria-label="Mark ${esc(c.title)} as done" onclick="setStatus(${c.id}, 'done')"></button>`;
+    else checkBtn = `<span class="cp-check cp-locked" title="Waiting on your ${ownerLabel.toLowerCase()}" aria-hidden="true"></span>`;
+
+    const due = c.due_date ? (isDone ? `Due ${fmtDate(c.due_date)}` : relDays(c.due_date)) : 'No due date';
+    const doneNote = isDone ? (c.status === 'skipped' ? ' · skipped' : c.completed_at ? ` · done ${fmtDate(c.completed_at)}` : '') : '';
+    return `
+      <div class="cp-task ${group}">
+        ${checkBtn}
+        <div>
+          <div class="cp-title">${esc(c.title)}</div>
+          <div class="cp-meta">${esc(KIND_LABEL[c.kind] || 'Step')} · ${esc(due)}${esc(doneNote)} · ${esc(c.doctor_name)}</div>
+        </div>
+        <div class="cp-side">
+          <span class="cp-owner ${ownerCls}">${isMine ? 'You' : isDone ? ownerLabel : `Waiting on ${ownerLabel}`}</span>
+          ${!isDone && isMine && group === 'overdue' ? `<button class="cp-snooze" onclick="setStatus(${c.id}, 'skipped')">Can't do this</button>` : ''}
+        </div>
+      </div>`;
+  }
+
+  function renderChecklist({ open, overdue, done }) {
+    const el = document.getElementById('checklist');
+    if (!open.length && !overdue.length && !done.length) {
+      el.innerHTML = '<div class="card empty-state"><h4>Nothing to do yet</h4><p>After your next visit, your doctor\'s plan and next steps will appear here.</p></div>';
+      return;
+    }
+    el.innerHTML = `
+      ${overdue.length ? `<div class="cp-group-title danger">Overdue · ${overdue.length}</div>${overdue.map((c) => taskRow(c, 'overdue')).join('')}` : ''}
+      ${open.length ? `<div class="cp-group-title">Coming up · ${open.length}</div>${open.map((c) => taskRow(c, 'open')).join('')}` : ''}
+      ${done.length ? `<div class="cp-group-title">Done · ${done.length}</div>${done.map((c) => taskRow(c, 'done')).join('')}` : ''}`;
+  }
+
+  function renderPlans(plans) {
+    const el = document.getElementById('plans');
+    if (!plans.length) {
+      el.innerHTML = '<div class="card empty-state"><p>No care plans yet.</p></div>';
+      return;
+    }
+    el.innerHTML = plans.slice(0, 6).map((p) => {
+      const openSteps = p.commitments.filter((c) => c.status === 'open').length;
+      const label = p.admission_id ? 'Hospital discharge plan' : (p.diagnosis ? esc(p.diagnosis) : 'Visit plan');
+      return `
+        <article class="card cp-plan-card">
+          <div class="flex justify-between items-center" style="gap: var(--space-3); flex-wrap: wrap;">
+            <h4 class="mb-0">${label}</h4>
+            ${p.admission_id ? '<span class="badge badge-info">Discharge</span>' : ''}
+          </div>
+          <div class="cp-who">${esc(p.doctor_name)} · ${esc(fmtDate(p.created_at))}</div>
+          <blockquote>${esc(p.plain_summary)}</blockquote>
+          ${p.commitments.length ? `<div class="cp-steps">${p.commitments.length} step${p.commitments.length > 1 ? 's' : ''} · ${openSteps} still open</div>` : ''}
+        </article>`;
+    }).join('');
+  }
+
+  async function setStatus(id, status) {
+    try {
+      const { message } = await api.patch(`/visit-loop/commitments/${id}`, { status });
+      toast.success(message);
+      load();
+    } catch (err) { toast.error(err.message); }
+  }
+</script>
+</body>
+</html>

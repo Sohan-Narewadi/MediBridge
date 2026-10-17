@@ -5,8 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doctor Dashboard — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<style>
+  .brief-row { display: grid; grid-template-columns: 64px minmax(0, 1.4fr) auto minmax(0, 1.3fr) auto; align-items: center; gap: var(--space-3); padding: 0.7rem 0; border-top: 1px solid var(--color-ink-150); }
+  .brief-row:first-child { border-top: 0; padding-top: 0.2rem; }
+  .brief-row .t { font-family: var(--font-mono); font-size: 0.84rem; color: var(--color-ink-900); }
+  .brief-row .t small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: var(--color-ink-500); text-transform: uppercase; letter-spacing: 0.05em; }
+  .brief-row .who { font-weight: 500; font-size: 0.9rem; }
+  .brief-row .why { font-size: 0.78rem; color: var(--color-ink-500); }
+  .brief-row .flags { display: flex; gap: 0.35rem; align-items: center; flex-wrap: wrap; min-width: 0; }
+  .intake-ok, .intake-miss { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.76rem; white-space: nowrap; }
+  .intake-ok { color: var(--color-success-700); }
+  .intake-miss { color: var(--color-ink-500); }
+  .day-sep { font-size: 0.68rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); padding: var(--space-3) 0 var(--space-1); border-top: 1px solid var(--color-ink-150); }
+  .day-sep:first-child { border-top: 0; padding-top: 0; }
+  .day-sep + .brief-row { border-top: 0; }
+  @media (max-width: 760px) {
+    .brief-row { grid-template-columns: 56px minmax(0, 1fr) auto; }
+    .brief-row .flags { grid-column: 2 / -1; }
+    .brief-row .intake-cell { display: none; }
+  }
+  .adm-row .wait { font-family: var(--font-mono); font-size: 0.84rem; text-align: right; white-space: nowrap; }
+  .adm-row .wait small { display: block; font-family: var(--font-body); font-size: 0.7rem; color: var(--color-ink-500); }
+</style>
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -16,107 +39,258 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div id="welcome-block" style="margin-bottom: var(--space-5);"><div class="skeleton" style="height:32px; width:280px;"></div></div>
+    <div class="page-head" id="welcome-block"><div><div class="skeleton" style="height:28px; width:300px;"></div></div></div>
 
-    <div class="stat-grid" id="stat-grid">
-      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
-      <div class="card skeleton" style="height:90px;"></div><div class="card skeleton" style="height:90px;"></div>
+    <div class="kpi-row" id="kpis" style="--kpi-cols:4;">
+      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
+      <div class="kpi"><div class="skeleton" style="height:50px;"></div></div>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1.3fr 1fr; margin-top: var(--space-5); align-items:start;">
+    <div class="grid" style="grid-template-columns: 1.65fr 1fr; margin-top: var(--space-4); align-items:start;">
       <div class="card">
-        <div class="card-header"><h3>Today's appointments</h3><a href="/doctor/appointments.html" class="text-sm">View all</a></div>
-        <div id="today-appts"><div class="skeleton" style="height:80px;"></div></div>
+        <div class="card-header">
+          <div>
+            <h3>Pre-visit briefs</h3>
+            <div class="text-xs text-muted" style="margin-top:2px;">Compiled from the patient's intake, records, medicines and adherence. Open one before the consult.</div>
+          </div>
+          <a href="/doctor/appointments.html">Schedule</a>
+        </div>
+        <div id="briefs"><div class="skeleton" style="height:180px;"></div></div>
       </div>
-      <div class="card">
-        <h3>Appointments — last 14 days</h3>
-        <canvas id="trend-chart" height="160"></canvas>
+
+      <div class="flex-col gap-4">
+        <div class="card">
+          <div class="card-header"><h3>Awaiting discharge</h3><a href="/doctor/inpatients.html">Inpatients</a></div>
+          <div id="discharge"><div class="skeleton" style="height:80px;"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Needs confirmation</h3><a href="/doctor/appointments.html">All</a></div>
+          <div id="pending"><div class="skeleton" style="height:60px;"></div></div>
+        </div>
       </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: 1fr 1fr; margin-top: var(--space-5); align-items:start;">
+    <div class="grid" style="grid-template-columns: 1.2fr 1fr; margin-top: var(--space-4); align-items:start;">
       <div class="card">
-        <div class="card-header"><h3>Upcoming</h3></div>
-        <div id="upcoming-appts"><div class="skeleton" style="height:80px;"></div></div>
+        <div class="card-header"><h3>Appointments · last 14 days</h3></div>
+        <div style="position:relative; height:200px;"><canvas id="trend-chart"></canvas></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>Recent consultations</h3></div>
+        <div class="card-header"><h3>Recent consultations</h3><a href="/doctor/patients.html">My patients</a></div>
         <div id="recent-consults"><div class="skeleton" style="height:80px;"></div></div>
       </div>
     </div>
   </main>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-  document.addEventListener('mb:auth-ready', async (e) => {
-    const user = e.detail;
-    MB_LAYOUT.renderDashboardShell('doctor', 'Doctor Dashboard');
-    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
-    document.getElementById('welcome-block').innerHTML = `<h2 style="margin-bottom:2px;">Welcome back, ${user.fullName}</h2><p class="text-muted">Here's your schedule and practice overview.</p>`;
+  const { esc, fmtMinutes, icon } = MB_LAYOUT;
+  const DEPT = { billing: 'Billing', insurance: 'Insurance', pharmacy: 'Pharmacy', nursing: 'Nursing', documentation: 'Records' };
+  const state = { core: null, briefs: null, cleared: null };
 
-    try {
-      const data = await api.get('/dashboard/doctor');
-      renderStats(data.counts, data.todayAppointments.length);
-      renderList('today-appts', data.todayAppointments, true);
-      renderList('upcoming-appts', data.upcomingAppointments, false);
-      renderConsults(data.recentConsultations);
-      renderTrend(data.trend);
-    } catch (err) { toast.error('Could not load dashboard.'); }
-  });
-
-  function renderStats(counts, todayCount) {
-    document.getElementById('stat-grid').innerHTML = `
-      <div class="card stat-card"><div class="value">${todayCount}</div><div class="label">Today's appointments</div></div>
-      <div class="card stat-card"><div class="value">${counts.total_patients || 0}</div><div class="label">Total patients</div></div>
-      <div class="card stat-card"><div class="value">${counts.completed || 0}</div><div class="label">Completed</div></div>
-      <div class="card stat-card"><div class="value">${counts.cancelled || 0}</div><div class="label">Cancelled</div></div>
-    `;
+  function parseDate(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
+  function dayLabel(iso) {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    const n = Math.round((parseDate(iso) - t) / 86400000);
+    if (n === 0) return 'Today'; if (n === 1) return 'Tomorrow';
+    return parseDate(iso).toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
   }
 
-  function renderList(elId, list, showActions) {
-    const el = document.getElementById(elId);
-    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm">Nothing here.</p>'; return; }
-    el.innerHTML = list.map((a) => `
-      <div class="flex justify-between items-center" style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
-        <div><strong class="text-sm">${a.patient_name}</strong><div class="text-sm text-muted">${a.appointment_date} at ${a.start_time.slice(0,5)}</div></div>
-        <div class="flex gap-2 items-center">
-          <span class="badge status-${a.status}">${a.status}</span>
-          ${showActions && a.status === 'pending' ? `<button class="btn btn-sm btn-primary" onclick="confirmAppt(${a.id})">Confirm</button>` : ''}
-        </div>
+  MB_LAYOUT.onAuthReady(async (e) => {
+    const user = e.detail;
+    MB_LAYOUT.renderDashboardShell('doctor', 'Dashboard');
+    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    const hour = new Date().getHours();
+    const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    document.getElementById('welcome-block').innerHTML = `
+      <div>
+        <h2>${greet}, ${esc(user.fullName)}</h2>
+        <p id="welcome-sub">${new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' })}</p>
       </div>
-    `).join('');
+      <div class="actions">
+        <a href="/doctor/inpatients.html" class="btn btn-outline">${icon('bed')}Inpatients</a>
+        <a href="/doctor/transfers.html" class="btn btn-outline">${icon('transfer')}Request transfer</a>
+      </div>`;
+
+    await Promise.all([loadCore(), loadBriefs(), loadDischarge()]);
+    renderKpis();
+    renderBriefs();
+  });
+
+  async function loadCore() {
+    try {
+      state.core = await api.get('/dashboard/doctor');
+      renderPending([...(state.core.todayAppointments || []), ...(state.core.upcomingAppointments || [])].filter((a) => a.status === 'pending'));
+      renderConsults(state.core.recentConsultations || []);
+      renderTrend(state.core.trend || []);
+    } catch (err) {
+      toast.error('Could not load dashboard.');
+      document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable.</p>';
+      document.getElementById('recent-consults').innerHTML = '<p class="text-muted text-sm mb-0">Unavailable.</p>';
+    }
+  }
+
+  async function loadBriefs() {
+    try { state.briefs = (await api.get('/visit-loop/briefs/today')).items || []; }
+    catch (e) { state.briefs = null; }
+  }
+
+  async function loadDischarge() {
+    const el = document.getElementById('discharge');
+    try {
+      const { admissions } = await api.get('/discharge/admissions?status=cleared');
+      state.cleared = admissions || [];
+      if (!state.cleared.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No patients waiting to leave.</p>'; return; }
+      el.innerHTML = state.cleared.slice(0, 5).map((a) => {
+        const b = a.bottleneck;
+        return `
+          <div class="list-row adm-row">
+            <div class="min-w-0">
+              <div class="primary truncate">${esc(a.patient_name)}</div>
+              <div class="secondary truncate">${esc(a.ward || '')}${a.bed ? ` · ${esc(a.bed)}` : ''} · ${a.tasks_done ?? 0}/${a.tasks_total ?? 5} done</div>
+              ${b ? `<div style="margin-top:4px;"><span class="badge status-${esc(b.status)}">${esc(DEPT[b.department] || b.department)}${b.status === 'blocked' ? ' blocked' : ''} · ${fmtMinutes(b.minutes)}</span></div>` : ''}
+            </div>
+            <div class="wait">${fmtMinutes(a.waiting_minutes)}<small>waiting</small></div>
+          </div>`;
+      }).join('');
+    } catch (e) {
+      state.cleared = null;
+      el.innerHTML = '<p class="text-muted text-sm mb-0">Inpatient data unavailable.</p>';
+    }
+  }
+
+  function renderKpis() {
+    const core = state.core || {};
+    const today = core.todayAppointments || [];
+    const counts = core.counts || {};
+    const briefs = state.briefs || [];
+    const todayIso = new Date().toLocaleDateString('en-CA');
+    const todayBriefs = briefs.filter((b) => String(b.appointment_date).slice(0, 10) === todayIso);
+    const ready = briefs.filter((b) => b.intake_done).length;
+    const flagged = briefs.filter((b) => b.flag_count > 0).length;
+    const waiting = state.cleared ? state.cleared.length : null;
+    const pendingUpcoming = [...today, ...(core.upcomingAppointments || [])].filter((a) => a.status === 'pending').length;
+    const longest = state.cleared && state.cleared.length ? Math.max(...state.cleared.map((a) => a.waiting_minutes || 0)) : 0;
+    document.getElementById('kpis').innerHTML = `
+      <div class="kpi"><div class="kpi-label">${icon('calendar', 13)}Consults today</div><div class="kpi-value">${today.length}</div><div class="kpi-sub">${(core.upcomingAppointments || []).length} more upcoming</div></div>
+      <div class="kpi"><div class="kpi-label">${icon('fileText', 13)}Briefs ready</div><div class="kpi-value">${state.briefs ? `${ready}<small>/ ${briefs.length}</small>` : '—'}</div><div class="kpi-sub">${state.briefs ? `${flagged} with flags · next 7 days` : 'unavailable'}</div></div>
+      <div class="kpi ${waiting ? 'is-warning' : ''}"><div class="kpi-label">${icon('bed', 13)}Awaiting discharge</div><div class="kpi-value">${waiting == null ? '—' : waiting}</div><div class="kpi-sub">${waiting ? `longest wait ${fmtMinutes(longest)}` : 'no one waiting'}</div></div>
+      <div class="kpi"><div class="kpi-label">${icon('users', 13)}Patients</div><div class="kpi-value">${counts.total_patients || 0}</div><div class="kpi-sub">${pendingUpcoming} booking${pendingUpcoming === 1 ? '' : 's'} to confirm</div></div>`;
+    const sub = document.getElementById('welcome-sub');
+    if (sub) sub.textContent += ` · ${today.length} consult${today.length === 1 ? '' : 's'} today${state.briefs ? ` · ${todayBriefs.filter((b) => b.intake_done).length} pre-visit forms in` : ''}`;
+  }
+
+  function flagChip(f, extra) {
+    if (!f) return '';
+    const level = typeof f === 'object' ? (f.level || 'info') : 'warning';
+    const text = typeof f === 'object' ? f.text : f;
+    return `<span class="flag flag-${esc(level)} truncate" style="max-width:100%;" title="${esc(text)}">${esc(text)}</span>${extra > 0 ? `<span class="text-xs text-muted">+${extra}</span>` : ''}`;
+  }
+
+  function renderBriefs() {
+    const el = document.getElementById('briefs');
+    let items = state.briefs;
+    let fallback = false;
+    if (!items || !items.length) {
+      // No briefs endpoint yet, or nothing in the next 7 days: fall back to the upcoming schedule.
+      const core = state.core || {};
+      items = [...(core.todayAppointments || []), ...(core.upcomingAppointments || [])]
+        .filter((a) => a.status !== 'cancelled' && a.status !== 'completed')
+        .map((a) => ({ appointment_id: a.id, patient_name: a.patient_name, appointment_date: a.appointment_date, start_time: a.start_time, intake_done: null, reason: a.reason }));
+      fallback = true;
+    }
+    if (!items.length) {
+      el.innerHTML = '<div class="empty-state" style="padding: var(--space-5);"><p class="mb-0">No consults scheduled in the next few days.</p></div>';
+      return;
+    }
+    let lastDay = null;
+    el.innerHTML = items.slice(0, 10).map((b) => {
+      const day = String(b.appointment_date).slice(0, 10);
+      const sep = day !== lastDay ? `<div class="day-sep">${dayLabel(day)}</div>` : '';
+      lastDay = day;
+      const intake = b.intake_done == null ? '' : b.intake_done
+        ? `<span class="intake-ok">${icon('checkCircle', 14)}Intake in</span>`
+        : `<span class="intake-miss">${icon('clock', 14)}No intake yet</span>`;
+      return `${sep}
+        <div class="brief-row">
+          <div class="t">${String(b.start_time).slice(0, 5)}</div>
+          <div class="min-w-0">
+            <div class="who truncate">${esc(b.patient_name)}</div>
+            ${b.reason ? `<div class="why truncate">${esc(b.reason)}</div>` : ''}
+          </div>
+          <div class="intake-cell">${intake}</div>
+          <div class="flags">${b.top_flag ? flagChip(b.top_flag, (b.flag_count || 0) - 1) : (b.flag_count === 0 ? '<span class="text-xs text-muted">No flags</span>' : '')}</div>
+          <a href="/doctor/brief.html?appointment=${b.appointment_id}" class="btn btn-outline btn-sm">Open brief</a>
+        </div>`;
+    }).join('') + (fallback && state.briefs === null ? '<p class="text-xs text-muted" style="margin:var(--space-3) 0 0;">Brief summaries are loading from the Smart Brief service; showing your schedule.</p>' : '');
+  }
+
+  function renderPending(list) {
+    const el = document.getElementById('pending');
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">All bookings are confirmed.</p>'; return; }
+    el.innerHTML = list.slice(0, 5).map((a) => `
+      <div class="list-row">
+        <div class="min-w-0">
+          <div class="primary truncate">${esc(a.patient_name)}</div>
+          <div class="secondary">${dayLabel(a.appointment_date)} · <span class="mono">${a.start_time.slice(0, 5)}</span></div>
+        </div>
+        <button class="btn btn-sm btn-primary" data-confirm="${a.id}">Confirm</button>
+      </div>`).join('');
+    el.querySelectorAll('[data-confirm]').forEach((btn) => btn.addEventListener('click', () => confirmAppt(btn)));
   }
 
   function renderConsults(list) {
     const el = document.getElementById('recent-consults');
-    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm">No consultations recorded yet.</p>'; return; }
+    if (!list.length) { el.innerHTML = '<p class="text-muted text-sm mb-0">No consultations recorded yet.</p>'; return; }
     el.innerHTML = list.map((c) => `
-      <div style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
-        <strong class="text-sm">${c.diagnosis}</strong><div class="text-sm text-muted">${c.patient_name} &#8226; ${c.record_date}</div>
-      </div>
-    `).join('');
+      <div class="list-row">
+        <div class="min-w-0"><div class="primary truncate">${esc(c.diagnosis || 'Consultation')}</div><div class="secondary">${esc(c.patient_name)}</div></div>
+        <span class="text-sm text-muted mono">${parseDate(c.record_date).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}</span>
+      </div>`).join('');
   }
 
   function renderTrend(trend) {
+    if (!window.Chart) return;
+    Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
+    Chart.defaults.font.size = 11;
+    Chart.defaults.color = '#6c736f';
     const labels = []; const data = [];
     for (let i = 13; i >= 0; i--) {
       const d = new Date(); d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      labels.push(iso.slice(5));
-      const match = trend.find((t) => t.date === iso);
+      const iso = d.toLocaleDateString('en-CA');
+      labels.push(d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }));
+      const match = trend.find((t) => String(t.date).slice(0, 10) === iso);
       data.push(match ? match.count : 0);
+    }
+    if (!data.some(Boolean)) {
+      document.getElementById('trend-chart').parentElement.innerHTML = '<div class="empty-state" style="padding-top:var(--space-8);"><p class="mb-0">No appointments in the last 14 days.</p></div>';
+      return;
     }
     new Chart(document.getElementById('trend-chart'), {
       type: 'bar',
-      data: { labels, datasets: [{ label: 'Appointments', data, backgroundColor: '#0d9488' }] },
-      options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } },
+      data: { labels, datasets: [{ label: 'Appointments', data, backgroundColor: data.map((_, i) => (i === data.length - 1 ? '#1d6a55' : '#b3d6c9')), borderRadius: 3, maxBarThickness: 22 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1a1f1c', padding: 8, cornerRadius: 6, displayColors: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 7 }, border: { color: '#e4e5df' } },
+          y: { beginAtZero: true, ticks: { precision: 0, maxTicksLimit: 5 }, grid: { color: '#f1f1ec' }, border: { display: false } },
+        },
+      },
     });
   }
 
-  async function confirmAppt(id) {
-    try { await api.patch(`/appointments/${id}/status`, { status: 'confirmed' }); toast.success('Confirmed.'); location.reload(); }
-    catch (e) { toast.error(e.message); }
+  async function confirmAppt(btn) {
+    btn.disabled = true;
+    try {
+      await api.patch(`/appointments/${btn.dataset.confirm}/status`, { status: 'confirmed' });
+      toast.success('Appointment confirmed.');
+      btn.closest('.list-row').remove();
+      if (!document.querySelector('#pending .list-row')) document.getElementById('pending').innerHTML = '<p class="text-muted text-sm mb-0">All bookings are confirmed.</p>';
+    } catch (e) { btn.disabled = false; toast.error(e.message); }
   }
 </script>
 </body>

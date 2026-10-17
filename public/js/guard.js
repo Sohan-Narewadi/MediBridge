@@ -14,8 +14,15 @@
         return;
       }
       window.MB_USER = user;
-      document.documentElement.classList.remove('mb-auth-pending');
-      document.dispatchEvent(new CustomEvent('mb:auth-ready', { detail: user }));
+      // /auth/me can resolve before the page's own inline script has run (e.g. while a
+      // CDN <script> is still downloading), so wait for parsing to finish before firing
+      // the event - otherwise the page's listener misses it and stays on skeletons.
+      const ready = () => {
+        document.documentElement.classList.remove('mb-auth-pending');
+        document.dispatchEvent(new CustomEvent('mb:auth-ready', { detail: user }));
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ready, { once: true });
+      else ready();
     } catch (e) {
       const next = encodeURIComponent(window.location.pathname);
       window.location.href = `/auth/login.html?next=${next}`;

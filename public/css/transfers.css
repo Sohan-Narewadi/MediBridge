@@ -1,0 +1,48 @@
+/* TransferConnect module styles. Uses design-system tokens only. */
+.tc-intro { max-width: 720px; }
+.tc-layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+@media (max-width: 1100px) { .tc-layout { grid-template-columns: 1fr; } }
+
+.tc-steps { display: flex; flex-direction: column; gap: var(--space-5); }
+.tc-step + .tc-step { border-top: 1px solid var(--color-ink-200); padding-top: var(--space-5); }
+.tc-step-head { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.tc-step-num {
+  width: 26px; height: 26px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.8rem; background: var(--color-ink-900); color: var(--color-surface);
+}
+.tc-check { display: flex !important; align-items: flex-start; gap: var(--space-2); font-weight: 600; cursor: pointer; }
+.tc-check input { width: auto; margin-top: 0.2rem; }
+
+.tc-match {
+  display: flex; gap: var(--space-3); align-items: flex-start; padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-ink-200); border-radius: var(--radius-md); margin-bottom: var(--space-2);
+  cursor: pointer; background: var(--color-surface);
+}
+.tc-match:has(input:checked) { border-color: var(--color-primary-600); background: var(--color-primary-50); }
+.tc-match input { width: auto; margin-top: 0.3rem; }
+.tc-match-body { flex: 1; min-width: 0; }
+.tc-match-weak { opacity: 0.75; }
+.tc-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tc-bar { height: 6px; border-radius: var(--radius-full); background: var(--color-ink-100); margin: var(--space-2) 0; overflow: hidden; }
+.tc-bar span { display: block; height: 100%; background: var(--color-primary-600); border-radius: inherit; }
+.tc-reasons { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: 0.8rem; color: var(--color-ink-500); }
+.tc-reasons span::before { content: '\2022'; margin-right: 0.35rem; color: var(--color-ink-300); }
+
+.tc-summary {
+  white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; line-height: 1.6;
+  background: var(--color-ink-100); border: 1px solid var(--color-ink-200); border-radius: var(--radius-md);
+  padding: var(--space-4); margin: 0 0 var(--space-4); color: var(--color-ink-900); max-height: 320px; overflow: auto;
+}
+
+.tc-request { margin-bottom: var(--space-4); }
+.tc-offers { list-style: none; padding: 0; margin: var(--space-3) 0 0; border-top: 1px solid var(--color-ink-100); }
+.tc-offers li {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--color-ink-100);
+}
+
+.tc-incoming-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: var(--space-4); }
+.tc-incoming { border-left: 4px solid var(--color-ink-300); }
+.tc-incoming.tc-urgency-critical { border-left-color: var(--color-danger-500); }
+.tc-incoming.tc-urgency-urgent { border-left-color: var(--color-warning-500); }
+.tc-incoming.tc-urgency-routine { border-left-color: var(--color-info-500); }

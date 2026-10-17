@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Queue — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .stat-grid.five { grid-template-columns: repeat(5, 1fr); }
+  @media (max-width: 1000px) { .stat-grid.five { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px) { .stat-grid.five { grid-template-columns: repeat(2, 1fr); } }
+  .queue-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; margin-bottom: var(--space-5); }
+  .queue-head .eyebrow { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-500); margin-bottom: var(--space-1); }
+  .task-card { margin-bottom: var(--space-3); border-left: 4px solid var(--color-ink-200); }
+  .task-card.is-warning { border-left-color: var(--color-warning-500); }
+  .task-card.is-danger { border-left-color: var(--color-danger-500); }
+  .task-top { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+  .task-top h4 { margin: 0 0 2px; }
+  .task-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; font-size: 0.84rem; color: var(--color-ink-500); }
+  .sla-clock { text-align: right; min-width: 170px; }
+  .sla-clock .big { font-family: var(--font-display); font-size: 1.35rem; font-weight: 800; color: var(--color-ink-900); font-variant-numeric: tabular-nums; }
+  .sla-clock .big.warn { color: var(--color-warning-500); }
+  .sla-clock .big.over { color: var(--color-danger-500); }
+  .sla-bar { height: 6px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; margin: var(--space-3) 0; }
+  .sla-bar > span { display: block; height: 100%; background: var(--color-success-500); transition: width 0.4s ease; }
+  .sla-bar.warn > span { background: var(--color-warning-500); }
+  .sla-bar.over > span { background: var(--color-danger-500); }
+  .task-foot { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+  .chips { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--color-ink-500); }
+  .reason-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+  .reason-chips button { border: 1px solid var(--color-ink-200); background: var(--color-surface); border-radius: var(--radius-full); padding: 0.3rem 0.75rem; font-size: 0.8rem; cursor: pointer; color: var(--color-ink-700); }
+  .reason-chips button:hover { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+  .updated { font-size: 0.8rem; color: var(--color-ink-500); }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="staff"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="queue-head">
+      <div id="queue-title"><div class="skeleton" style="height:32px; width:300px;"></div></div>
+      <div class="flex items-center gap-3">
+        <span class="updated" id="updated-at"></span>
+        <button class="btn btn-outline btn-sm" id="refresh-btn">Refresh</button>
+      </div>
+    </div>
+
+    <div class="stat-grid five" id="stat-grid">
+      <div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div>
+      <div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div>
+      <div class="card skeleton" style="height:86px;"></div>
+    </div>
+
+    <div class="card-header" style="margin-top: var(--space-6);">
+      <h3 class="mb-0">Patients waiting on your desk</h3>
+      <span class="text-sm text-muted">Most urgent first &middot; refreshes every 30s</span>
+    </div>
+    <div id="task-list"><div class="card skeleton" style="height:130px;"></div></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
+  const DEPT = { documentation: 'Medical Records', billing: 'Billing', insurance: 'Insurance', pharmacy: 'Pharmacy', nursing: 'Nursing' };
+  const STATUS_BADGE = { pending: ['badge-neutral', 'Not started'], in_progress: ['badge-info', 'In progress'], blocked: ['badge-danger', 'Blocked'] };
+  // One-tap reasons per department, so staff rarely have to type.
+  const QUICK_REASONS = {
+    insurance: ['Awaiting TPA pre-authorisation approval', 'Policy documents missing', 'Insurer raised a query on the claim', 'Final bill not yet received from billing'],
+    billing: ['Pending consumables sheet from ward', 'Awaiting pharmacy return credit', 'Waiting for insurance approval amount', 'Patient deposit / payment pending'],
+    pharmacy: ['Medicine out of stock - sourcing', 'Prescription needs doctor clarification', 'Waiting for billing clearance'],
+    nursing: ['Waiting for family member for discharge teaching', 'Dressing change pending', 'Waiting for take-home medicines'],
+    documentation: ['Doctor yet to sign discharge summary', 'Lab reports pending', 'Certificate details need correction'],
+  };
+
+  let state = { tasks: [], department: null, fetchedAt: Date.now() };
+
+  document.addEventListener('mb:auth-ready', async (e) => {
+    const user = e.detail;
+    try {
+      const { staff } = await api.get('/staff/me');
+      if (staff.department === 'transfer_desk') { window.location.replace('/staff/transfers.html'); return; }
+    } catch (err) { /* fall through - queue call will show the error */ }
+    MB_LAYOUT.renderDashboardShell('staff', 'My Queue');
+    MB_LAYOUT.renderUserMenu(user, { showDashboardLink: false });
+    load();
+    setInterval(load, 30000);
+    setInterval(tick, 10000);
+    document.getElementById('refresh-btn').addEventListener('click', load);
+  });
+
+  // Minutes elapsed right now = what the server said + time since we fetched.
+  const liveMinutes = (base) => base + Math.floor((Date.now() - state.fetchedAt) / 60000);
+
+  async function load() {
+    try {
+      const data = await api.get('/discharge/queue');
+      state = { ...data, fetchedAt: Date.now() };
+      renderHeader(data);
+      renderStats(data.stats);
+      renderTasks();
+      document.getElementById('updated-at').textContent = `Updated ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+    } catch (err) {
+      document.getElementById('task-list').innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`;
+    }
+  }
+
+  function renderHeader(data) {
+    document.getElementById('queue-title').innerHTML = `
+      <div class="eyebrow">${esc(data.hospital_name)}</div>
+      <h2 class="mb-0">${esc(data.department_label)} desk &mdash; discharge queue</h2>
+      <p class="text-muted mb-0">Patients the doctor has already cleared. Every minute here is a patient waiting to go home.</p>`;
+  }
+
+  function renderStats(s) {
+    const tiles = [
+      [s.overdue, 'Past target time'], [s.blocked, 'Blocked'], [s.pending, 'Not started'],
+      [s.inProgress, 'In progress'], [s.doneToday, 'Completed today'],
+    ];
+    document.getElementById('stat-grid').innerHTML = tiles.map(([v, l]) =>
+      `<div class="card stat-card"><span class="value">${v}</span><span class="label">${l}</span></div>`).join('');
+  }
+
+  function slaClass(mins, sla) {
+    if (mins > sla) return 'over';
+    if (mins >= sla * 0.75) return 'warn';
+    return '';
+  }
+
+  function renderTasks() {
+    const el = document.getElementById('task-list');
+    if (!state.tasks.length) {
+      el.innerHTML = `<div class="card empty-state"><h3>All clear</h3><p class="mb-0">No cleared patients are waiting on ${esc(state.department_label || 'your desk')} right now.</p></div>`;
+      return;
+    }
+    el.innerHTML = state.tasks.map((t) => {
+      const mins = liveMinutes(t.minutes_since_cleared);
+      const cls = slaClass(mins, t.sla_minutes);
+      const [badgeCls, badgeText] = STATUS_BADGE[t.status];
+      const showInsurance = ['insurance', 'billing'].includes(t.department);
+      const pct = Math.min(100, Math.round((mins / t.sla_minutes) * 100));
+      return `
+      <div class="card task-card ${cls === 'over' ? 'is-danger' : cls === 'warn' ? 'is-warning' : ''}" data-task="${t.id}">
+        <div class="task-top">
+          <div>
+            <div class="flex items-center gap-2" style="flex-wrap:wrap;"><h4>${esc(t.patient_name)}</h4><span class="badge ${badgeCls}">${badgeText}</span></div>
+            <div class="task-meta">
+              <span>${esc(t.ward || '')}${t.bed ? ` &middot; Bed ${esc(t.bed)}` : ''}</span>
+              <span>${esc(t.doctor_name)}</span>
+              <span>${esc(t.diagnosis || '')}</span>
+            </div>
+            <p class="text-sm mb-0" style="margin-top:var(--space-2);"><strong>${esc(t.title)}</strong></p>
+            ${showInsurance ? `<p class="text-sm text-muted mb-0">${t.insurance_provider
+              ? `Insurer: <strong>${esc(t.insurance_provider)}</strong> &middot; Policy ${esc(t.insurance_policy_no || 'n/a')}`
+              : 'Self-pay patient (no insurer)'}</p>` : ''}
+          </div>
+          <div class="sla-clock">
+            <div class="big ${cls}" data-timer="${t.id}">${fmtMins(mins)}</div>
+            <div class="text-sm text-muted">since cleared &middot; target ${fmtMins(t.sla_minutes)}</div>
+          </div>
+        </div>
+        <div class="sla-bar ${cls}" data-bar="${t.id}"><span style="width:${pct}%"></span></div>
+        ${t.status === 'blocked' ? `<div class="alert alert-warning" style="margin-bottom:var(--space-3);"><span><strong>Blocked:</strong> ${esc(t.blocked_reason)}</span></div>` : ''}
+        <div class="task-foot">
+          <div class="chips">${t.other_pending.length
+            ? `Patient is also waiting on: ${t.other_pending.map((d) => `<span class="badge badge-neutral">${DEPT[d]}</span>`).join('')}`
+            : '<span class="badge badge-success">Your step is the last one left</span>'}</div>
+          <div class="flex gap-2" style="flex-wrap:wrap;">
+            ${t.status === 'pending' ? `<button class="btn btn-outline btn-sm" data-act="in_progress" data-id="${t.id}">Start</button>` : ''}
+            ${t.status === 'blocked' ? `<button class="btn btn-outline btn-sm" data-act="in_progress" data-id="${t.id}">Resume</button>` : ''}
+            ${t.status !== 'blocked' ? `<button class="btn btn-ghost btn-sm" data-act="block" data-id="${t.id}">Report blocker</button>` : `<button class="btn btn-ghost btn-sm" data-act="block" data-id="${t.id}">Update blocker</button>`}
+            <button class="btn btn-primary btn-sm" data-act="done" data-id="${t.id}">Mark done</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+
+    el.querySelectorAll('button[data-act]').forEach((btn) => btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      if (btn.dataset.act === 'block') openBlockModal(id);
+      else updateTask(id, { status: btn.dataset.act }, btn);
+    }));
+  }
+
+  // Keeps the timers moving between refreshes without re-rendering the list.
+  function tick() {
+    for (const t of state.tasks) {
+      const mins = liveMinutes(t.minutes_since_cleared);
+      const cls = slaClass(mins, t.sla_minutes);
+      const timer = document.querySelector(`[data-timer="${t.id}"]`);
+      const bar = document.querySelector(`[data-bar="${t.id}"]`);
+      if (timer) { timer.textContent = fmtMins(mins); timer.className = `big ${cls}`; }
+      if (bar) { bar.className = `sla-bar ${cls}`; bar.firstElementChild.style.width = `${Math.min(100, Math.round((mins / t.sla_minutes) * 100))}%`; }
+    }
+  }
+
+  async function updateTask(id, payload, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      await api.patch(`/discharge/tasks/${id}`, payload);
+      const msg = { done: 'Step completed. The patient and doctor have been updated.', in_progress: 'Marked in progress.', blocked: 'Blocker reported to the attending doctor.' }[payload.status];
+      toast.success(msg);
+      document.getElementById('modal-root').innerHTML = '';
+      load();
+    } catch (err) {
+      toast.error(err.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function openBlockModal(id) {
+    const t = state.tasks.find((x) => x.id === id);
+    const reasons = QUICK_REASONS[t.department] || [];
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="block-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">What is holding this up?</h3><button class="modal-close" id="block-close" aria-label="Close">&times;</button></div>
+          <p class="text-sm text-muted">${esc(t.patient_name)} &middot; ${esc(t.title)}. The attending doctor sees this immediately, and the patient sees it as a plain-language delay.</p>
+          <div class="reason-chips">${reasons.map((r) => `<button type="button" data-reason="${esc(r)}">${esc(r)}</button>`).join('')}</div>
+          <div class="field"><label for="block-reason">Reason</label>
+            <textarea id="block-reason" maxlength="255" placeholder="e.g. Awaiting TPA pre-authorisation approval">${t.status === 'blocked' ? esc(t.blocked_reason) : ''}</textarea></div>
+          <div class="flex justify-between gap-2">
+            <button class="btn btn-ghost" id="block-cancel">Cancel</button>
+            <button class="btn btn-danger" id="block-save">Report blocker</button>
+          </div>
+        </div>
+      </div>`;
+    const close = () => { document.getElementById('modal-root').innerHTML = ''; };
+    document.getElementById('block-close').addEventListener('click', close);
+    document.getElementById('block-cancel').addEventListener('click', close);
+    document.getElementById('block-backdrop').addEventListener('click', (ev) => { if (ev.target.id === 'block-backdrop') close(); });
+    document.querySelectorAll('.reason-chips button').forEach((b) => b.addEventListener('click', () => {
+      document.getElementById('block-reason').value = b.dataset.reason;
+    }));
+    document.getElementById('block-save').addEventListener('click', (ev) => {
+      const reason = document.getElementById('block-reason').value.trim();
+      if (!reason) { toast.error('Please describe the blocker.'); return; }
+      updateTask(id, { status: 'blocked', blockedReason: reason }, ev.currentTarget);
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransferConnect — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/transfers.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/transfers-ui.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2>TransferConnect</h2>
+    <p class="text-muted tc-intro">When a patient needs care this hospital can't give, send one request instead of making a round of phone calls. MediBridge finds hospitals with the right specialty and free beds, shares a consented summary, and the first hospital to accept gets the patient.</p>
+
+    <div class="tc-layout">
+      <section class="card">
+        <div class="card-header"><h3>New transfer</h3></div>
+        <div id="tc-wizard"></div>
+      </section>
+      <section>
+        <h3>My transfer requests</h3>
+        <div id="tc-outgoing"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'TransferConnect');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    const outgoing = MB_TRANSFERS.renderOutgoing(document.getElementById('tc-outgoing'), {
+      emptyText: 'No active transfers. Requests you send appear here with each hospital\'s answer.',
+    });
+    MB_TRANSFERS.renderWizard(document.getElementById('tc-wizard'), { onSent: () => outgoing.reload() });
+  });
+</script>
+</body>
+</html>

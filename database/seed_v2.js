@@ -8,8 +8,11 @@ const bcrypt = require('bcryptjs');
 
 const HOURS = 3600 * 1000;
 const ago = (hours) => new Date(Date.now() - hours * HOURS);
-const fmt = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
-const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); };
+// Local wall-clock time, matching MySQL NOW()/CURRENT_TIMESTAMP (toISOString would write UTC
+// and make every seeded "3 hours ago" look hours older than intended).
+const pad = (n) => String(n).padStart(2, '0');
+const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+const day = (offset) => { const d = new Date(); d.setDate(d.getDate() + offset); return fmt(d).slice(0, 10); };
 
 const DEPT_TASKS = [
   ['documentation', 'Discharge summary & medical certificates', 60],
@@ -102,15 +105,40 @@ async function main() {
   const adminId = (await q(`SELECT id FROM users WHERE role = 'admin' LIMIT 1`))[0].id;
 
   // ---- intake forms for the demo patient's upcoming appointments -------------
+  // The demo doctor gets a short run of visits today/tomorrow so the Smart Brief list is never empty
+  // on demo day. ON DUPLICATE KEY keeps re-runs of this script from tripping the slot unique key.
+  const briefVisits = [
+    [otherPatients[6], day(0), '18:00:00', '18:30:00', 'confirmed', 'Palpitations at night'],
+    [otherPatients[7], day(0), '18:30:00', '19:00:00', 'confirmed', 'BP medication review'],
+    [otherPatients[8], day(1), '09:00:00', '09:30:00', 'pending', 'Chest discomfort on exertion'],
+  ];
+  const briefApptIds = [];
+  for (const [pid, date, start, end, status, reason] of briefVisits) {
+    const r = await q(
+      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, start_time, end_time, consultation_mode, status, reason)
+       VALUES (?,?,?,?,?, 'in_person', ?, ?)
+       ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id), patient_id = VALUES(patient_id), status = VALUES(status), reason = VALUES(reason)`,
+      [pid, demoDoctor, date, start, end, status, reason]);
+    briefApptIds.push({ id: r.insertId, patient_id: pid });
+  }
+  // two of the three filled in their pre-visit form; the third shows the "no intake" flag
+  await q(`INSERT INTO intake_forms (appointment_id, patient_id, chief_complaint, symptoms, symptom_duration, severity, medication_changes, new_allergies, questions_for_doctor)
+           VALUES (?,?,?,?,?,?,?,?,?)`,
+    [briefApptIds[0].id, briefApptIds[0].patient_id, 'Heart racing when lying down at night', 'Palpitations,Anxiety,Poor sleep', '10 days', 4,
+      'Stopped my thyroid tablet last month', 'Sulfa drugs (rash)', 'Could this be related to my thyroid?']);
+  await q(`INSERT INTO intake_forms (appointment_id, patient_id, chief_complaint, symptoms, symptom_duration, severity, questions_for_doctor)
+           VALUES (?,?,?,?,?,?,?)`,
+    [briefApptIds[1].id, briefApptIds[1].patient_id, 'Routine BP medication review', 'Mild headache', '1 month', 2, 'Can I reduce the dose?']);
+
   const upcoming = await q(
-    `SELECT id, patient_id FROM appointments WHERE appointment_date >= CURDATE() AND status IN ('pending','confirmed') ORDER BY appointment_date, start_time`);
-  let first = true;
-  for (const a of upcoming.filter((u) => u.patient_id === demoPatient).slice(0, 2)) {
-    if (!first) break; // fill in only the first one: the second shows the "intake missing" prompt
-    first = false;
+    `SELECT id, patient_id, doctor_id FROM appointments WHERE appointment_date >= CURDATE() AND status IN ('pending','confirmed') ORDER BY appointment_date, start_time`);
+  // Demo patient: intake filled for the visit with the demo doctor (so the doctor's brief is rich);
+  // their other upcoming visits stay without one so the "Before your visit" prompt shows.
+  const heroAppt = upcoming.find((u) => u.patient_id === demoPatient && u.doctor_id === demoDoctor);
+  if (heroAppt) {
     await q(`INSERT INTO intake_forms (appointment_id, patient_id, chief_complaint, symptoms, symptom_duration, severity, medication_changes, new_allergies, questions_for_doctor)
              VALUES (?,?,?,?,?,?,?,?,?)`,
-      [a.id, demoPatient, 'Shortness of breath while climbing stairs', 'Breathlessness,Fatigue,Chest tightness', '2 weeks', 3,
+      [heroAppt.id, demoPatient, 'Shortness of breath while climbing stairs', 'Breathlessness,Fatigue,Chest tightness', '2 weeks', 3,
         'Started a new multivitamin last week', null, 'Is it safe to continue my evening walks?']);
   }
   // a few other upcoming appointments get intake forms so the doctor's list looks lived-in
@@ -121,14 +149,15 @@ async function main() {
     ['Skin rash on forearms', 'Itching,Redness', '1 week', 2],
   ];
   let ci = 0;
-  for (const a of upcoming.filter((u) => u.patient_id !== demoPatient).slice(0, 4)) {
+  const hasIntake = new Set(briefApptIds.map((b) => b.id));
+  for (const a of upcoming.filter((u) => u.patient_id !== demoPatient && !hasIntake.has(u.id)).slice(0, 4)) {
     const c = complaints[ci++ % complaints.length];
     await q(`INSERT INTO intake_forms (appointment_id, patient_id, chief_complaint, symptoms, symptom_duration, severity) VALUES (?,?,?,?,?,?)`,
       [a.id, a.patient_id, c[0], c[1], c[2], c[3]]);
   }
 
   // ---- Visit Loop: care plans + commitments for the demo patient -------------
-  const rec = await q(`SELECT id FROM medical_records WHERE patient_id = ? ORDER BY record_date DESC LIMIT 2`, [demoPatient]);
+  const rec = await q(`SELECT id FROM medical_records WHERE patient_id = ? AND doctor_id = ? ORDER BY record_date DESC LIMIT 2`, [demoPatient, demoDoctor]);
   const plan1 = await q(
     `INSERT INTO care_plans (patient_id, doctor_id, medical_record_id, plain_summary, created_at) VALUES (?,?,?,?,?)`,
     [demoPatient, demoDoctor, rec[0] ? rec[0].id : null,
@@ -274,7 +303,7 @@ async function main() {
         'BP 100/70, pulse 108, on aspirin + heparin. Allergies: none known. Chronic: type 2 diabetes. ECG attached in record. Needs cath lab + CCU bed.'),
       1, 'Consent obtained from patient\'s son at bedside', fmt(ago(0.7))]);
   const offers1 = [[2, 96, 'accepted', 'Cath lab ready, CCU bed 4 reserved. Send ambulance now.', 0.4],
-    [1, 61, 'pending', null, null], [4, 40, 'declined', 'No cardiology cover tonight.', 0.5]];
+    [4, 40, 'declined', 'No cardiology cover tonight.', 0.5]];
   for (const [hIdx, score, status, note, respAgo] of offers1) {
     await q(`INSERT INTO transfer_offers (request_id, hospital_id, match_score, status, response_note, sent_at, responded_at, summary_viewed_at, responded_by)
              VALUES (?,?,?,?,?,?,?,?,?)`,

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notifications — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="staff"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Mark all read</button></div>
+    <div id="notif-list"><div class="card skeleton" style="height:70px;"></div></div>
+  </main>
+</div>
+
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('staff', 'Notifications');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    load();
+  });
+  const LINKS = { admission: '/staff/dashboard.html', transfer_request: '/staff/transfers.html', transfer_offer: '/staff/transfers.html' };
+  async function load() {
+    const el = document.getElementById('notif-list');
+    try {
+      const { notifications } = await api.get('/notifications');
+      if (!notifications.length) { el.innerHTML = '<div class="empty-state"><p>No notifications yet.</p></div>'; return; }
+      el.innerHTML = notifications.map((n) => `
+        <div class="card" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
+          <div class="flex justify-between items-start gap-3">
+            <div>
+              <strong class="text-sm">${esc(n.title)}</strong>
+              <p class="text-sm text-muted mb-0">${esc(n.message)}</p>
+              <p class="text-sm text-muted mb-0">${new Date(n.created_at.replace(' ', 'T')).toLocaleString()}${LINKS[n.related_type] ? ` &middot; <a href="${LINKS[n.related_type]}">Open</a>` : ''}</p>
+            </div>
+            ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    } catch (err) {
+      el.innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`;
+    }
+  }
+  async function markRead(id) { await api.patch(`/notifications/${id}/read`); load(); }
+  document.getElementById('mark-all').addEventListener('click', async () => { await api.patch('/notifications/read-all'); load(); });
+</script>
+</body>
+</html>

@@ -23,6 +23,13 @@ const getMyProfile = asyncHandler(async (req, res) => {
     );
     return res.json({ profile: { ...user, ...rows[0] } });
   }
+  if (user.role === 'staff') {
+    const [rows] = await pool.query(
+      `SELECT s.department, s.hospital_id, h.name AS hospital_name FROM staff s JOIN hospitals h ON h.id = s.hospital_id WHERE s.user_id = ?`,
+      [req.user.id]
+    );
+    return res.json({ profile: { ...user, ...(rows[0] || {}) } });
+  }
   res.json({ profile: user });
 });
 

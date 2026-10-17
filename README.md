@@ -1,10 +1,27 @@
-# MediBridge — Smart Healthcare Access & Management Platform
+# MediBridge — Care that doesn't fall through the gaps
 
-MediBridge is a full-stack web platform connecting **patients**, **doctors** and **administrators**
-around real appointment booking, medical records, prescriptions, medication reminders and a
-personal **Care Score**. It was built as a college full-stack development project, using a
-traditional Node.js/Express/MySQL backend and a vanilla HTML/CSS/JavaScript multi-page frontend —
-no frontend framework, so the HTML/CSS/JS and backend engineering are directly visible.
+MediBridge is a **care-handoff platform**. Most health software handles one visit at a time; the
+things that actually go wrong happen *between* steps — the doctor who starts from zero, the patient
+who is medically fit at noon but still in bed at five because billing and insurance haven't signed
+off, the transfer arranged one phone call at a time. MediBridge carries the patient's information
+across every one of those handoffs so nobody re-types it, and shows every role exactly who the
+patient is waiting on.
+
+It connects **patients**, **doctors**, **hospital department staff** and **administrators**, built
+on real appointment booking, medical records, prescriptions, medication tracking and a personal
+**Care Score**. It is a college full-stack project: Node.js/Express/MySQL backend and a vanilla
+HTML/CSS/JavaScript multi-page frontend with no framework, so the engineering is directly visible.
+
+### What's new and why (v2)
+
+| Module | The gap it closes | What it does |
+|---|---|---|
+| **Smart Brief** | Doctors start every consult by re-asking history; patients repeat themselves. | The patient answers a 2-minute pre-visit form once. The doctor opens a one-page brief compiled automatically from biodata, allergies, current medicines + adherence, recent records, open follow-ups and the intake, with computed flags ("New allergy reported", "Missed 3 doses this week", "Follow-up overdue"). |
+| **Discharge Flow** | Patients are medically cleared but wait hours for billing, insurance, pharmacy and paperwork, and nobody can see which desk is holding them. | When the doctor marks a patient fit, every department gets its task with a target time. Staff work from a live queue, report blockers with a reason, get nudged, and the patient/family see the same live "currently waiting on" status. Admins see which department causes the most delay. |
+| **TransferConnect** | When a hospital can't provide the care needed, staff phone other hospitals one by one. | Hospitals are ranked by specialty, free beds, ICU, distance and response history (with plain-English reasons). One request goes to several at once; the first to accept wins, beds are reserved, and the clinical summary is generated automatically and revealed only on open, with consent and an access log. |
+| **Visit Loop** | Patients forget most of what they're told; follow-ups silently lapse. | After a visit or discharge the doctor writes a plain-language plan with commitments (tests, follow-ups, medicines) that patient, doctor and admin all track until they're done. Overdue items surface as "broken loops" for the admin to act on. |
+
+The **Operations Center** (admin) shows all three handoff problems on one screen.
 
 > **Disclaimer:** All doctors, patients, and medical data in this project are entirely fictional
 > demo data. MediBridge is not a certified medical-records system and must not be used for real
@@ -123,9 +140,14 @@ FLUSH PRIVILEGES;
 ```bash
 npm install
 cp .env.example .env   # then edit .env with your real DB credentials
-npm run setup          # creates the schema AND seeds realistic demo data
+npm run setup          # creates the schema AND seeds realistic demo data (incl. v2 modules)
 npm start               # http://localhost:4000
 ```
+`npm run setup` also runs `db:v2` (applies `database/migrate_v2.sql` and seeds hospitals, staff,
+admissions with live discharge tasks, transfer requests, pre-visit intakes and care plans).
+**Demo data is dated relative to the day you seed it**, so run `npm run setup` again on the day
+of a demo to get "upcoming" appointments and "cleared 3 hours ago" admissions. `npm run db:v2`
+alone resets just the v2 modules.
 `npm run setup` runs `db:create` (applies `database/schema.sql`) then `db:seed` (populates 24
 doctors, 15 patients, ~45 days of appointment history, medical records, prescriptions, medication
 logs, reviews, notifications, resources, reported issues and audit entries — all fictional).
@@ -148,6 +170,11 @@ seeded PRNG keeps it consistent across runs).
 | Patient | `patient@medibridge.demo` | `Patient@123` |
 | Doctor | `doctor@medibridge.demo` | `Doctor@123` |
 | Admin | `admin@medibridge.demo` | `Admin@123` |
+| Hospital staff (MediBridge City Hospital) | `billing@`, `insurance@`, `pharmacy@`, `nursing@`, `records@` `medibridge.demo` | `Staff@123` |
+| Transfer desk, home hospital | `transfer@medibridge.demo` | `Staff@123` |
+| Transfer desks, partner hospitals | `desk@` (Lakeview), `desk.sunrise@`, `desk.agnes@`, `desk.cedar@`, `desk.riverside@` `medibridge.demo` | `Staff@123` |
+
+A step-by-step evaluation walkthrough is in [`DEMO_SCRIPT.md`](./DEMO_SCRIPT.md).
 
 (The login page also has one-click buttons to fill these in.) New patient accounts can also be
 created via **Register** — doctor and admin accounts are provisioned by an admin, by design.
@@ -173,6 +200,9 @@ cookie, set on login/register) and, where noted, a specific role.
 | Care (signature feature) | `GET /care/score`, `GET /care/timeline`, `GET /care/adherence-trend` |
 | Dashboard | `GET /dashboard/patient`, `GET /dashboard/doctor` |
 | Admin | `GET /admin/stats`, `GET /admin/analytics`, `GET /admin/patients`, `GET /admin/doctors`, `PATCH /admin/doctors/:id/verify`, `PATCH /admin/users/:id/status`, `GET/PATCH /admin/reports`, `GET /admin/audit-logs` |
+| Smart Brief + Visit Loop | `POST /visit-loop/intake`, `GET /visit-loop/intake/:appointmentId`, `GET /visit-loop/pending-intakes`, `GET /visit-loop/intake-status`, `GET /visit-loop/brief/:appointmentId` (doctor), `GET /visit-loop/briefs/today` (doctor), `GET/POST /visit-loop/care-plans`, `GET /visit-loop/commitments`, `PATCH /visit-loop/commitments/:id`, `GET /visit-loop/analytics` (admin) |
+| Discharge Flow | `GET /discharge/queue` (staff), `PATCH /discharge/tasks/:id`, `POST /discharge/tasks/:id/nudge`, `GET /discharge/admissions`, `GET /discharge/admissions/:id`, `POST /discharge/admissions/:id/clear` (doctor), `POST /discharge/admissions/:id/discharge`, `GET /discharge/my-stay` (patient), `GET /discharge/board`, `GET /discharge/analytics` (admin), `GET /staff/me` |
+| TransferConnect | `GET /transfers/hospitals`, `GET /transfers/candidates`, `POST /transfers/match`, `POST /transfers/preview-summary`, `POST /transfers`, `GET /transfers`, `GET /transfers/incoming` (desk), `GET /transfers/:id`, `POST /transfers/offers/:id/respond` (desk), `POST /transfers/:id/complete`, `POST /transfers/:id/cancel`, `GET /transfers/analytics` (admin) |
 
 All responses are JSON; errors return `{ "error": "message" }` with an appropriate HTTP status
 code and never leak raw database errors or stack traces to the client.

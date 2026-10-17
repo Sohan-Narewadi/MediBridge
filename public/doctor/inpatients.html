@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inpatients &amp; Discharge — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .adm-card { margin-bottom: var(--space-4); }
+  .adm-top { display: flex; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; align-items: flex-start; }
+  .adm-top h3 { margin: 0 0 2px; }
+  .adm-meta { display: flex; gap: var(--space-3); flex-wrap: wrap; font-size: 0.85rem; color: var(--color-ink-500); }
+  .wait { text-align: right; }
+  .wait .big { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--color-ink-900); }
+  .bottleneck { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+    padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); margin: var(--space-4) 0;
+    background: var(--color-danger-100); border: 1px solid var(--color-danger-500); }
+  .bottleneck.calm { background: var(--color-warning-100); border-color: var(--color-warning-500); }
+  .bottleneck.ready { background: var(--color-success-100); border-color: var(--color-success-500); }
+  .bottleneck .label { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-ink-700); }
+  .bottleneck .what { font-weight: 700; color: var(--color-ink-900); }
+  .checklist { display: flex; flex-direction: column; border: 1px solid var(--color-ink-200); border-radius: var(--radius-md); overflow: hidden; }
+  .check-row { display: grid; grid-template-columns: 22px 1.4fr 1fr 130px 110px; gap: var(--space-3); align-items: center;
+    padding: 0.65rem var(--space-4); border-top: 1px solid var(--color-ink-100); font-size: 0.87rem; }
+  .check-row:first-child { border-top: none; }
+  .step-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--color-ink-300); }
+  .step-dot.done { background: var(--color-success-500); border-color: var(--color-success-500); }
+  .step-dot.in_progress { border-color: var(--color-info-500); background: var(--color-info-100); }
+  .step-dot.blocked { background: var(--color-danger-500); border-color: var(--color-danger-500); }
+  .mini-bar { height: 5px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; }
+  .mini-bar > span { display: block; height: 100%; background: var(--color-success-500); }
+  .mini-bar.warn > span { background: var(--color-warning-500); }
+  .mini-bar.over > span { background: var(--color-danger-500); }
+  @media (max-width: 760px) { .check-row { grid-template-columns: 22px 1fr auto; } .check-row .hide-sm { display: none; } }
+  .adm-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; justify-content: flex-end; margin-top: var(--space-4); }
+  .plan { margin-top: var(--space-4); padding: var(--space-4); border-radius: var(--radius-md); background: var(--color-primary-50); border: 1px solid var(--color-primary-100); }
+  .plan h4 { margin-bottom: var(--space-2); }
+  .events { margin-top: var(--space-3); font-size: 0.84rem; }
+  .events li { margin-bottom: var(--space-1); color: var(--color-ink-700); }
+  .summary-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-4); margin-bottom: var(--space-5); }
+  @media (max-width: 700px) { .summary-strip { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <h2 style="margin-bottom:2px;">Inpatients &amp; Discharge</h2>
+    <p class="text-muted">Clear a patient once and MediBridge runs billing, insurance, pharmacy, nursing and paperwork in parallel. You'll see exactly who is holding things up.</p>
+
+    <div class="summary-strip" id="summary">
+      <div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div><div class="card skeleton" style="height:86px;"></div>
+    </div>
+
+    <div class="pill-nav" id="tabs" style="margin-bottom: var(--space-4);">
+      <button data-tab="cleared" class="active">Awaiting discharge</button>
+      <button data-tab="admitted">In treatment</button>
+      <button data-tab="discharged">Recently discharged</button>
+    </div>
+    <div id="adm-list"><div class="card skeleton" style="height:160px;"></div></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const fmtMins = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m}m`);
+  const fmtTime = (s) => s ? new Date(s.replace(' ', 'T')).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  const STATUS = { pending: ['badge-neutral', 'Not started'], in_progress: ['badge-info', 'In progress'], blocked: ['badge-danger', 'Blocked'], done: ['badge-success', 'Done'] };
+
+  let admissions = [];
+  let fetchedAt = Date.now();
+  let activeTab = 'cleared';
+  let plansByPatient = {};      // patientId -> plans[] | 'error'
+  const openTimelines = new Set();
+
+  const live = (m) => m + Math.floor((Date.now() - fetchedAt) / 60000);
+  const slaCls = (m, sla) => (m > sla ? 'over' : m >= sla * 0.75 ? 'warn' : '');
+
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'Inpatients & Discharge');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    document.querySelectorAll('#tabs button').forEach((b) => b.addEventListener('click', () => {
+      document.querySelectorAll('#tabs button').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      activeTab = b.dataset.tab;
+      render();
+    }));
+    load();
+    setInterval(() => { if (!document.getElementById('modal-root').innerHTML) load(); }, 30000);
+  });
+
+  async function load() {
+    try {
+      const data = await api.get('/discharge/admissions');
+      admissions = data.admissions;
+      fetchedAt = Date.now();
+      await loadPlans();
+      renderSummary();
+      render();
+    } catch (err) {
+      document.getElementById('adm-list').innerHTML = `<div class="alert alert-danger">${esc(err.message)}</div>`;
+    }
+  }
+
+  // Discharge care plans come from the Visit Loop module; a failure there must not break this page.
+  async function loadPlans() {
+    const ids = [...new Set(admissions.filter((a) => a.status !== 'discharged').map((a) => a.patient_id))];
+    await Promise.all(ids.map(async (pid) => {
+      try { plansByPatient[pid] = (await api.get(`/visit-loop/care-plans?patientId=${pid}`)).plans || []; }
+      catch (err) { plansByPatient[pid] = 'error'; }
+    }));
+  }
+
+  function renderSummary() {
+    const cleared = admissions.filter((a) => a.status === 'cleared');
+    const admitted = admissions.filter((a) => a.status === 'admitted');
+    const longest = cleared.reduce((m, a) => Math.max(m, a.waiting_minutes || 0), 0);
+    const ready = cleared.filter((a) => a.tasks_total && a.tasks_done === a.tasks_total).length;
+    document.getElementById('summary').innerHTML = `
+      <div class="card stat-card"><span class="value">${admitted.length}</span><span class="label">In treatment</span></div>
+      <div class="card stat-card"><span class="value">${cleared.length}</span><span class="label">Cleared, waiting to leave${ready ? ` &middot; ${ready} ready now` : ''}</span></div>
+      <div class="card stat-card"><span class="value">${cleared.length ? fmtMins(live(longest)) : '&mdash;'}</span><span class="label">Longest wait after clearance</span></div>`;
+  }
+
+  function render() {
+    const el = document.getElementById('adm-list');
+    const list = admissions.filter((a) => a.status === activeTab);
+    if (!list.length) {
+      const msg = { cleared: 'No cleared patients are waiting to leave.', admitted: 'You have no patients currently in treatment.', discharged: 'No discharges in the last 7 days.' }[activeTab];
+      el.innerHTML = `<div class="card empty-state"><p class="mb-0">${msg}</p></div>`;
+      return;
+    }
+    if (activeTab === 'discharged') { el.innerHTML = renderDischargedTable(list); return; }
+    el.innerHTML = list.map((a) => (a.status === 'cleared' ? renderCleared(a) : renderAdmitted(a))).join('');
+    bindActions(el);
+    openTimelines.forEach((id) => loadTimeline(id));
+  }
+
+  function patientHeader(a, right) {
+    return `
+      <div class="adm-top">
+        <div>
+          <h3>${esc(a.patient_name)}</h3>
+          <div class="adm-meta">
+            <span>${esc(a.ward || '')}${a.bed ? ` &middot; Bed ${esc(a.bed)}` : ''}</span>
+            <span>${esc(a.diagnosis || '')}</span>
+            <span>${a.insurance_provider ? `${esc(a.insurance_provider)} (${esc(a.insurance_policy_no || 'policy n/a')})` : 'Self-pay'}</span>
+          </div>
+        </div>
+        ${right}
+      </div>`;
+  }
+
+  function renderAdmitted(a) {
+    return `
+      <div class="card adm-card">
+        ${patientHeader(a, `<div class="wait"><div class="big">${Math.round(a.hours_admitted / 24 * 10) / 10}d</div><div class="text-sm text-muted">admitted ${fmtTime(a.admitted_at)}</div></div>`)}
+        <div class="adm-actions">
+          <a class="btn btn-ghost btn-sm" href="/doctor/transfers.html?patientId=${a.patient_id}&admissionId=${a.id}">Request transfer</a>
+          <button class="btn btn-primary btn-sm" data-act="clear" data-id="${a.id}">Mark medically fit for discharge</button>
+        </div>
+      </div>`;
+  }
+
+  function renderCleared(a) {
+    const mins = live(a.waiting_minutes || 0);
+    const allDone = a.tasks_total && a.tasks_done === a.tasks_total;
+    const b = a.bottleneck;
+    let banner;
+    if (allDone) {
+      banner = `<div class="bottleneck ready"><div><div class="label">Ready</div><div class="what">Every department has signed off. The patient can go home now.</div></div>
+        <button class="btn btn-primary btn-sm" data-act="discharge" data-id="${a.id}">Complete discharge</button></div>`;
+    } else if (b) {
+      banner = `<div class="bottleneck ${b.overdue || b.status === 'blocked' ? '' : 'calm'}">
+        <div><div class="label">Waiting on</div>
+          <div class="what">${esc(b.department_label)} &mdash; ${fmtMins(live(b.minutes))}${b.reason ? ` &mdash; ${esc(b.reason)}` : ''}</div>
+          <div class="text-sm text-muted">${esc(b.title)} &middot; target ${fmtMins(b.sla_minutes)}</div></div>
+        <button class="btn btn-danger btn-sm" data-act="nudge" data-id="${b.task_id}">Nudge ${esc(b.department_label)}</button></div>`;
+    }
+    const rows = a.tasks.map((t) => {
+      const m = t.status === 'done' ? t.minutes_since_cleared : live(t.minutes_since_cleared);
+      const cls = t.status === 'done' ? '' : slaCls(m, t.sla_minutes);
+      const [bc, bt] = STATUS[t.status];
+      return `
+        <div class="check-row">
+          <span class="step-dot ${t.status}"></span>
+          <div><strong>${esc(t.department_label)}</strong><div class="text-sm text-muted">${esc(t.title)}</div>
+            ${t.status === 'blocked' ? `<div class="text-sm" style="color:var(--color-danger-500);">${esc(t.blocked_reason)}</div>` : ''}</div>
+          <div class="hide-sm text-sm">${t.status === 'done'
+            ? `Done in ${fmtMins(m)}${t.completed_by_name ? ` <span class="text-muted">by ${esc(t.completed_by_name.replace(/\s*\(.*\)$/, ''))}</span>` : ''}`
+            : `${fmtMins(m)} <span class="text-muted">/ ${fmtMins(t.sla_minutes)}</span>`}</div>
+          <div class="hide-sm">${t.status === 'done' ? ''
+            : `<div class="mini-bar ${cls}"><span style="width:${Math.min(100, Math.round(m / t.sla_minutes * 100))}%"></span></div>`}</div>
+          <div style="justify-self:end;"><span class="badge ${bc}">${bt}</span></div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="card adm-card" id="adm-${a.id}">
+        ${patientHeader(a, `<div class="wait"><div class="big">${fmtMins(mins)}</div><div class="text-sm text-muted">since you cleared &middot; ${a.tasks_done}/${a.tasks_total} done</div></div>`)}
+        ${banner || ''}
+        <div class="checklist">${rows}</div>
+        ${renderPlan(a)}
+        <div class="adm-actions">
+          <button class="btn btn-ghost btn-sm" data-act="timeline" data-id="${a.id}">${openTimelines.has(a.id) ? 'Hide' : 'Show'} activity</button>
+          <a class="btn btn-ghost btn-sm" href="/doctor/transfers.html?patientId=${a.patient_id}&admissionId=${a.id}">Request transfer</a>
+          ${allDone ? '' : `<button class="btn btn-outline btn-sm" disabled title="Available once every department has signed off">Complete discharge</button>`}
+        </div>
+        <div id="timeline-${a.id}"></div>
+      </div>`;
+  }
+
+  function renderPlan(a) {
+    const plans = plansByPatient[a.patient_id];
+    if (plans === 'error') return `<div class="plan"><p class="text-sm text-muted mb-0">Discharge care plan unavailable right now.</p></div>`;
+    const plan = (plans || []).find((p) => p.admission_id === a.id);
+    if (!plan) return `<div class="plan"><p class="text-sm text-muted mb-0">No discharge care plan written yet for this stay.</p></div>`;
+    const commitments = plan.commitments || [];
+    return `
+      <div class="plan">
+        <h4>Discharge care plan (patient sees this)</h4>
+        <p class="text-sm mb-0">${esc(plan.plain_summary)}</p>
+        ${commitments.length ? `<ul class="text-sm" style="margin-top:var(--space-2);">${commitments.map((c) => `<li>${esc(c.title)}${c.due_date ? ` &middot; due ${esc(c.due_date)}` : ''}</li>`).join('')}</ul>` : ''}
+      </div>`;
+  }
+
+  function renderDischargedTable(list) {
+    return `<div class="table-wrap"><table class="data-table">
+      <thead><tr><th>Patient</th><th>Diagnosis</th><th>Wait after clearance</th><th>Discharged</th></tr></thead>
+      <tbody>${list.map((a) => `<tr><td>${esc(a.patient_name)}</td><td>${esc(a.diagnosis || '')}</td>
+        <td>${a.waiting_minutes != null ? fmtMins(a.waiting_minutes) : '&mdash;'}</td><td>${fmtTime(a.discharged_at)}</td></tr>`).join('')}</tbody>
+    </table></div>`;
+  }
+
+  function bindActions(root) {
+    root.querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      const act = btn.dataset.act;
+      if (act === 'clear') confirmClear(id);
+      if (act === 'nudge') nudge(id, btn);
+      if (act === 'discharge') discharge(id, btn);
+      if (act === 'timeline') toggleTimeline(id);
+    }));
+  }
+
+  function confirmClear(id) {
+    const a = admissions.find((x) => x.id === id);
+    document.getElementById('modal-root').innerHTML = `
+      <div class="modal-backdrop" id="clear-backdrop">
+        <div class="modal">
+          <div class="modal-header"><h3 class="mb-0">Clear ${esc(a.patient_name)} for discharge?</h3><button class="modal-close" id="clear-close" aria-label="Close">&times;</button></div>
+          <p class="text-sm">This starts the discharge clock. Medical records, billing, ${a.insurance_provider ? 'insurance, ' : ''}pharmacy and nursing are all alerted at once, and the patient can follow progress live.</p>
+          ${a.insurance_provider ? '' : '<p class="text-sm text-muted">Self-pay patient: the insurance step will be skipped automatically.</p>'}
+          <div class="flex justify-between gap-2"><button class="btn btn-ghost" id="clear-cancel">Cancel</button><button class="btn btn-primary" id="clear-go">Yes, medically fit</button></div>
+        </div>
+      </div>`;
+    const close = () => { document.getElementById('modal-root').innerHTML = ''; };
+    document.getElementById('clear-close').addEventListener('click', close);
+    document.getElementById('clear-cancel').addEventListener('click', close);
+    document.getElementById('clear-go').addEventListener('click', async (ev) => {
+      ev.currentTarget.disabled = true;
+      try {
+        await api.post(`/discharge/admissions/${id}/clear`);
+        close();
+        toast.success('Discharge started. All departments have been alerted.');
+        activeTab = 'cleared';
+        document.querySelectorAll('#tabs button').forEach((x) => x.classList.toggle('active', x.dataset.tab === 'cleared'));
+        load();
+      } catch (err) { toast.error(err.message); ev.currentTarget.disabled = false; }
+    });
+  }
+
+  async function nudge(taskId, btn) {
+    btn.disabled = true;
+    try { const r = await api.post(`/discharge/tasks/${taskId}/nudge`); toast.success(r.message); }
+    catch (err) { toast.error(err.message); }
+    finally { btn.disabled = false; }
+  }
+
+  async function discharge(id, btn) {
+    btn.disabled = true;
+    try { await api.post(`/discharge/admissions/${id}/discharge`); toast.success('Patient discharged.'); load(); }
+    catch (err) { toast.error(err.message); btn.disabled = false; }
+  }
+
+  function toggleTimeline(id) {
+    if (openTimelines.has(id)) { openTimelines.delete(id); render(); return; }
+    openTimelines.add(id);
+    render();
+  }
+
+  async function loadTimeline(id) {
+    const el = document.getElementById(`timeline-${id}`);
+    if (!el) return;
+    try {
+      const { events } = await api.get(`/discharge/admissions/${id}`);
+      el.innerHTML = `<ul class="events">${events.map((ev) => `<li><span class="text-muted">${fmtTime(ev.created_at)}</span> &middot; ${esc(ev.message)}${ev.actor_name ? ` <span class="text-muted">(${esc(ev.actor_name)})</span>` : ''}</li>`).join('')}</ul>`;
+    } catch (err) { el.innerHTML = `<p class="text-sm text-muted">${esc(err.message)}</p>`; }
+  }
+</script>
+</body>
+</html>

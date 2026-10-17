@@ -33,6 +33,7 @@
 
 <script>
   let allAppointments = [];
+  let intakeIds = new Set();
   let activeTab = 'upcoming';
 
   document.addEventListener('mb:auth-ready', (e) => {
@@ -50,8 +51,12 @@
 
   async function load() {
     try {
-      const { appointments } = await api.get('/appointments');
+      const [{ appointments }, status] = await Promise.all([
+        api.get('/appointments'),
+        api.get('/visit-loop/intake-status').catch(() => ({ appointmentIds: [] })),
+      ]);
       allAppointments = appointments;
+      intakeIds = new Set(status.appointmentIds);
       render();
     } catch (e) {
       document.getElementById('appt-list').innerHTML = '<div class="alert alert-danger">Could not load appointments.</div>';
@@ -84,7 +89,12 @@
           </div>
           <span class="badge status-${a.status}">${a.status}</span>
         </div>
-        <div class="flex gap-2" style="margin-top: var(--space-3);">
+        <div class="flex gap-2" style="margin-top: var(--space-3); flex-wrap: wrap;">
+          ${['pending', 'confirmed'].includes(a.status) && a.appointment_date >= new Date().toISOString().slice(0, 10)
+            ? (intakeIds.has(a.id)
+              ? `<span class="badge badge-success" style="align-self:center;">Pre-visit info sent</span><a class="btn btn-ghost btn-sm" href="/patient/intake.html?appointment=${a.id}">Edit</a>`
+              : `<a class="btn btn-primary btn-sm" href="/patient/intake.html?appointment=${a.id}">Add pre-visit info</a>`)
+            : ''}
           ${['pending', 'confirmed'].includes(a.status) ? `<button class="btn btn-outline btn-sm" onclick="openReschedule(${a.id}, ${a.doctor_id})">Reschedule</button><button class="btn btn-danger btn-sm" onclick="cancelAppt(${a.id})">Cancel</button>` : ''}
           ${a.status === 'completed' ? `<button class="btn btn-outline btn-sm" onclick="openReview(${a.id})">Leave a review</button>` : ''}
         </div>
