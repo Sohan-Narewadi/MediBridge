@@ -131,7 +131,7 @@
   function renderDeptChart(rows) {
     if (!window.Chart) { document.getElementById('dept-chart-wrap').innerHTML = unavailable('Chart library'); return; }
     const over = cssVar('--color-danger-500', 'crimson');
-    const ok = cssVar('--color-primary-600', 'teal');
+    const ok = cssVar('--color-success-500', '#5c6e3b');
     const target = cssVar('--color-ink-300', 'silver');
     if (deptChart) deptChart.destroy();
     deptChart = new Chart(document.getElementById('dept-chart'), {
