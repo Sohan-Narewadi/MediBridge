@@ -11,7 +11,7 @@
   .dept-bars { display: flex; flex-direction: column; gap: 0.8rem; }
   .dept-bar { display: grid; grid-template-columns: 120px 1fr 92px; gap: var(--space-3); align-items: center; font-size: 0.82rem; }
   .dept-bar .track { position: relative; height: 10px; background: var(--color-ink-100); border-radius: 3px; }
-  .dept-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--color-primary-400); }
+  .dept-bar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--color-success-500); }
   .dept-bar .fill.over { background: var(--color-danger-500); opacity: 0.8; }
   .dept-bar .sla { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--color-ink-900); border-radius: 1px; }
   .dept-bar .v { font-family: var(--font-mono); font-size: 0.78rem; text-align: right; white-space: nowrap; }
@@ -97,7 +97,7 @@
 <script>
   const { esc, fmtMinutes, icon } = MB_LAYOUT;
   const DEPT = { billing: 'Billing', insurance: 'Insurance', pharmacy: 'Pharmacy', nursing: 'Nursing', documentation: 'Medical records' };
-  const PALETTE = { primary: '#1d6a55', primarySoft: '#84bba7', slate: '#63718a', slateSoft: '#ccd3de', warning: '#a3620c', info: '#2f5d98', success: '#2e7a4d', danger: '#b2392f', grid: '#f1f1ec', axis: '#e4e5df' };
+  const PALETTE = { primary: '#6b1f2b', primarySoft: '#c48c88', slate: '#857665', slateSoft: '#d9ccb9', warning: '#a06b1a', info: '#4f6682', success: '#5c6e3b', danger: '#c2402d', grid: '#ebe2d3', axis: '#e6dccb' };
 
   MB_LAYOUT.onAuthReady(async (e) => {
     const user = e.detail;
@@ -111,8 +111,8 @@
     if (window.Chart) {
       Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
       Chart.defaults.font.size = 11;
-      Chart.defaults.color = '#6c736f';
-      Chart.defaults.plugins.tooltip.backgroundColor = '#1a1f1c';
+      Chart.defaults.color = '#7d706a';
+      Chart.defaults.plugins.tooltip.backgroundColor = '#2b2321';
       Chart.defaults.plugins.tooltip.cornerRadius = 6;
       Chart.defaults.plugins.tooltip.padding = 8;
     }
@@ -179,7 +179,7 @@
         }).join('')}
       </div>
       <div class="legend">
-        <span><i style="background:var(--color-primary-400);"></i>within target</span>
+        <span><i style="background:var(--color-success-500);"></i>within target</span>
         <span><i style="background:var(--color-danger-500); opacity:.8;"></i>over target</span>
         <span><i style="background:var(--color-ink-900); width:2px;"></i>SLA target</span>
         <span>“% late” = share of discharges over target</span>
@@ -258,7 +258,7 @@
     const colors = { pending: PALETTE.warning, confirmed: PALETTE.info, completed: PALETTE.success, cancelled: PALETTE.danger };
     new Chart(document.getElementById('status-chart'), {
       type: 'doughnut',
-      data: { labels: data.map((d) => d.status), datasets: [{ data: data.map((d) => d.count), backgroundColor: data.map((d) => colors[d.status] || PALETTE.slate), borderColor: '#fff', borderWidth: 2 }] },
+      data: { labels: data.map((d) => d.status), datasets: [{ data: data.map((d) => d.count), backgroundColor: data.map((d) => colors[d.status] || PALETTE.slate), borderColor: '#fbf8f2', borderWidth: 2 }] },
       options: { responsive: true, maintainAspectRatio: false, cutout: '68%', plugins: { legend: { position: 'right', labels: { boxWidth: 8, boxHeight: 8, usePointStyle: true, pointStyle: 'circle', padding: 12 } } } },
     });
   }
