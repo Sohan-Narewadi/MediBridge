@@ -20,14 +20,13 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main" style="max-width:760px;">
-    <h2>Weekly Availability</h2>
-    <p class="text-muted">Define the recurring time blocks you're available each week. Patients can only book within these windows.</p>
+    <div class="page-head"><div><h2>Availability</h2><p>Weekly hours patients can book</p></div></div>
     <div class="card">
       <div id="avail-rows"></div>
-      <button type="button" class="btn btn-outline btn-sm" id="add-row">+ Add time block</button>
+      <button type="button" class="btn btn-outline btn-sm" id="add-row">+ Add hours</button>
       <hr class="divider">
       <div id="avail-alert"></div>
-      <button class="btn btn-primary" id="save-btn">Save availability</button>
+      <button class="btn btn-primary" id="save-btn">Save</button>
     </div>
   </main>
 </div>
@@ -73,7 +72,7 @@
     }));
     try {
       await api.put(`/doctors/${doctorId}/availability`, { blocks });
-      toast.success('Availability saved.');
+      toast.success('Saved.');
     } catch (e) { document.getElementById('avail-alert').innerHTML = `<div class="alert alert-danger">${e.message}</div>`; }
   });
 </script>

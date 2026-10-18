@@ -27,9 +27,9 @@
       <input type="date" id="f-to">
     </div>
     <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Patient</th><th>Doctor</th><th>Specialization</th><th>Date</th><th>Time</th><th>Mode</th><th>Status</th></tr></thead>
-        <tbody id="a-body"><tr><td colspan="7"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      <table class="data-table" style="min-width:0;">
+        <thead><tr><th>Patient</th><th>Doctor</th><th>When</th><th>Status</th></tr></thead>
+        <tbody id="a-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
   </main>
@@ -50,12 +50,12 @@
     if (document.getElementById('f-from').value) params.set('from', document.getElementById('f-from').value);
     if (document.getElementById('f-to').value) params.set('to', document.getElementById('f-to').value);
     const { appointments } = await api.get(`/appointments?${params.toString()}`);
-    if (!appointments.length) { body.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No appointments found.</td></tr>'; return; }
+    if (!appointments.length) { body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No appointments found.</td></tr>'; return; }
     body.innerHTML = appointments.map((a) => `
       <tr>
-        <td>${a.patient_name}</td><td>${a.doctor_name}</td><td>${a.specialization}</td>
-        <td>${a.appointment_date}</td><td>${a.start_time.slice(0,5)}</td>
-        <td>${a.consultation_mode.replace('_',' ')}</td>
+        <td><strong>${a.patient_name}</strong></td>
+        <td>${a.doctor_name}<div class="text-xs text-muted">${a.specialization}</div></td>
+        <td>${a.appointment_date}<div class="text-xs text-muted">${a.start_time.slice(0,5)} &middot; ${a.consultation_mode.replace('_',' ')}</div></td>
         <td><span class="badge status-${a.status}">${a.status}</span></td>
       </tr>
     `).join('');

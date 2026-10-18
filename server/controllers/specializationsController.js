@@ -1,34 +1,35 @@
-const pool = require('../../database/db');
+const { M, find, insert, update, remove, count } = require('../../database/store');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 
 const list = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT s.id, s.name, s.description, s.icon, COUNT(d.user_id) AS doctor_count
-     FROM specializations s
-     LEFT JOIN doctors d ON d.specialization_id = s.id
-     GROUP BY s.id ORDER BY s.name`
-  );
-  res.json({ specializations: rows });
+  const [specs, perSpec] = await Promise.all([
+    find('specializations', {}, { sort: { name: 1 } }),
+    M.doctors.aggregate([{ $group: { _id: '$specialization_id', n: { $sum: 1 } } }]),
+  ]);
+  const counts = new Map(perSpec.map((r) => [r._id, r.n]));
+  res.json({
+    specializations: specs.map((s) => ({ id: s.id, name: s.name, description: s.description, icon: s.icon, doctor_count: counts.get(s.id) || 0 })),
+  });
 });
 
 const create = asyncHandler(async (req, res) => {
   const { name, description, icon } = req.body;
-  const [result] = await pool.query('INSERT INTO specializations (name, description, icon) VALUES (?, ?, ?)', [name, description || null, icon || null]);
-  res.status(201).json({ id: result.insertId });
+  const created = await insert('specializations', { name, description: description || null, icon: icon || null });
+  res.status(201).json({ id: created.id });
 });
 
-const update = asyncHandler(async (req, res) => {
+const updateSpec = asyncHandler(async (req, res) => {
   const { name, description, icon } = req.body;
-  await pool.query('UPDATE specializations SET name = ?, description = ?, icon = ? WHERE id = ?', [name, description || null, icon || null, req.params.id]);
+  await update('specializations', { id: Number(req.params.id) }, { name, description: description || null, icon: icon || null });
   res.json({ message: 'Specialization updated.' });
 });
 
-const remove = asyncHandler(async (req, res) => {
-  const [inUse] = await pool.query('SELECT COUNT(*) AS c FROM doctors WHERE specialization_id = ?', [req.params.id]);
-  if (inUse[0].c > 0) throw new ApiError(409, 'Cannot delete a specialization that is still assigned to doctors.');
-  await pool.query('DELETE FROM specializations WHERE id = ?', [req.params.id]);
+const removeSpec = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if ((await count('doctors', { specialization_id: id })) > 0) throw new ApiError(409, 'Cannot delete a specialization that is still assigned to doctors.');
+  await remove('specializations', { id });
   res.json({ message: 'Specialization deleted.' });
 });
 
-module.exports = { list, create, update, remove };
+module.exports = { list, create, update: updateSpec, remove: removeSpec };

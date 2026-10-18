@@ -1,19 +1,25 @@
-// Central MySQL connection pool. Every query in the app goes through this
-// module so swapping drivers/config later only touches one file.
+// MongoDB connection (Mongoose). Every model lives in database/store.js; this
+// file only owns the connection so the app, the seeds and serverless
+// functions all connect the same way.
 require('dotenv').config();
-const mysql = require('mysql2/promise');
-const { getSslConfig } = require('./sslConfig');
+const mongoose = require('mongoose');
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'medibridge',
-  waitForConnections: true,
-  connectionLimit: 10,
-  dateStrings: true, // return DATE/DATETIME as plain strings, not JS Date
-  ssl: getSslConfig(),
-});
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/medibridge';
 
-module.exports = pool;
+mongoose.set('strictQuery', true);
+
+// Connection is cached on the module so repeated calls (and warm serverless
+// invocations) reuse one pool instead of opening a new connection each time.
+let connecting = null;
+function connectDb() {
+  if (mongoose.connection.readyState === 1) return Promise.resolve(mongoose);
+  if (!connecting) {
+    connecting = mongoose
+      .connect(MONGO_URI, { serverSelectionTimeoutMS: 8000 })
+      .then(() => mongoose)
+      .catch((err) => { connecting = null; throw err; });
+  }
+  return connecting;
+}
+
+module.exports = { mongoose, connectDb, MONGO_URI };

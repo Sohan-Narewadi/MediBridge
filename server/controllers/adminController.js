@@ -1,58 +1,69 @@
-const pool = require('../../database/db');
+const { M, find, count, update, updateMany, byIds, withUsers, todayStr, shiftDate, fmtDate, contains } = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
+// Appointment counts per user id, for the admin tables.
+async function appointmentCounts(field) {
+  const rows = await M.appointments.aggregate([{ $group: { _id: `$${field}`, n: { $sum: 1 } } }]);
+  return new Map(rows.map((r) => [r._id, r.n]));
+}
+
 // GET /api/admin/stats - the headline numbers for the admin dashboard.
 const getStats = asyncHandler(async (req, res) => {
-  const [[patients]] = await pool.query(`SELECT COUNT(*) AS count FROM users WHERE role = 'patient'`);
-  const [[doctors]] = await pool.query(`SELECT COUNT(*) AS count FROM users WHERE role = 'doctor' AND is_active = 1`);
-  const [[appointments]] = await pool.query(`SELECT COUNT(*) AS count FROM appointments`);
-  const [[completed]] = await pool.query(`SELECT COUNT(*) AS count FROM appointments WHERE status = 'completed'`);
-  const [[cancelled]] = await pool.query(`SELECT COUNT(*) AS count FROM appointments WHERE status = 'cancelled'`);
-  const [[pending]] = await pool.query(`SELECT COUNT(*) AS count FROM appointments WHERE status = 'pending'`);
-  const [[activeToday]] = await pool.query(
-    `SELECT COUNT(DISTINCT patient_id) AS count FROM appointments WHERE appointment_date = CURDATE()`
-  );
-  const [[openReports]] = await pool.query(`SELECT COUNT(*) AS count FROM reported_issues WHERE status = 'open'`);
-  const [recentUsers] = await pool.query(
-    `SELECT id, full_name, role, email, created_at FROM users ORDER BY created_at DESC LIMIT 6`
-  );
-  const [recentAppointments] = await pool.query(
-    `SELECT a.id, a.appointment_date, a.status, pu.full_name AS patient_name, du.full_name AS doctor_name
-     FROM appointments a
-     JOIN users pu ON pu.id = a.patient_id JOIN users du ON du.id = a.doctor_id
-     ORDER BY a.created_at DESC LIMIT 6`
-  );
+  const today = todayStr();
+  const [patients, doctors, appointments, completed, cancelled, pending, activeTodayIds, openReports] = await Promise.all([
+    count('users', { role: 'patient' }),
+    count('users', { role: 'doctor', is_active: 1 }),
+    count('appointments'),
+    count('appointments', { status: 'completed' }),
+    count('appointments', { status: 'cancelled' }),
+    count('appointments', { status: 'pending' }),
+    M.appointments.distinct('patient_id', { appointment_date: today }),
+    count('reported_issues', { status: 'open' }),
+  ]);
+  const recentUsers = await find('users', {}, { sort: { created_at: -1, id: -1 }, limit: 6, select: 'id full_name role email created_at' });
+  const recentAppts = await find('appointments', {}, { sort: { created_at: -1, id: -1 }, limit: 6 });
+  await withUsers(recentAppts, { patient_id: 'patient_name', doctor_id: 'doctor_name' });
+  const recentAppointments = recentAppts.map((a) => ({ id: a.id, appointment_date: a.appointment_date, status: a.status, patient_name: a.patient_name, doctor_name: a.doctor_name }));
 
   res.json({
-    totals: {
-      patients: patients.count, doctors: doctors.count, appointments: appointments.count,
-      completed: completed.count, cancelled: cancelled.count, pending: pending.count,
-      activeToday: activeToday.count, openReports: openReports.count,
-    },
+    totals: { patients, doctors, appointments, completed, cancelled, pending, activeToday: activeTodayIds.length, openReports },
     recentUsers, recentAppointments,
   });
 });
 
 // GET /api/admin/analytics - chart-ready series.
 const getAnalytics = asyncHandler(async (req, res) => {
-  const [growth] = await pool.query(`
-    SELECT DATE_FORMAT(created_at, '%Y-%m') AS month, role, COUNT(*) AS count
-    FROM users WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-    GROUP BY month, role ORDER BY month`);
+  const today = todayStr();
 
-  const [appointmentTrend] = await pool.query(`
-    SELECT appointment_date AS date, status, COUNT(*) AS count
-    FROM appointments WHERE appointment_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-    GROUP BY appointment_date, status ORDER BY appointment_date`);
+  // New users per month and role, last six months (months taken in local time).
+  const since = new Date(); since.setMonth(since.getMonth() - 6);
+  const newUsers = await find('users', { created_at: { $gte: since } }, { select: 'created_at role' });
+  const monthly = new Map();
+  for (const u of newUsers) {
+    const month = fmtDate(u.created_at).slice(0, 7);
+    const key = `${month}|${u.role}`;
+    monthly.set(key, (monthly.get(key) || 0) + 1);
+  }
+  const growth = [...monthly.entries()].sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, n]) => { const [month, role] = key.split('|'); return { month, role, count: n }; });
 
-  const [specializationDistribution] = await pool.query(`
-    SELECT s.name, COUNT(d.user_id) AS doctor_count
-    FROM specializations s LEFT JOIN doctors d ON d.specialization_id = s.id
-    GROUP BY s.id ORDER BY doctor_count DESC`);
+  const trendRows = await M.appointments.aggregate([
+    { $match: { appointment_date: { $gte: shiftDate(today, -30) } } },
+    { $group: { _id: { date: '$appointment_date', status: '$status' }, count: { $sum: 1 } } },
+    { $sort: { '_id.date': 1 } },
+  ]);
+  const appointmentTrend = trendRows.map((t) => ({ date: t._id.date, status: t._id.status, count: t.count }));
 
-  const [statusBreakdown] = await pool.query(`
-    SELECT status, COUNT(*) AS count FROM appointments GROUP BY status`);
+  const [specs, perSpec, statuses] = await Promise.all([
+    find('specializations'),
+    M.doctors.aggregate([{ $group: { _id: '$specialization_id', n: { $sum: 1 } } }]),
+    M.appointments.aggregate([{ $group: { _id: '$status', count: { $sum: 1 } } }]),
+  ]);
+  const perSpecMap = new Map(perSpec.map((r) => [r._id, r.n]));
+  const specializationDistribution = specs.map((s) => ({ name: s.name, doctor_count: perSpecMap.get(s.id) || 0 }))
+    .sort((a, b) => b.doctor_count - a.doctor_count || a.name.localeCompare(b.name));
+  const statusBreakdown = statuses.map((s) => ({ status: s._id, count: s.count }));
 
   res.json({ growth, appointmentTrend, specializationDistribution, statusBreakdown });
 });
@@ -60,88 +71,94 @@ const getAnalytics = asyncHandler(async (req, res) => {
 // ---- Patients ----
 const listPatients = asyncHandler(async (req, res) => {
   const { q, page = 1, pageSize = 15 } = req.query;
-  const where = ["u.role = 'patient'"];
-  const params = [];
-  if (q) { where.push('(u.full_name LIKE ? OR u.email LIKE ?)'); params.push(`%${q}%`, `%${q}%`); }
+  const filter = { role: 'patient' };
+  if (q) filter.$or = [{ full_name: contains(q) }, { email: contains(q) }];
   const limit = Math.min(Number(pageSize) || 15, 100);
-  const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
+  const skip = (Math.max(Number(page) || 1, 1) - 1) * limit;
 
-  const [[{ total }]] = await pool.query(`SELECT COUNT(*) AS total FROM users u WHERE ${where.join(' AND ')}`, params);
-  const [rows] = await pool.query(
-    `SELECT u.id, u.full_name, u.email, u.phone, u.is_active, u.created_at, p.city, p.blood_group,
-        (SELECT COUNT(*) FROM appointments a WHERE a.patient_id = u.id) AS appointment_count
-     FROM users u JOIN patients p ON p.user_id = u.id
-     WHERE ${where.join(' AND ')} ORDER BY u.created_at DESC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
-  );
-  res.json({ patients: rows, total, page: Number(page), pageSize: limit });
+  const [total, users, counts] = await Promise.all([
+    count('users', filter),
+    find('users', filter, { sort: { created_at: -1, id: -1 }, skip, limit, select: 'id full_name email phone is_active created_at' }),
+    appointmentCounts('patient_id'),
+  ]);
+  const profiles = await byIds('patients', users.map((u) => u.id), 'user_id', 'user_id city blood_group');
+  const patients = users.map((u) => {
+    const p = profiles.get(u.id) || {};
+    return { ...u, city: p.city || null, blood_group: p.blood_group || null, appointment_count: counts.get(u.id) || 0 };
+  });
+  res.json({ patients, total, page: Number(page), pageSize: limit });
 });
 
 // ---- Doctors (admin view, includes inactive/unverified) ----
 const listDoctors = asyncHandler(async (req, res) => {
   const { q, page = 1, pageSize = 15 } = req.query;
-  const where = [];
-  const params = [];
-  if (q) { where.push('(u.full_name LIKE ? OR s.name LIKE ?)'); params.push(`%${q}%`, `%${q}%`); }
-  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const limit = Math.min(Number(pageSize) || 15, 100);
-  const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
+  const skip = (Math.max(Number(page) || 1, 1) - 1) * limit;
+  const match = q ? { $or: [{ 'u.full_name': contains(q) }, { 's.name': contains(q) }] } : {};
 
-  const [[{ total }]] = await pool.query(
-    `SELECT COUNT(*) AS total FROM doctors d JOIN users u ON u.id = d.user_id JOIN specializations s ON s.id = d.specialization_id ${whereClause}`,
-    params
-  );
-  const [rows] = await pool.query(
-    `SELECT u.id, u.full_name, u.email, u.is_active, u.created_at, s.name AS specialization,
-        d.experience_years, d.consultation_fee, d.rating_avg, d.rating_count, d.is_verified,
-        (SELECT COUNT(*) FROM appointments a WHERE a.doctor_id = u.id) AS appointment_count
-     FROM doctors d JOIN users u ON u.id = d.user_id JOIN specializations s ON s.id = d.specialization_id
-     ${whereClause} ORDER BY u.created_at DESC LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
-  );
-  res.json({ doctors: rows, total, page: Number(page), pageSize: limit });
+  const [result, counts] = await Promise.all([
+    M.doctors.aggregate([
+      { $lookup: { from: 'users', localField: 'user_id', foreignField: 'id', as: 'u' } },
+      { $unwind: '$u' },
+      { $lookup: { from: 'specializations', localField: 'specialization_id', foreignField: 'id', as: 's' } },
+      { $unwind: '$s' },
+      { $match: match },
+      { $sort: { 'u.created_at': -1, user_id: -1 } },
+      {
+        $facet: {
+          rows: [
+            { $skip: skip }, { $limit: limit },
+            {
+              $project: {
+                _id: 0, id: '$u.id', full_name: '$u.full_name', email: '$u.email', is_active: '$u.is_active', created_at: '$u.created_at',
+                specialization: '$s.name', experience_years: 1, consultation_fee: 1, rating_avg: 1, rating_count: 1, is_verified: 1,
+              },
+            },
+          ],
+          total: [{ $count: 'n' }],
+        },
+      },
+    ]),
+    appointmentCounts('doctor_id'),
+  ]);
+  const doctors = result[0].rows.map((d) => ({ ...d, appointment_count: counts.get(d.id) || 0 }));
+  res.json({ doctors, total: result[0].total[0] ? result[0].total[0].n : 0, page: Number(page), pageSize: limit });
 });
 
 const verifyDoctor = asyncHandler(async (req, res) => {
-  await pool.query('UPDATE doctors SET is_verified = 1 WHERE user_id = ?', [req.params.id]);
+  await update('doctors', { user_id: Number(req.params.id) }, { is_verified: 1 });
   res.json({ message: 'Doctor verified.' });
 });
 
 const setUserStatus = asyncHandler(async (req, res) => {
   const { isActive } = req.body;
-  await pool.query('UPDATE users SET is_active = ? WHERE id = ?', [isActive ? 1 : 0, req.params.id]);
+  await updateMany('users', { id: Number(req.params.id) }, { is_active: isActive ? 1 : 0 });
   res.json({ message: `User ${isActive ? 'activated' : 'deactivated'}.` });
 });
 
 // ---- Reported issues ----
 const listReports = asyncHandler(async (req, res) => {
   const { status } = req.query;
-  const where = status ? 'WHERE ri.status = ?' : '';
-  const [rows] = await pool.query(
-    `SELECT ri.*, u.full_name AS reporter_name, u.role AS reporter_role
-     FROM reported_issues ri JOIN users u ON u.id = ri.reporter_id
-     ${where} ORDER BY ri.created_at DESC`,
-    status ? [status] : []
-  );
-  res.json({ reports: rows });
+  const rows = await find('reported_issues', status ? { status } : {}, { sort: { created_at: -1, id: -1 } });
+  const users = await byIds('users', rows.map((r) => r.reporter_id), 'id', 'id full_name role');
+  res.json({
+    reports: rows.map((r) => ({ ...r, reporter_name: users.get(r.reporter_id)?.full_name || null, reporter_role: users.get(r.reporter_id)?.role || null })),
+  });
 });
 
 const updateReport = asyncHandler(async (req, res) => {
   const { status, adminNotes } = req.body;
   if (!['open', 'in_review', 'resolved', 'dismissed'].includes(status)) throw new ApiError(400, 'Invalid status.');
-  await pool.query(
-    `UPDATE reported_issues SET status = ?, admin_notes = ?, resolved_at = IF(? IN ('resolved','dismissed'), NOW(), resolved_at) WHERE id = ?`,
-    [status, adminNotes || null, status, req.params.id]
-  );
+  const set = { status, admin_notes: adminNotes || null };
+  if (['resolved', 'dismissed'].includes(status)) set.resolved_at = new Date();
+  await update('reported_issues', { id: Number(req.params.id) }, set);
   res.json({ message: 'Report updated.' });
 });
 
 // ---- Audit log ----
 const listAuditLogs = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT al.*, u.full_name AS user_name FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
-     ORDER BY al.created_at DESC LIMIT 100`
-  );
+  const rows = await find('audit_logs', {}, { sort: { created_at: -1, id: -1 }, limit: 100 });
+  await withUsers(rows, { user_id: 'user_name' });
   res.json({ logs: rows });
 });
 

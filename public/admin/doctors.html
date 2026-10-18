@@ -19,14 +19,14 @@
     <div class="card-header">
       <h2 class="mb-0">Doctors</h2>
       <div class="flex gap-2">
-        <input type="text" id="search" placeholder="Search name or specialization" style="max-width:240px;">
-        <button class="btn btn-primary btn-sm" id="add-doctor-btn">+ Add doctor</button>
+        <input type="text" id="search" placeholder="Search" style="max-width:240px;">
+        <button class="btn btn-primary btn-sm" id="add-doctor-btn">+ Add</button>
       </div>
     </div>
     <div class="table-wrap">
-      <table class="data-table">
-        <thead><tr><th>Name</th><th>Specialization</th><th>Experience</th><th>Fee</th><th>Rating</th><th>Status</th><th>Verified</th><th></th></tr></thead>
-        <tbody id="d-body"><tr><td colspan="8"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
+      <table class="data-table" style="min-width:0;">
+        <thead><tr><th>Doctor</th><th>Rating</th><th>Status</th><th></th></tr></thead>
+        <tbody id="d-body"><tr><td colspan="4"><div class="skeleton" style="height:40px;"></div></td></tr></tbody>
       </table>
     </div>
     <div class="pagination flex gap-2" id="pagination" style="margin-top:var(--space-4); justify-content:center;"></div>
@@ -47,17 +47,13 @@
     const body = document.getElementById('d-body');
     const q = document.getElementById('search').value.trim();
     const { doctors, total, pageSize } = await api.get(`/admin/doctors?page=${page}&pageSize=10${q ? '&q=' + encodeURIComponent(q) : ''}`);
-    if (!doctors.length) { body.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No doctors found.</td></tr>'; document.getElementById('pagination').innerHTML=''; return; }
+    if (!doctors.length) { body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No doctors found.</td></tr>'; document.getElementById('pagination').innerHTML=''; return; }
     body.innerHTML = doctors.map((d) => `
       <tr>
-        <td><strong>${d.full_name}</strong></td>
-        <td>${d.specialization}</td>
-        <td>${d.experience_years} yrs</td>
-        <td>&#8377;${d.consultation_fee}</td>
-        <td>&#9733; ${Number(d.rating_avg).toFixed(1)} (${d.rating_count})</td>
-        <td><span class="badge ${d.is_active ? 'badge-success' : 'badge-danger'}">${d.is_active ? 'Active' : 'Inactive'}</span></td>
-        <td>${d.is_verified ? '<span class="badge badge-info">Verified</span>' : `<button class="btn btn-sm btn-outline" onclick="verify(${d.id})">Verify</button>`}</td>
-        <td><button class="btn btn-outline btn-sm" onclick="toggleStatus(${d.id}, ${d.is_active ? 0 : 1})">${d.is_active ? 'Deactivate' : 'Activate'}</button></td>
+        <td><strong>${d.full_name}</strong><div class="text-xs text-muted">${d.specialization} &middot; ${d.experience_years} yrs &middot; &#8377;${d.consultation_fee}</div></td>
+        <td class="rating">&#9733; ${Number(d.rating_avg).toFixed(1)} <span class="text-muted text-xs">(${d.rating_count})</span></td>
+        <td><span class="badge ${d.is_active ? 'badge-success' : 'badge-danger'}">${d.is_active ? 'Active' : 'Inactive'}</span>${d.is_verified ? '' : ' <span class="badge badge-warning badge-plain">Unverified</span>'}</td>
+        <td class="text-right">${d.is_verified ? '' : `<button class="btn btn-sm btn-outline" onclick="verify(${d.id})">Verify</button> `}<button class="btn btn-ghost btn-sm" onclick="toggleStatus(${d.id}, ${d.is_active ? 0 : 1})">${d.is_active ? 'Deactivate' : 'Activate'}</button></td>
       </tr>
     `).join('');
 

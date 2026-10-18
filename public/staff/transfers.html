@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transfer Desk — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/transfers.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/transfers-ui.js"></script>
+<script src="/js/guard.js" data-role="staff"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" id="desk-main">
+    <div class="skeleton" style="height:32px; width:240px; margin-bottom:var(--space-4);"></div>
+    <div class="skeleton" style="height:160px;"></div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  const esc = MB_TRANSFERS.esc;
+
+  document.addEventListener('mb:auth-ready', async (e) => {
+    MB_LAYOUT.renderDashboardShell('staff', 'Transfer Desk');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    const main = document.getElementById('desk-main');
+
+    let desk = null;
+    try {
+      desk = (await api.get('/staff/me')).staff;
+    } catch (err) {
+      try { desk = { ...(await api.get('/transfers/desk')).desk, department: 'transfer_desk' }; } catch (e2) { desk = null; }
+    }
+
+    if (!desk || desk.department !== 'transfer_desk') {
+      main.innerHTML = `
+        <h2>Transfers</h2>
+        <p class="text-muted">Handled by the transfer desk. Your work is in <a href="/staff/dashboard.html">My Queue</a>.</p>`;
+      return;
+    }
+
+    if (Number(desk.is_home)) {
+      main.innerHTML = `
+        <div class="page-head"><div><h2>Transfers</h2><p>${esc(desk.hospital_name)}</p></div></div>
+        <div class="tc-layout">
+          <section class="card">
+            <div class="card-header"><h3>New</h3></div>
+            <div id="tc-wizard"></div>
+          </section>
+          <section>
+            <h3>Requests</h3>
+            <div id="tc-outgoing"></div>
+          </section>
+        </div>`;
+      const outgoing = MB_TRANSFERS.renderOutgoing(document.getElementById('tc-outgoing'));
+      MB_TRANSFERS.renderWizard(document.getElementById('tc-wizard'), { onSent: () => outgoing.reload() });
+      return;
+    }
+
+    main.innerHTML = `
+      <div class="page-head"><div><h2>Incoming</h2><p>${esc(desk.hospital_name)}</p></div></div>
+      <div class="stat-grid" id="tc-stats" style="margin-bottom:var(--space-5);"></div>
+      <div id="tc-incoming"><div class="skeleton" style="height:140px;"></div></div>`;
+    MB_TRANSFERS.renderIncoming(document.getElementById('tc-incoming'), document.getElementById('tc-stats'));
+  });
+</script>
+</body>
+</html>

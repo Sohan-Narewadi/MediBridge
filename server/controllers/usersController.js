@@ -1,46 +1,48 @@
-const pool = require('../../database/db');
+const { findOne, update } = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 
-// GET /api/users/me/profile - merges the users row with the role-specific
-// profile table so the frontend gets one flat object.
+// GET /api/users/me/profile - merges the users document with the role-specific
+// profile so the frontend gets one flat object.
 const getMyProfile = asyncHandler(async (req, res) => {
-  const [userRows] = await pool.query(
-    'SELECT id, email, full_name, phone, avatar_url, role, created_at FROM users WHERE id = ?',
-    [req.user.id]
-  );
-  if (!userRows.length) throw new ApiError(404, 'User not found.');
-  const user = userRows[0];
+  const user = await findOne('users', { id: req.user.id }, { select: 'id email full_name phone avatar_url role created_at' });
+  if (!user) throw new ApiError(404, 'User not found.');
 
   if (user.role === 'patient') {
-    const [rows] = await pool.query('SELECT * FROM patients WHERE user_id = ?', [req.user.id]);
-    return res.json({ profile: { ...user, ...rows[0] } });
+    const patient = await findOne('patients', { user_id: req.user.id });
+    return res.json({ profile: { ...user, ...patient } });
   }
   if (user.role === 'doctor') {
-    const [rows] = await pool.query(
-      `SELECT d.*, s.name AS specialization FROM doctors d JOIN specializations s ON s.id = d.specialization_id WHERE d.user_id = ?`,
-      [req.user.id]
-    );
-    return res.json({ profile: { ...user, ...rows[0] } });
+    const doctor = await findOne('doctors', { user_id: req.user.id });
+    const spec = doctor ? await findOne('specializations', { id: doctor.specialization_id }) : null;
+    return res.json({ profile: { ...user, ...doctor, specialization: spec ? spec.name : null } });
+  }
+  if (user.role === 'staff') {
+    const staff = await findOne('staff', { user_id: req.user.id });
+    const hospital = staff ? await findOne('hospitals', { id: staff.hospital_id }) : null;
+    return res.json({
+      profile: { ...user, ...(staff ? { department: staff.department, hospital_id: staff.hospital_id, hospital_name: hospital ? hospital.name : null } : {}) },
+    });
   }
   res.json({ profile: user });
 });
 
 const updateMyProfile = asyncHandler(async (req, res) => {
   const { fullName, phone, ...rest } = req.body;
-  if (fullName || phone) {
-    await pool.query('UPDATE users SET full_name = COALESCE(?, full_name), phone = COALESCE(?, phone) WHERE id = ?', [fullName || null, phone || null, req.user.id]);
-  }
+  const userSet = {};
+  if (fullName) userSet.full_name = fullName;
+  if (phone) userSet.phone = phone;
+  if (Object.keys(userSet).length) await update('users', { id: req.user.id }, { ...userSet, updated_at: new Date() });
 
   if (req.user.role === 'patient') {
     const allowed = ['date_of_birth', 'gender', 'blood_group', 'height_cm', 'weight_kg', 'address', 'city', 'emergency_contact_name', 'emergency_contact_phone', 'allergies', 'chronic_conditions'];
     const camelMap = { dateOfBirth: 'date_of_birth', bloodGroup: 'blood_group', heightCm: 'height_cm', weightKg: 'weight_kg', emergencyContactName: 'emergency_contact_name', emergencyContactPhone: 'emergency_contact_phone', chronicConditions: 'chronic_conditions' };
-    const sets = []; const params = [];
+    const set = {};
     for (const [key, value] of Object.entries(rest)) {
-      const col = camelMap[key] || key;
-      if (allowed.includes(col)) { sets.push(`${col} = ?`); params.push(value); }
+      const field = camelMap[key] || key;
+      if (allowed.includes(field)) set[field] = value === '' ? null : value;
     }
-    if (sets.length) await pool.query(`UPDATE patients SET ${sets.join(', ')} WHERE user_id = ?`, [...params, req.user.id]);
+    if (Object.keys(set).length) await update('patients', { user_id: req.user.id }, set);
   }
 
   res.json({ message: 'Profile updated.' });

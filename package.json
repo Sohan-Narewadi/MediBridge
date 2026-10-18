@@ -1,14 +1,16 @@
 {
   "name": "medibridge",
   "version": "1.0.0",
-  "description": "MediBridge - Smart Healthcare Access & Management Platform",
+  "description": "MediBridge - Smart Healthcare Access & Management Platform (Express + MongoDB)",
   "main": "server/app.js",
   "scripts": {
     "start": "node server/app.js",
     "dev": "node --watch server/app.js",
     "db:create": "node database/migrate.js",
     "db:seed": "node database/seed.js",
-    "setup": "npm run db:create && npm run db:seed"
+    "setup": "npm run db:create && npm run db:seed && npm run db:v2",
+    "db:v2": "node database/seed_v2.js && node database/seed_demo_extra.js",
+    "db:demo": "node database/seed_demo_extra.js"
   },
   "license": "MIT",
   "dependencies": {
@@ -19,7 +21,7 @@
     "express": "^4.19.2",
     "express-validator": "^7.2.0",
     "jsonwebtoken": "^9.0.2",
-    "morgan": "^1.10.0",
-    "mysql2": "^3.11.0"
+    "mongoose": "^9.11.2",
+    "morgan": "^1.10.0"
   }
 }

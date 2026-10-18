@@ -1,0 +1,231 @@
+- generic [ref=e1]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "MediBridge home" [ref=e5] [cursor=pointer]:
+        - /url: /index.html
+        - text: MediBridge
+      - navigation [ref=e11]:
+        - link "Home" [ref=e12] [cursor=pointer]:
+          - /url: /index.html
+        - link "Find Doctors" [ref=e13] [cursor=pointer]:
+          - /url: /doctors.html
+        - link "Health Resources" [ref=e14] [cursor=pointer]:
+          - /url: /resources.html
+        - link "Emergency" [ref=e15] [cursor=pointer]:
+          - /url: /emergency.html
+        - link "About" [ref=e16] [cursor=pointer]:
+          - /url: /about.html
+      - generic [ref=e18]:
+        - link "Log in" [ref=e19] [cursor=pointer]:
+          - /url: /auth/login.html
+        - link "Get started" [ref=e20] [cursor=pointer]:
+          - /url: /auth/register.html
+  - generic [ref=e21]:
+    - heading "Find a doctor" [level=1] [ref=e23]
+    - generic [ref=e25]:
+      - generic [ref=e26]:
+        - generic [ref=e27]: Name or condition
+        - textbox "Name or condition" [ref=e28]:
+          - /placeholder: e.g. Dr. Rao, migraine
+      - generic [ref=e29]:
+        - generic [ref=e30]: Specialty
+        - generic [ref=e31]:
+          - button "Specialty" [ref=e32] [cursor=pointer]:
+            - generic [ref=e33]: All specialties
+          - combobox [aria-hidden]
+      - generic [ref=e37]:
+        - generic [ref=e38]: Visit type
+        - generic [ref=e39]:
+          - button "Visit type" [ref=e40] [cursor=pointer]:
+            - generic [ref=e41]: Any
+          - combobox [aria-hidden]
+      - generic [ref=e45]:
+        - generic [ref=e46]: Experience
+        - generic [ref=e47]:
+          - button "Experience" [ref=e48] [cursor=pointer]:
+            - generic [ref=e49]: Any
+          - combobox [aria-hidden]
+      - generic [ref=e53]:
+        - generic [ref=e54]: Rating
+        - generic [ref=e55]:
+          - button "Rating" [ref=e56] [cursor=pointer]:
+            - generic [ref=e57]: Any
+          - combobox [aria-hidden]
+      - generic [ref=e61]:
+        - generic [ref=e62]: Area
+        - textbox "Area" [ref=e63]:
+          - /placeholder: City or area
+    - generic [ref=e64]:
+      - generic [ref=e65]:
+        - strong [ref=e399]: "24"
+        - text: doctors found
+      - generic [ref=e67]:
+        - button "Clear filters" [active] [ref=e68] [cursor=pointer]
+        - generic [ref=e69]:
+          - button "Sort by" [ref=e70] [cursor=pointer]:
+            - generic [ref=e71]: Top rated
+          - combobox [aria-hidden]
+    - generic [ref=e75]:
+      - link "VR Dr. Vikram Rao Orthopedics 16 yrs experience Banashankari Medical Centre 5.0 (2) Video ₹850" [ref=e400] [cursor=pointer]:
+        - /url: /doctor.html?id=8
+        - generic [ref=e401]:
+          - generic [ref=e402]: VR
+          - generic [ref=e403]:
+            - heading "Dr. Vikram Rao" [level=4] [ref=e404]
+            - generic [ref=e405]: Orthopedics
+        - generic [ref=e406]:
+          - generic [ref=e407]: 16 yrs experience
+          - generic [ref=e411]: Banashankari Medical Centre
+        - generic [ref=e415]:
+          - generic [ref=e416]:
+            - text: "5.0"
+            - generic [ref=e419]: (2)
+          - generic [ref=e420]: Video
+          - generic [ref=e424]: ₹850
+      - link "IV Dr. Ishaan Verma Neurology 15 yrs experience Indiranagar Family Care Centre 5.0 (1) Video ₹1100" [ref=e425] [cursor=pointer]:
+        - /url: /doctor.html?id=9
+        - generic [ref=e426]:
+          - generic [ref=e427]: IV
+          - generic [ref=e428]:
+            - heading "Dr. Ishaan Verma" [level=4] [ref=e429]
+            - generic [ref=e430]: Neurology
+        - generic [ref=e431]:
+          - generic [ref=e432]: 15 yrs experience
+          - generic [ref=e436]: Indiranagar Family Care Centre
+        - generic [ref=e440]:
+          - generic [ref=e441]:
+            - text: "5.0"
+            - generic [ref=e444]: (1)
+          - generic [ref=e445]: Video
+          - generic [ref=e449]: ₹1100
+      - link "SJ Dr. Siddharth Joshi Psychiatry 9 yrs experience Koramangala Health Clinic 5.0 (2) Video ₹700" [ref=e450] [cursor=pointer]:
+        - /url: /doctor.html?id=11
+        - generic [ref=e451]:
+          - generic [ref=e452]: SJ
+          - generic [ref=e453]:
+            - heading "Dr. Siddharth Joshi" [level=4] [ref=e454]
+            - generic [ref=e455]: Psychiatry
+        - generic [ref=e456]:
+          - generic [ref=e457]: 9 yrs experience
+          - generic [ref=e461]: Koramangala Health Clinic
+        - generic [ref=e465]:
+          - generic [ref=e466]:
+            - text: "5.0"
+            - generic [ref=e469]: (2)
+          - generic [ref=e470]: Video
+          - generic [ref=e474]: ₹700
+      - link "AK Dr. Aditya Kulkarni General Medicine 10 yrs experience Jayanagar Family Care Centre 5.0 (1) Video ₹500" [ref=e475] [cursor=pointer]:
+        - /url: /doctor.html?id=13
+        - generic [ref=e476]:
+          - generic [ref=e477]: AK
+          - generic [ref=e478]:
+            - heading "Dr. Aditya Kulkarni" [level=4] [ref=e479]
+            - generic [ref=e480]: General Medicine
+        - generic [ref=e481]:
+          - generic [ref=e482]: 10 yrs experience
+          - generic [ref=e486]: Jayanagar Family Care Centre
+        - generic [ref=e490]:
+          - generic [ref=e491]:
+            - text: "5.0"
+            - generic [ref=e494]: (1)
+          - generic [ref=e495]: Video
+          - generic [ref=e499]: ₹500
+      - link "SR Dr. Sneha Reddy Gynecology 13 yrs experience Jayanagar Family Care Centre 5.0 (4) Video ₹800" [ref=e500] [cursor=pointer]:
+        - /url: /doctor.html?id=15
+        - generic [ref=e501]:
+          - generic [ref=e502]: SR
+          - generic [ref=e503]:
+            - heading "Dr. Sneha Reddy" [level=4] [ref=e504]
+            - generic [ref=e505]: Gynecology
+        - generic [ref=e506]:
+          - generic [ref=e507]: 13 yrs experience
+          - generic [ref=e511]: Jayanagar Family Care Centre
+        - generic [ref=e515]:
+          - generic [ref=e516]:
+            - text: "5.0"
+            - generic [ref=e519]: (4)
+          - generic [ref=e520]: Video
+          - generic [ref=e524]: ₹800
+      - link "SP Dr. Shruti Pandey Endocrinology 11 yrs experience Richmond Town Medical Centre 5.0 (1) Video ₹950" [ref=e525] [cursor=pointer]:
+        - /url: /doctor.html?id=20
+        - generic [ref=e526]:
+          - generic [ref=e527]: SP
+          - generic [ref=e528]:
+            - heading "Dr. Shruti Pandey" [level=4] [ref=e529]
+            - generic [ref=e530]: Endocrinology
+        - generic [ref=e531]:
+          - generic [ref=e532]: 11 yrs experience
+          - generic [ref=e536]: Richmond Town Medical Centre
+        - generic [ref=e540]:
+          - generic [ref=e541]:
+            - text: "5.0"
+            - generic [ref=e544]: (1)
+          - generic [ref=e545]: Video
+          - generic [ref=e549]: ₹950
+      - link "MP Dr. Meera Pillai Neurology 10 yrs experience Richmond Town Health Clinic 4.5 (2) Video ₹950" [ref=e550] [cursor=pointer]:
+        - /url: /doctor.html?id=10
+        - generic [ref=e551]:
+          - generic [ref=e552]: MP
+          - generic [ref=e553]:
+            - heading "Dr. Meera Pillai" [level=4] [ref=e554]
+            - generic [ref=e555]: Neurology
+        - generic [ref=e556]:
+          - generic [ref=e557]: 10 yrs experience
+          - generic [ref=e561]: Richmond Town Health Clinic
+        - generic [ref=e565]:
+          - generic [ref=e566]:
+            - text: "4.5"
+            - generic [ref=e569]: (2)
+          - generic [ref=e570]: Video
+          - generic [ref=e574]: ₹950
+      - link "PA Dr. Pooja Agarwal Ophthalmology 8 yrs experience Whitefield Family Care Centre 4.5 (2) Video ₹550" [ref=e575] [cursor=pointer]:
+        - /url: /doctor.html?id=18
+        - generic [ref=e576]:
+          - generic [ref=e577]: PA
+          - generic [ref=e578]:
+            - heading "Dr. Pooja Agarwal" [level=4] [ref=e579]
+            - generic [ref=e580]: Ophthalmology
+        - generic [ref=e581]:
+          - generic [ref=e582]: 8 yrs experience
+          - generic [ref=e586]: Whitefield Family Care Centre
+        - generic [ref=e590]:
+          - generic [ref=e591]:
+            - text: "4.5"
+            - generic [ref=e594]: (2)
+          - generic [ref=e595]: Video
+          - generic [ref=e599]: ₹550
+      - link "TB Dr. Tara Bhatt Psychiatry 7 yrs experience Indiranagar Health Clinic 4.3 (3) Video ₹650" [ref=e600] [cursor=pointer]:
+        - /url: /doctor.html?id=12
+        - generic [ref=e601]:
+          - generic [ref=e602]: TB
+          - generic [ref=e603]:
+            - heading "Dr. Tara Bhatt" [level=4] [ref=e604]
+            - generic [ref=e605]: Psychiatry
+        - generic [ref=e606]:
+          - generic [ref=e607]: 7 yrs experience
+          - generic [ref=e611]: Indiranagar Health Clinic
+        - generic [ref=e615]:
+          - generic [ref=e616]:
+            - text: "4.3"
+            - generic [ref=e619]: (3)
+          - generic [ref=e620]: Video
+          - generic [ref=e624]: ₹650
+    - generic [ref=e301]:
+      - button "1" [ref=e625] [cursor=pointer]
+      - button "2" [ref=e626] [cursor=pointer]
+      - button "3" [ref=e627] [cursor=pointer]
+  - contentinfo [ref=e307]:
+    - generic [ref=e308]:
+      - link "MediBridge home" [ref=e309] [cursor=pointer]:
+        - /url: /index.html
+        - text: MediBridge
+      - navigation "Footer" [ref=e315]:
+        - link "Doctors" [ref=e316] [cursor=pointer]:
+          - /url: /doctors.html
+        - link "Resources" [ref=e317] [cursor=pointer]:
+          - /url: /resources.html
+        - link "Emergency" [ref=e318] [cursor=pointer]:
+          - /url: /emergency.html
+        - link "About" [ref=e319] [cursor=pointer]:
+          - /url: /about.html
+      - generic [ref=e320]: Demo project · fictional data · not medical advice

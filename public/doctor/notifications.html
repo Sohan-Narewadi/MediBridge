@@ -16,7 +16,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Mark all read</button></div>
+    <div class="card-header"><h2 class="mb-0">Notifications</h2><button class="btn btn-outline btn-sm" id="mark-all">Read all</button></div>
     <div id="notif-list"><div class="card skeleton" style="height:70px;"></div></div>
   </main>
 </div>
@@ -27,19 +27,19 @@
     MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
     load();
   });
-  const ICONS = { appointment: '&#128197;', cancellation: '&#10060;', record: '&#128203;' };
+  const ICONS = { appointment: 'calendar', cancellation: 'x', record: 'fileText', discharge: 'bed', transfer: 'transfer', care_plan: 'listChecks' };
   async function load() {
     const el = document.getElementById('notif-list');
     const { notifications } = await api.get('/notifications');
-    if (!notifications.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128276;</div><p>No notifications yet.</p></div>'; return; }
+    if (!notifications.length) { el.innerHTML = '<div class="empty-state"><p>None</p></div>'; return; }
     el.innerHTML = notifications.map((n) => `
-      <div class="card" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
-        <div class="flex justify-between items-start">
-          <div class="flex gap-3">
-            <span style="font-size:1.2rem;">${ICONS[n.type] || '&#128276;'}</span>
-            <div><strong class="text-sm">${n.title}</strong><p class="text-sm text-muted mb-0">${n.message}</p><p class="text-sm text-muted mb-0">${new Date(n.created_at).toLocaleString()}</p></div>
+      <div class="card card-compact" style="margin-bottom:var(--space-2); ${n.is_read ? '' : 'border-left:3px solid var(--color-primary-600);'}">
+        <div class="flex justify-between items-center gap-3">
+          <div class="flex gap-3 items-center">
+            <span style="color:var(--color-primary-600);display:inline-flex;">${MB_LAYOUT.icon(ICONS[n.type] || 'bell', 18)}</span>
+            <div><strong class="text-sm">${n.title}</strong><div class="text-sm text-muted">${n.message}</div></div>
           </div>
-          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})">Mark read</button>` : ''}
+          ${!n.is_read ? `<button class="btn btn-ghost btn-sm" onclick="markRead(${n.id})" aria-label="Mark read">${MB_LAYOUT.icon('check', 14)}</button>` : ''}
         </div>
       </div>
     `).join('');

@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TransferConnect — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/transfers.css">
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/transfers-ui.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main">
+    <div class="page-head"><div><h2>TransferConnect</h2></div></div>
+
+    <div class="tc-layout">
+      <section class="card">
+        <div class="card-header"><h3>New</h3></div>
+        <div id="tc-wizard"></div>
+      </section>
+      <section>
+        <h3>Requests</h3>
+        <div id="tc-outgoing"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<div id="modal-root"></div>
+
+<script>
+  document.addEventListener('mb:auth-ready', (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'TransferConnect');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    const outgoing = MB_TRANSFERS.renderOutgoing(document.getElementById('tc-outgoing'), {
+      emptyText: 'None active',
+    });
+    MB_TRANSFERS.renderWizard(document.getElementById('tc-wizard'), { onSent: () => outgoing.reload() });
+  });
+</script>
+</body>
+</html>

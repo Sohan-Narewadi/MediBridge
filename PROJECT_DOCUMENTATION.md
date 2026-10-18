@@ -27,6 +27,7 @@ For a shorter, presentation-style overview (problem statement, SDG mapping, quic
 12. [A real bug we found and fixed (case study)](#12-a-real-bug-we-found-and-fixed-case-study)
 13. [Deployment](#13-deployment)
 14. [Future scope — what is not implemented yet](#14-future-scope--what-is-not-implemented-yet)
+15. [v2: care-handoff modules (Smart Brief, Discharge Flow, TransferConnect, Visit Loop)](#15-v2-care-handoff-modules)
 
 ---
 
@@ -38,8 +39,8 @@ users — **patient**, **doctor**, **admin** — each with their own dashboard a
 a public marketing site (home, doctor directory, health resources, emergency info, about).
 
 It is a real working system, not a mockup: every button and form on every page is backed by a
-genuine HTTP API call to an Express server, which runs real, parameterized SQL queries against a
-MySQL database. There is no mock data baked into the frontend.
+genuine HTTP API call to an Express server, which runs real queries against a
+MongoDB database. There is no mock data baked into the frontend.
 
 ---
 
@@ -49,7 +50,7 @@ MySQL database. There is no mock data baked into the frontend.
 |---|---|---|
 | Runtime | **Node.js** | JavaScript on both client and server — one language for the whole stack. |
 | Web framework | **Express 4** | Minimal, unopinionated router/middleware framework; keeps request handling explicit. |
-| Database | **MySQL 8** (via `mysql2/promise`) | Relational data (users, appointments, medical records) has real foreign-key relationships — a relational DB models that directly, with `mysql2` giving promise-based/async queries and a connection pool. |
+| Database | **MongoDB** (via **Mongoose**) | Document collections for users, appointments, medical records and the care-handoff modules. Mongoose gives schema validation, defaults and declared indexes (unique slot, one review per visit), and aggregation pipelines serve the grouped/joined views. |
 | Auth | **JWT (`jsonwebtoken`)** stored in an **httpOnly cookie** (`cookie-parser`) | Stateless auth — no server-side session store needed. httpOnly means client-side JavaScript can never read the token (mitigates XSS token theft). |
 | Password hashing | **bcryptjs** | Industry-standard salted password hashing; never stores plaintext passwords. |
 | Input validation | **express-validator** | Declarative validation chains on routes (e.g. `body('email').isEmail()`) instead of hand-rolled `if` checks scattered through controllers. |
@@ -93,16 +94,16 @@ Express app (server/app.js)
   └─ everything else that matches no file     → public/404.html
        │
        ▼
-  database/db.js (one shared mysql2 connection pool)
+  database/store.js (Mongoose models + helpers) over database/db.js (one cached connection)
        │
        ▼
-     MySQL (database/schema.sql — 15 tables)
+     MongoDB (one collection per entity, declared in database/store.js)
 ```
 
 Every controller function follows the same shape: read `req.user` (set by the auth middleware),
-run one or more parameterized SQL queries via the shared `pool`, and respond with JSON. There is
-no ORM — queries are hand-written SQL, which keeps exactly what's happening in the database
-visible in the controller code itself.
+run one or more queries through the helpers in `database/store.js` (`find`, `findOne`, `insert`,
+`update`, `byIds`, ...) or an aggregation pipeline on the Mongoose model, and respond with JSON.
+Response shapes are identical to the original relational version, so the frontend is unchanged.
 
 ### Request flow for a typical page load
 
@@ -128,9 +129,16 @@ Take `patient/dashboard.html` as an example, end to end:
 
 ---
 
-## 4. Database design (all 15 tables explained)
+## 4. Database design (all collections explained)
 
-Full source: [`database/schema.sql`](./database/schema.sql). MySQL 8, InnoDB, `utf8mb4`.
+Full source: [`database/store.js`](./database/store.js) (Mongoose schemas, defaults and indexes).
+The data model began as relational tables and was moved to MongoDB with the same names: each
+"table" below is now a collection, rows are documents, foreign keys are plain numeric id
+references, and `UNIQUE` keys are unique indexes. Auto-increment ids come from a `counters`
+collection (atomic `$inc`). DATE/TIME values are `'YYYY-MM-DD'` / `'HH:MM:SS'` strings; timestamps
+are `Date`s serialised as local `'YYYY-MM-DD HH:MM:SS'`. Without multi-document transactions
+(standalone `mongod`), races are decided by atomic conditional updates (for example, which
+hospital wins a transfer, and the bed reservation).
 
 | Table | Purpose | Key relationships |
 |---|---|---|
@@ -354,15 +362,17 @@ the data.
   optional structured `details`, so controllers can `throw new ApiError(404, 'Doctor not found.')`
   and have it turn into the right JSON response automatically.
 - **`server/middleware/errorHandler.js`** — the single place that turns any thrown error into a
-  JSON response: `ApiError`s become their own status/message; a MySQL duplicate-key error becomes
+  JSON response: `ApiError`s become their own status/message; a MongoDB duplicate-key error (code 11000) becomes
   a friendly 409; anything else is logged server-side and returned to the client as a generic
-  500 — **raw stack traces and SQL errors never leak to the client.**
+  500 — **raw stack traces and database errors never leak to the client.**
 - **`server/middleware/validate.js`** — pairs with `express-validator`: run after a chain of
   `body(...)`/`param(...)` checks, it turns any validation failures into one consistent
   `400 { error, details: [{ field, message }] }` response.
-- **`database/db.js`** — the single shared `mysql2` connection pool every controller imports;
-  configured with `dateStrings: true` so DATE/DATETIME columns come back as plain `'YYYY-MM-DD'`
-  strings rather than JS `Date` objects (avoids timezone-shift bugs when serializing to JSON).
+- **`database/db.js`** — the single cached MongoDB connection (`MONGO_URI`) used by the app, the
+  seed scripts and serverless invocations.
+- **`database/store.js`** — Mongoose models and helpers. DATE columns are stored as plain
+  `'YYYY-MM-DD'` strings, and the JSON replacer in `server/app.js` turns timestamp `Date`s into
+  local `'YYYY-MM-DD HH:MM:SS'` strings (avoids timezone-shift bugs when serializing to JSON).
 
 ---
 
@@ -571,7 +581,7 @@ and where it can break.
 nothing — the page it navigated to stayed stuck showing its loading skeletons forever.
 
 **Root cause**: `GET /api/auth/me` (`authController.me`) was returning the raw database row
-shape — `full_name`, `avatar_url` (snake_case, matching the SQL column names) — while
+shape — `full_name`, `avatar_url` (snake_case, matching the stored field names) — while
 `login`/`register` returned a hand-mapped camelCase shape (`fullName`, `avatarUrl`). Every
 frontend consumer of `/auth/me` (`guard.js`, `nav.js`, and every dashboard page's `mb:auth-ready`
 handler) was written expecting the camelCase shape, since that's what `login.html` receives and
@@ -621,8 +631,8 @@ static-only UI preview with no backend). In short:
 - **`server/app.js`** only calls `app.listen()` when **not** running on Vercel
   (`if (!process.env.VERCEL)`), since a serverless platform manages the HTTP server itself; the
   file otherwise exports the Express `app` unchanged.
-- MySQL is **not** hosted by Vercel — a separate free MySQL-compatible host (Aiven, Railway,
-  Clever Cloud, etc.) is required, with its credentials set as Vercel environment variables.
+- The database is **not** hosted by Vercel — use a free MongoDB Atlas cluster and set its
+  connection string as the `MONGO_URI` Vercel environment variable.
 
 ---
 
@@ -633,11 +643,10 @@ Honest gaps, in the order they'd most improve the product:
 1. **Real-time updates.** Notifications and dashboard data are fetched on page load only — there's
    no WebSocket/SSE push. A new appointment request doesn't appear for the doctor until they
    reload. Adding Socket.IO (or plain SSE) for notifications would be the highest-impact addition.
-2. **Audit logging isn't actually instrumented.** The `audit_logs` table and the admin "Audit Log"
-   page exist and work, but no controller currently writes to that table — the only rows in it
-   come from the demo seed script. A real implementation would insert a row from key actions
-   (login, status changes, doctor verification, report resolution, etc.).
-3. **File/document uploads.** `medical_records.document_url` exists in the schema for attaching a
+2. **Audit logging is only partly instrumented.** The v2 modules (§15) write audit rows for every
+   state change (intake, care plans, discharge tasks, transfer requests, summary access). The
+   original controllers (login, appointment status, doctor verification, reports) still don't.
+3. **File/document uploads.** `medical_records.document_url` exists in the model for attaching a
    scanned report or image, but there's no upload endpoint yet — a natural next step with
    `multer` plus local disk or object storage (S3/Cloudinary).
 4. **Refresh tokens / session revocation.** The JWT is a single long-lived (7-day) token; there's
@@ -645,8 +654,8 @@ Honest gaps, in the order they'd most improve the product:
    logout everywhere after a password change). A refresh-token pair or a server-side token
    denylist would close this gap.
 5. **Automated tests.** There is currently no test suite. Given the backend is a set of pure
-   Express route handlers over SQL, Jest + Supertest (hitting a test database) would be the
-   natural fit, starting with the appointment-booking transaction logic and the Care Score
+   Express route handlers over Mongoose, Jest + Supertest (hitting a test database) would be the
+   natural fit, starting with the appointment-booking and transfer-acceptance race logic and the Care Score
    calculation, since both have real business-rule edge cases worth locking down.
 6. **Payments/billing.** Consultation fees are displayed but there's no payment flow — adding one
    (Stripe/Razorpay) would need a `payments` table and webhook handling.
@@ -669,6 +678,90 @@ Honest gaps, in the order they'd most improve the product:
 13. **Mobile app / PWA.** The frontend is responsive down to ~360px but is not an installable PWA
     (no manifest/service worker) and there is no native mobile app.
 14. **Multi-language support.** All UI text is hardcoded English; there's no i18n layer.
+
+---
+
+## 15. v2: care-handoff modules
+
+After the first evaluation ("the features already exist on other sites"), MediBridge was
+repositioned from a booking site into a **care-handoff platform**: the value is in the gaps
+*between* visits, departments and hospitals, where information is normally re-typed, re-asked or
+lost. One rule drives every module: **anything entered once is reused at every later step.**
+
+### Collection additions (declared in `database/store.js`, seeded by `npm run db:v2`)
+
+| Table | Purpose |
+|---|---|
+| `users.role` | now also `staff` (hospital department users) |
+| `hospitals`, `hospital_capabilities` | the home hospital plus partner hospitals; beds/ICU free per specialization (TransferConnect input) |
+| `staff` | staff login → hospital + department (`billing`, `insurance`, `pharmacy`, `nursing`, `documentation`, `transfer_desk`) |
+| `intake_forms` | the patient's pre-visit answers, 1:1 with an appointment |
+| `care_plans`, `commitments` | plain-language plan after a visit/discharge, and the trackable items in it (owner, kind, due date, status) |
+| `admissions`, `discharge_tasks`, `discharge_events` | inpatient stays; one task per department with an SLA once the doctor clears the patient; an event timeline |
+| `transfer_requests`, `transfer_offers` | one request fanned out to several hospitals; each offer has a match score and its own response |
+
+### Smart Brief + Visit Loop — `visitLoopController.js`
+
+- `saveIntake` upserts the pre-visit form for the patient's own upcoming appointment.
+- `getBrief` compiles the doctor's one-page brief from `patients`, `medications` + `medication_logs`
+  (7-day adherence per medicine), `medical_records`, open `commitments`, visit history, the intake
+  and the Care Score, and computes **flags** from that data (allergies, new allergy in intake,
+  severity ≥ 4, missed doses, overdue follow-ups/commitments, recent hospital stay, medication
+  changes, first visit, no intake). Access: the appointment's doctor, or admin.
+- `createCarePlan` stores the plan and its commitments in one transaction; the doctor's
+  "document visit" form posts it right after the medical record, pre-filling a follow-up
+  commitment from the follow-up date so it's entered once.
+- `analytics` gives the admin open/overdue counts, completion rate and the overdue ("broken loop")
+  list.
+- A doctor may read a patient's plans only with a care relationship: a non-cancelled appointment
+  **or** an admission they attend.
+
+### Discharge Flow — `dischargeController.js`, `staffController.js`
+
+- `clear` (attending doctor) sets `cleared_at`, creates the five department tasks (self-pay
+  admissions skip insurance) and notifies each department's staff and the patient.
+- `queue` is a staff member's department worklist, most urgent first, with minutes since
+  clearance vs SLA and which other departments the patient is still waiting on.
+- `updateTask` lets staff start / block (reason required) / complete their own department's tasks;
+  `nudge` notifies a department (rate-limited to once per 5 minutes per task).
+- **Bottleneck rule:** an explicitly blocked task first; otherwise the task furthest past its SLA;
+  otherwise the one closest to breaching.
+- `discharge` is refused until every task is done; `myStay` is the patient's live view;
+  `board`/`analytics` feed the admin Operations Center (average time per department vs target,
+  breach %, top bottleneck).
+
+### TransferConnect — `transfersController.js`
+
+- `match` scores each hospital that has the specialization out of 100: specialty 30, free beds 20,
+  ICU 15 (−25 if ICU is needed but none free), distance 20 (haversine from the sending hospital),
+  response history 15 — each part returned as a plain-English reason.
+- `create` requires consent, auto-generates the clinical summary from the patient's record
+  (biodata, allergies, chronic conditions, active medicines, latest vitals/diagnosis, admission),
+  and creates one offer per chosen hospital.
+- Receiving desks see only initials/age/sex until they open a request; opening sets
+  `summary_viewed_at` and writes an audit row. `respond`: the first accept wins, reserves a bed
+  (and ICU bed if needed), withdraws the other offers and notifies sender and patient.
+- `complete`/`cancel` close the request (cancel releases the reserved bed; complete marks the
+  admission `transferred`).
+
+### Pages
+
+| Role | Page | What it shows |
+|---|---|---|
+| Patient | `patient/intake.html` | pre-visit form, with "already on file" data shown so nothing is repeated |
+| Patient | `patient/care-plan.html` | plans from doctors + Overdue / Coming up / Done checklist |
+| Patient | `patient/hospital-stay.html` | live discharge tracker: "currently waiting on …" |
+| Doctor | `doctor/brief.html` | the Smart Brief |
+| Doctor | `doctor/inpatients.html` | admitted patients, "medically fit" button, live task checklist, nudge, complete discharge, request transfer |
+| Doctor | `doctor/transfers.html` | transfer wizard (match → select → summary preview → consent → send) + live request tracker |
+| Staff | `staff/dashboard.html` | department discharge queue with timers, blocker reporting |
+| Staff | `staff/transfers.html` | partner desk: incoming queue, summary, accept/decline; home desk: outgoing requests |
+| Admin | `admin/operations.html` | Operations Center: discharge board + department delays, transfer stats, broken loops |
+
+The dashboards for patient, doctor and admin were rebuilt around these modules, and the design
+system (`public/css/main.css`, `public/js/icons.js`, `public/js/layout.js`) was redone: IBM Plex
+type, one accent colour, hairline borders, an inline SVG icon set instead of emoji, grouped sidebar
+navigation and a topbar with notifications.
 
 ---
 

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" class="mb-auth-pending">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Brief — MediBridge</title>
+<link rel="stylesheet" href="/css/main.css">
+<style>
+  .bf-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-4); flex-wrap: wrap; }
+  .bf-head h2 { margin: 0 0 var(--space-1); }
+  .bf-meta { color: var(--color-ink-500); font-size: 0.88rem; display: flex; flex-wrap: wrap; gap: 0.25rem 0.9rem; align-items: center; }
+  .bf-meta strong { color: var(--color-ink-900); font-weight: 600; }
+  .bf-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 var(--space-5); }
+  .bf-complaint { font-family: var(--font-display); font-size: 1.55rem; line-height: 1.3; color: var(--color-ink-900); margin: 0 0 var(--space-3); font-weight: 400; }
+  .bf-line { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin-top: var(--space-3); font-size: 0.88rem; color: var(--color-ink-700); }
+  .bf-severity { display: inline-flex; gap: 3px; vertical-align: middle; margin-right: var(--space-2); }
+  .bf-severity span { width: 18px; height: 7px; border-radius: var(--radius-full); background: var(--color-ink-200); }
+  .bf-severity.s-low span.on { background: var(--color-success-500); }
+  .bf-severity.s-mid span.on { background: var(--color-warning-500); }
+  .bf-severity.s-high span.on { background: var(--color-danger-500); }
+  .bf-question { margin-top: var(--space-4); padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); background: var(--color-primary-50); font-size: 0.92rem; display: flex; gap: var(--space-2); align-items: flex-start; }
+  .bf-question .mb-icon { color: var(--color-primary-600); margin-top: 2px; }
+  .bf-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--space-4); align-items: start; margin-top: var(--space-4); }
+  .bf-meter { height: 6px; border-radius: var(--radius-full); background: var(--color-ink-100); overflow: hidden; width: 70px; display: inline-block; vertical-align: middle; margin-right: var(--space-2); }
+  .bf-meter > i { display: block; height: 100%; background: var(--color-success-500); }
+  .bf-meter.mid > i { background: var(--color-warning-500); }
+  .bf-meter.low > i { background: var(--color-danger-500); }
+  .bf-row-list { list-style: none; padding: 0; margin: 0; }
+  .bf-row-list li { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: 0.6rem 0; border-top: 1px solid var(--color-ink-150); font-size: 0.9rem; }
+  .bf-row-list li:first-child { border-top: none; padding-top: 0; }
+  .bf-sub { color: var(--color-ink-500); font-size: 0.78rem; }
+  .bf-empty-inline { color: var(--color-ink-500); font-size: 0.88rem; margin: 0; }
+  details.bf-more { margin-top: var(--space-4); }
+  details.bf-more > summary { cursor: pointer; font-size: 0.85rem; font-weight: 500; color: var(--color-ink-500); padding: 0.4rem 0; list-style: none; display: flex; align-items: center; gap: 0.4rem; }
+  details.bf-more > summary::-webkit-details-marker { display: none; }
+  details.bf-more > summary:hover { color: var(--color-primary-700); }
+  details.bf-more[open] > summary { margin-bottom: var(--space-2); }
+  .bf-stats { display: flex; gap: var(--space-6); flex-wrap: wrap; }
+  .bf-stats .n { font-family: var(--font-display); font-size: 1.6rem; line-height: 1.1; }
+  .bf-stats .l { font-size: 0.74rem; color: var(--color-ink-500); }
+  @media (max-width: 900px) { .bf-grid { grid-template-columns: 1fr; } }
+  @media print { #dash-topbar, #dash-sidebar, .no-print { display: none !important; } .dash-shell { display: block; margin-left: 0; } }
+</style>
+</head>
+<body>
+<script src="/js/api.js"></script>
+<script src="/js/toast.js"></script>
+<script src="/js/layout.js"></script>
+<script src="/js/guard.js" data-role="doctor"></script>
+
+<div id="dash-topbar"></div>
+<div class="dash-shell">
+  <div id="dash-sidebar"></div>
+  <main class="dash-main" id="brief-root">
+    <div class="skeleton" style="height:40px; width:320px; margin-bottom: var(--space-5);"></div>
+    <div class="card skeleton" style="height:180px;"></div>
+  </main>
+</div>
+
+<script>
+  const { esc, icon } = MB_LAYOUT;
+  const appointmentId = new URLSearchParams(window.location.search).get('appointment');
+
+  MB_LAYOUT.onAuthReady(async (e) => {
+    MB_LAYOUT.renderDashboardShell('doctor', 'Brief');
+    MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    const root = document.getElementById('brief-root');
+    if (!appointmentId) {
+      root.innerHTML = `<div class="empty-state"><p>Open a brief from <a href="/doctor/appointments.html">Visits</a>.</p></div>`;
+      return;
+    }
+    try { render(await api.get(`/visit-loop/brief/${encodeURIComponent(appointmentId)}`)); }
+    catch (err) { root.innerHTML = `<div class="alert alert-danger">${esc(err.message || 'Could not load.')}</div>`; }
+    MB_LAYOUT.hydrate();
+  });
+
+  const fmtDate = (d) => d ? new Date(`${d.slice(0, 10)}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+  function relDays(d) {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const diff = Math.round((new Date(`${d.slice(0, 10)}T00:00:00`) - today) / 86400000);
+    if (diff === 0) return 'today';
+    return diff > 0 ? `in ${diff}d` : `${-diff}d late`;
+  }
+
+  function render(d) {
+    const { appointment: a, patient: p, intake, medications, adherence, recentRecords, openCommitments, visitHistory, flags, careScore } = d;
+    const root = document.getElementById('brief-root');
+    const allergy = p.allergies
+      ? p.allergies.split(',').map((x) => `<span class="badge badge-danger">${icon('alert', 12)} ${esc(x.trim())}</span>`).join('')
+      : '<span class="badge badge-neutral badge-plain">No known allergies</span>';
+    const newAllergy = intake && intake.new_allergies ? `<span class="badge badge-danger">New: ${esc(intake.new_allergies)}</span>` : '';
+    const chronic = p.chronic_conditions ? p.chronic_conditions.split(',').map((x) => `<span class="badge badge-warning badge-plain">${esc(x.trim())}</span>`).join('') : '';
+    // Flags already covering allergies / severity are shown elsewhere; show the rest as chips.
+    const flagChips = flags
+      .filter((f) => !/allerg/i.test(f.text))
+      .map((f) => `<span class="flag flag-${esc(f.level)}">${esc(f.text)}</span>`).join('');
+    const age = p.age != null ? `${esc(p.age)}y` : '';
+    const sex = (p.gender || '').replace(/_/g, ' ');
+
+    root.innerHTML = `
+      <div class="bf-head">
+        <div>
+          <h2>${esc(p.full_name)}</h2>
+          <div class="bf-meta">
+            <span><strong>${[age, esc(sex)].filter(Boolean).join(' · ')}</strong></span>
+            <span>${esc(p.blood_group || '—')}</span>
+            ${p.bmi != null ? `<span>BMI ${esc(p.bmi)}</span>` : ''}
+            <span class="mono">${esc(fmtDate(a.appointment_date))} · ${esc(a.start_time.slice(0, 5))}</span>
+            <span class="badge status-${esc(a.status)}">${esc(a.status)}</span>
+          </div>
+        </div>
+        <div class="flex gap-2 no-print">
+          <button class="btn btn-outline btn-sm" onclick="window.print()">Print</button>
+          <a class="btn btn-primary btn-sm" href="/doctor/appointments.html">Start</a>
+        </div>
+      </div>
+
+      <div class="bf-chips">${allergy}${newAllergy}${chronic}${flagChips}</div>
+
+      ${renderIntake(intake, a)}
+
+      <div class="bf-grid">
+        ${renderMeds(medications, adherence)}
+        ${renderCommitments(openCommitments)}
+      </div>
+
+      <details class="bf-more">
+        <summary>${icon('chevronRight', 14)} Records, history &amp; score</summary>
+        <div class="bf-grid" style="margin-top:0;">
+          ${renderRecords(recentRecords)}
+          <div class="card">
+            <div class="card-header"><h3>History</h3></div>
+            <div class="bf-stats">
+              <div><div class="n">${esc(visitHistory.total)}</div><div class="l">Visits</div></div>
+              <div><div class="n">${esc(visitHistory.withThisDoctor)}</div><div class="l">With you</div></div>
+              ${careScore ? `<div><div class="n">${esc(careScore.score)}</div><div class="l">Care Score</div></div>` : ''}
+            </div>
+            ${visitHistory.lastVisit ? `<p class="bf-sub" style="margin:var(--space-3) 0 0;">Last visit ${esc(fmtDate(visitHistory.lastVisit))}</p>` : ''}
+          </div>
+        </div>
+      </details>`;
+  }
+
+  function renderIntake(i, a) {
+    if (!i) {
+      return `<div class="card">
+        ${a.reason ? `<p class="bf-complaint">${esc(a.reason)}</p>` : ''}
+        <span class="badge badge-neutral">No intake yet</span>
+      </div>`;
+    }
+    const sev = Number(i.severity) || 0;
+    const sevClass = sev >= 4 ? 's-high' : sev === 3 ? 's-mid' : 's-low';
+    const tags = (i.symptoms || '').split(',').map((s) => s.trim()).filter(Boolean);
+    return `<div class="card">
+      <p class="bf-complaint">“${esc(i.chief_complaint)}”</p>
+      ${tags.length ? `<div class="flex flex-wrap gap-2">${tags.map((t) => `<span class="badge badge-info badge-plain">${esc(t)}</span>`).join('')}</div>` : ''}
+      <div class="bf-line">
+        ${sev ? `<span><span class="bf-severity ${sevClass}">${[1, 2, 3, 4, 5].map((n) => `<span class="${n <= sev ? 'on' : ''}"></span>`).join('')}</span>${sev}/5</span>` : ''}
+        ${i.symptom_duration ? `<span>${icon('clock', 14)} ${esc(i.symptom_duration)}</span>` : ''}
+        ${i.medication_changes ? `<span>${icon('pill', 14)} ${esc(i.medication_changes)}</span>` : ''}
+      </div>
+      ${i.questions_for_doctor ? `<div class="bf-question">${icon('message', 16)}<span>${esc(i.questions_for_doctor)}</span></div>` : ''}
+    </div>`;
+  }
+
+  function renderMeds(meds, adherence) {
+    const meter = (pct) => {
+      if (pct == null) return '<span class="bf-sub">no logs</span>';
+      const cls = pct >= 80 ? '' : pct >= 50 ? 'mid' : 'low';
+      return `<span class="bf-meter ${cls}"><i style="width:${Math.max(0, Math.min(100, pct))}%"></i></span><span class="text-sm">${pct}%</span>`;
+    };
+    return `<div class="card">
+      <div class="card-header"><h3>Medicines</h3>${adherence.pct30 != null ? `<span class="badge badge-plain">${adherence.pct30}% taken</span>` : ''}</div>
+      ${meds.length ? `<ul class="bf-row-list">${meds.map((m) => `<li><div><strong>${esc(m.name)}</strong><div class="bf-sub">${esc(m.dosage)}</div></div><div style="white-space:nowrap;">${meter(m.adherence_pct_7d)}</div></li>`).join('')}</ul>` : '<p class="bf-empty-inline">None</p>'}
+    </div>`;
+  }
+
+  function renderRecords(records) {
+    return `<div class="card">
+      <div class="card-header"><h3>Records</h3><a class="text-sm" href="/doctor/patients.html">All</a></div>
+      ${records.length ? `<ul class="bf-row-list">${records.map((r) => `<li><div><strong>${esc(r.diagnosis || 'Consultation')}</strong><div class="bf-sub">${esc(r.doctor_name)}${r.vitals_bp ? ` · BP ${esc(r.vitals_bp)}` : ''}</div></div><div class="bf-sub" style="white-space:nowrap;">${esc(fmtDate(r.record_date))}</div></li>`).join('')}</ul>` : '<p class="bf-empty-inline">None</p>'}
+    </div>`;
+  }
+
+  function renderCommitments(list) {
+    return `<div class="card">
+      <div class="card-header"><h3>Open items</h3>${list.length ? `<span class="count-chip">${list.length}</span>` : ''}</div>
+      ${list.length ? `<ul class="bf-row-list">${list.map((c) => `<li><span>${esc(c.title)}</span>${c.due_date ? `<span class="badge ${c.overdue ? 'badge-danger' : 'badge-neutral'} badge-plain">${esc(relDays(c.due_date))}</span>` : ''}</li>`).join('')}</ul>` : '<p class="bf-empty-inline">None</p>'}
+    </div>`;
+  }
+</script>
+</body>
+</html>

@@ -2,10 +2,11 @@
 // data: doctors, patients, appointments, medical records, prescriptions,
 // medications + adherence logs, reviews, notifications and resources.
 //
-// Usage: npm run db:seed   (schema must already exist - run db:create first)
+// Usage: npm run db:seed   (MongoDB must be running; this wipes and refills the medibridge database)
 require('dotenv').config();
-const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
+const { connectDb } = require('./db');
+const { mongoose, M, insert, update } = require('./store');
 
 // --- small seeded PRNG so re-running the seed gives the same demo data ---
 function mulberry32(seed) {
@@ -29,7 +30,9 @@ const pickWeighted = (pairs) => {
   return pairs[0][0];
 };
 const randInt = (min, max) => Math.floor(rand() * (max - min + 1)) + min;
-const fmtDate = (d) => d.toISOString().slice(0, 10);
+// Local calendar date, so 'today' in the seed is today for the people using the demo.
+const pad2 = (n) => String(n).padStart(2, '0');
+const fmtDate = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const addDays = (d, n) => {
   const copy = new Date(d);
   copy.setDate(copy.getDate() + n);
@@ -40,35 +43,12 @@ const TODAY = new Date(); // driven by the system clock
 TODAY.setHours(0, 0, 0, 0);
 
 async function main() {
-  const conn = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'medibridge',
-    multipleStatements: true,
-  });
-
-  console.log('Connected to database. Clearing existing data ...');
-  await conn.query(`
-    SET FOREIGN_KEY_CHECKS = 0;
-    TRUNCATE TABLE audit_logs;
-    TRUNCATE TABLE reported_issues;
-    TRUNCATE TABLE notifications;
-    TRUNCATE TABLE reviews;
-    TRUNCATE TABLE medication_logs;
-    TRUNCATE TABLE medications;
-    TRUNCATE TABLE prescriptions;
-    TRUNCATE TABLE medical_records;
-    TRUNCATE TABLE appointments;
-    TRUNCATE TABLE doctor_availability;
-    TRUNCATE TABLE doctors;
-    TRUNCATE TABLE patients;
-    TRUNCATE TABLE healthcare_resources;
-    TRUNCATE TABLE specializations;
-    TRUNCATE TABLE users;
-    SET FOREIGN_KEY_CHECKS = 1;
-  `);
+  await connectDb();
+  console.log('Connected to MongoDB. Clearing existing data ...');
+  // Start from an empty database: every collection and the id counters.
+  await mongoose.connection.dropDatabase();
+  for (const model of Object.values(M)) await model.createCollection().catch(() => {});
+  for (const model of Object.values(M)) await model.syncIndexes();
 
   // -------------------------------------------------------------------
   // Specializations
@@ -92,11 +72,8 @@ async function main() {
   ];
   const specId = {};
   for (const [name, description, icon] of specializations) {
-    const [res] = await conn.query(
-      'INSERT INTO specializations (name, description, icon) VALUES (?, ?, ?)',
-      [name, description, icon]
-    );
-    specId[name] = res.insertId;
+    const created = await insert('specializations', { name, description, icon });
+    specId[name] = created.id;
   }
   console.log(`Inserted ${specializations.length} specializations.`);
 
@@ -149,25 +126,19 @@ async function main() {
   for (const d of doctorDefs) {
     const [name, spec, qual, exp, fee, langs, area, lat, lng, demoEmail] = d;
     const email = demoEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@medibridge.demo`;
-    const [userRes] = await conn.query(
-      `INSERT INTO users (email, password_hash, role, full_name, phone, is_active)
-       VALUES (?, ?, 'doctor', ?, ?, 1)`,
-      [email, doctorHash, `Dr. ${name}`, `+91 98${randInt(10000000, 99999999)}`]
-    );
-    const userId = userRes.insertId;
-    await conn.query(
-      `INSERT INTO doctors (user_id, specialization_id, qualifications, experience_years, consultation_fee,
-          languages, bio, clinic_name, clinic_address, city, latitude, longitude, consultation_modes,
-          rating_avg, rating_count, is_verified)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Bengaluru', ?, ?, ?, 0, 0, 1)`,
-      [
-        userId, specId[spec], qual, exp, fee, langs, pick(doctorBios),
-        `${area} ${pick(['Health Clinic', 'Family Care Centre', 'Medical Centre', 'Wellness Clinic'])}`,
-        `${randInt(1, 200)} ${area} Main Road, Bengaluru`,
-        lat, lng,
-        pick(['in_person,video', 'in_person', 'in_person,video']),
-      ]
-    );
+    const user = await insert('users', {
+      email, password_hash: doctorHash, role: 'doctor', full_name: `Dr. ${name}`, phone: `+91 98${randInt(10000000, 99999999)}`, is_active: 1,
+    });
+    const userId = user.id;
+    const bio = pick(doctorBios);
+    const clinicName = `${area} ${pick(['Health Clinic', 'Family Care Centre', 'Medical Centre', 'Wellness Clinic'])}`;
+    const clinicAddress = `${randInt(1, 200)} ${area} Main Road, Bengaluru`;
+    const modes = pick(['in_person,video', 'in_person', 'in_person,video']);
+    await insert('doctors', {
+      user_id: userId, specialization_id: specId[spec], qualifications: qual, experience_years: exp, consultation_fee: fee, languages: langs,
+      bio, clinic_name: clinicName, clinic_address: clinicAddress, city: 'Bengaluru', latitude: lat, longitude: lng, consultation_modes: modes,
+      rating_avg: 0, rating_count: 0, is_verified: 1,
+    });
     doctors.push({ userId, name: `Dr. ${name}`, specialization: spec, fee, email, isDemo: !!demoEmail });
   }
   console.log(`Inserted ${doctors.length} doctors.`);
@@ -191,11 +162,7 @@ async function main() {
     ];
     if (rand() > 0.4) blocks.push([6, '10:00:00', '13:00:00']);
     for (const [dow, start, end] of blocks) {
-      await conn.query(
-        `INSERT INTO doctor_availability (doctor_id, day_of_week, start_time, end_time, slot_duration_mins, is_active)
-         VALUES (?, ?, ?, ?, 30, 1)`,
-        [doc.userId, dow, start, end]
-      );
+      await insert('doctor_availability', { doctor_id: doc.userId, day_of_week: dow, start_time: start, end_time: end, slot_duration_mins: 30, is_active: 1 });
     }
   }
   console.log('Inserted doctor availability templates.');
@@ -224,24 +191,20 @@ async function main() {
   for (const p of patientDefs) {
     const [name, dob, gender, blood, city, allergies, conditions, demoEmail] = p;
     const email = demoEmail || `${name.toLowerCase().replace(/\s+/g, '.')}@mailbox.demo`;
-    const [userRes] = await conn.query(
-      `INSERT INTO users (email, password_hash, role, full_name, phone, is_active)
-       VALUES (?, ?, 'patient', ?, ?, 1)`,
-      [email, patientHash, name, `+91 99${randInt(10000000, 99999999)}`]
-    );
-    const userId = userRes.insertId;
-    await conn.query(
-      `INSERT INTO patients (user_id, date_of_birth, gender, blood_group, height_cm, weight_kg, address, city,
-          emergency_contact_name, emergency_contact_phone, allergies, chronic_conditions)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        userId, dob, gender, blood,
-        (150 + randInt(0, 40)).toFixed(1), (50 + randInt(0, 35)).toFixed(1),
-        `${randInt(1, 150)} ${city} Cross, Bengaluru`, city,
-        pick(['Ravi Sharma', 'Sunita Rao', 'Manoj Kapoor', 'Leela Menon']), `+91 97${randInt(10000000, 99999999)}`,
-        allergies.join(', ') || null, conditions.join(', ') || null,
-      ]
-    );
+    const user = await insert('users', {
+      email, password_hash: patientHash, role: 'patient', full_name: name, phone: `+91 99${randInt(10000000, 99999999)}`, is_active: 1,
+    });
+    const userId = user.id;
+    const height = 150 + randInt(0, 40);
+    const weight = 50 + randInt(0, 35);
+    const addressNo = randInt(1, 150);
+    const contactName = pick(['Ravi Sharma', 'Sunita Rao', 'Manoj Kapoor', 'Leela Menon']);
+    const contactPhone = `+91 97${randInt(10000000, 99999999)}`;
+    await insert('patients', {
+      user_id: userId, date_of_birth: dob, gender, blood_group: blood, height_cm: height, weight_kg: weight,
+      address: `${addressNo} ${city} Cross, Bengaluru`, city, emergency_contact_name: contactName, emergency_contact_phone: contactPhone,
+      allergies: allergies.join(', ') || null, chronic_conditions: conditions.join(', ') || null,
+    });
     patients.push({ userId, name, email, isDemo: !!demoEmail, conditions });
   }
   console.log(`Inserted ${patients.length} patients.`);
@@ -250,11 +213,9 @@ async function main() {
   // -------------------------------------------------------------------
   // Admin account
   // -------------------------------------------------------------------
-  await conn.query(
-    `INSERT INTO users (email, password_hash, role, full_name, phone, is_active)
-     VALUES ('admin@medibridge.demo', ?, 'admin', 'Platform Admin', '+91 9000000000', 1)`,
-    [adminHash]
-  );
+  await insert('users', {
+    email: 'admin@medibridge.demo', password_hash: adminHash, role: 'admin', full_name: 'Platform Admin', phone: '+91 9000000000', is_active: 1,
+  });
   console.log('Inserted admin account.');
 
   // -------------------------------------------------------------------
@@ -311,38 +272,32 @@ async function main() {
   const createdMedications = []; // collect for medication_logs pass
 
   async function createAppointment({ patient, doctor, date, startTime, endTime, status, reason, mode }) {
-    const [res] = await conn.query(
-      `INSERT INTO appointments (patient_id, doctor_id, appointment_date, start_time, end_time,
-          consultation_mode, status, reason, cancelled_by, cancellation_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        patient.userId, doctor.userId, fmtDate(date), startTime, endTime, mode, status, reason,
-        status === 'cancelled' ? pick(['patient', 'doctor']) : null,
-        status === 'cancelled' ? pick(['Schedule conflict', 'Feeling better, no longer needed', 'Doctor unavailable']) : null,
-      ]
-    );
+    const cancelledBy = status === 'cancelled' ? pick(['patient', 'doctor']) : null;
+    const cancelReason = status === 'cancelled' ? pick(['Schedule conflict', 'Feeling better, no longer needed', 'Doctor unavailable']) : null;
+    const created = await insert('appointments', {
+      patient_id: patient.userId, doctor_id: doctor.userId, appointment_date: fmtDate(date), start_time: startTime, end_time: endTime,
+      consultation_mode: mode, status, reason, cancelled_by: cancelledBy, cancellation_reason: cancelReason,
+    });
     appointmentCount++;
-    return res.insertId;
+    return created.id;
   }
 
   async function createRecordWithPrescriptions(appointmentId, patient, doctor, date) {
     const diagnosisOptions = diagnosesBySpec[doctor.specialization] || diagnosesBySpec['General Medicine'];
     const diagnosis = pick(diagnosisOptions);
     const hasFollowUp = rand() > 0.5;
-    const [res] = await conn.query(
-      `INSERT INTO medical_records (appointment_id, patient_id, doctor_id, record_date, diagnosis,
-          consultation_summary, vitals_bp, vitals_pulse, vitals_temp, follow_up_date, follow_up_notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        appointmentId, patient.userId, doctor.userId, fmtDate(date), diagnosis,
-        `Patient presented with symptoms consistent with ${diagnosis.toLowerCase()}. Advised rest, hydration and the prescribed medication. Discussed lifestyle measures relevant to long-term management.`,
-        `${110 + randInt(-10, 15)}/${70 + randInt(-8, 10)}`, `${68 + randInt(-6, 14)} bpm`, `${(36.4 + rand() * 1.2).toFixed(1)} C`,
-        hasFollowUp ? fmtDate(addDays(date, randInt(14, 45))) : null,
-        hasFollowUp ? 'Review response to treatment and adjust plan if needed.' : null,
-      ]
-    );
+    const summary = `Patient presented with symptoms consistent with ${diagnosis.toLowerCase()}. Advised rest, hydration and the prescribed medication. Discussed lifestyle measures relevant to long-term management.`;
+    const bp = `${110 + randInt(-10, 15)}/${70 + randInt(-8, 10)}`;
+    const pulse = `${68 + randInt(-6, 14)} bpm`;
+    const temp = `${(36.4 + rand() * 1.2).toFixed(1)} C`;
+    const followUp = hasFollowUp ? fmtDate(addDays(date, randInt(14, 45))) : null;
+    const record = await insert('medical_records', {
+      appointment_id: appointmentId, patient_id: patient.userId, doctor_id: doctor.userId, record_date: fmtDate(date), diagnosis,
+      consultation_summary: summary, vitals_bp: bp, vitals_pulse: pulse, vitals_temp: temp, follow_up_date: followUp,
+      follow_up_notes: hasFollowUp ? 'Review response to treatment and adjust plan if needed.' : null,
+    });
     recordCount++;
-    const recordId = res.insertId;
+    const recordId = record.id;
 
     const numMeds = randInt(1, 3);
     const chosen = new Set();
@@ -350,27 +305,21 @@ async function main() {
       const med = pick(medicinePool);
       if (chosen.has(med[0])) continue;
       chosen.add(med[0]);
-      const [mres] = await conn.query(
-        `INSERT INTO prescriptions (medical_record_id, medicine_name, dosage, frequency, duration_days, instructions)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [recordId, ...med]
-      );
+      const rx = await insert('prescriptions', {
+        medical_record_id: recordId, medicine_name: med[0], dosage: med[1], frequency: med[2], duration_days: med[3], instructions: med[4],
+      });
       prescriptionCount++;
       // Turn roughly two-thirds of prescriptions into tracked medications for the patient
       if (rand() > 0.33) {
         const startDate = date;
         const endDate = addDays(date, med[3]);
         const reminderTimes = med[1].includes('night') || med[2].includes('night') ? '21:00' : pick(['08:00', '08:00,20:00', '09:00,14:00,21:00']);
-        const [medRes] = await conn.query(
-          `INSERT INTO medications (patient_id, prescription_id, medicine_name, dosage, frequency, start_date,
-              end_date, reminder_times, instructions, is_active)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            patient.userId, mres.insertId, med[0], med[1], med[2], fmtDate(startDate), fmtDate(endDate),
-            reminderTimes, med[4], endDate >= TODAY ? 1 : 0,
-          ]
-        );
-        createdMedications.push({ id: medRes.insertId, patientId: patient.userId, startDate, endDate });
+        const tracked = await insert('medications', {
+          patient_id: patient.userId, prescription_id: rx.id, medicine_name: med[0], dosage: med[1], frequency: med[2],
+          start_date: fmtDate(startDate), end_date: fmtDate(endDate), reminder_times: reminderTimes, instructions: med[4],
+          is_active: endDate >= TODAY ? 1 : 0,
+        });
+        createdMedications.push({ id: tracked.id, patientId: patient.userId, startDate, endDate });
       }
     }
   }
@@ -435,33 +384,26 @@ async function main() {
           mode: pick(['in_person', 'in_person', 'video']),
         });
       } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') continue; // slot collision, skip
+        if (err.code === 11000) continue; // slot collision, skip
         throw err;
       }
 
       if (status === 'completed' && rand() > 0.25) {
         await createRecordWithPrescriptions(apptId, patient, doctor, date);
         if (rand() > 0.4) {
-          await conn.query(
-            `INSERT IGNORE INTO reviews (doctor_id, patient_id, appointment_id, rating, comment)
-             VALUES (?, ?, ?, ?, ?)`,
-            [doctor.userId, patient.userId, apptId, pickWeighted([[5, 55], [4, 30], [3, 10], [2, 5]]), pick(reviewComments)]
-          );
+          const rating = pickWeighted([[5, 55], [4, 30], [3, 10], [2, 5]]);
+          const comment = pick(reviewComments);
+          await insert('reviews', { doctor_id: doctor.userId, patient_id: patient.userId, appointment_id: apptId, rating, comment })
+            .catch((e) => { if (e.code !== 11000) throw e; });
         }
       }
     }
   }
   console.log(`Inserted ${appointmentCount} appointments, ${recordCount} medical records, ${prescriptionCount} prescriptions.`);
 
-  // Recompute doctor rating_avg / rating_count from the reviews table
-  await conn.query(`
-    UPDATE doctors d
-    LEFT JOIN (
-      SELECT doctor_id, ROUND(AVG(rating), 2) AS avg_rating, COUNT(*) AS cnt
-      FROM reviews GROUP BY doctor_id
-    ) r ON r.doctor_id = d.user_id
-    SET d.rating_avg = COALESCE(r.avg_rating, 0), d.rating_count = COALESCE(r.cnt, 0)
-  `);
+  // Recompute doctor rating_avg / rating_count from the reviews collection
+  const ratings = await M.reviews.aggregate([{ $group: { _id: '$doctor_id', avg: { $avg: '$rating' }, cnt: { $sum: 1 } } }]);
+  for (const r of ratings) await update('doctors', { user_id: r._id }, { rating_avg: Math.round(r.avg * 100) / 100, rating_count: r.cnt });
 
   // -------------------------------------------------------------------
   // A couple of standalone self-added medications for the demo patient,
@@ -473,13 +415,11 @@ async function main() {
       ['Multivitamin', '1 tablet', 'Once a day', addDays(TODAY, -4), addDays(TODAY, 56), '08:00', 'Take after breakfast'],
     ];
     for (const [name, dosage, freq, start, end, time, instr] of selfMeds) {
-      const [res] = await conn.query(
-        `INSERT INTO medications (patient_id, prescription_id, medicine_name, dosage, frequency, start_date,
-            end_date, reminder_times, instructions, is_active)
-         VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 1)`,
-        [demoPatient.userId, name, dosage, freq, fmtDate(start), fmtDate(end), time, instr]
-      );
-      createdMedications.push({ id: res.insertId, patientId: demoPatient.userId, startDate: start, endDate: end });
+      const created = await insert('medications', {
+        patient_id: demoPatient.userId, prescription_id: null, medicine_name: name, dosage, frequency: freq,
+        start_date: fmtDate(start), end_date: fmtDate(end), reminder_times: time, instructions: instr, is_active: 1,
+      });
+      createdMedications.push({ id: created.id, patientId: demoPatient.userId, startDate: start, endDate: end });
     }
   }
 
@@ -493,10 +433,7 @@ async function main() {
     while (day <= last) {
       const status = pickWeighted([['taken', 78], ['skipped', 12], ['missed', 10]]);
       try {
-        await conn.query(
-          `INSERT IGNORE INTO medication_logs (medication_id, log_date, status) VALUES (?, ?, ?)`,
-          [med.id, fmtDate(day), status]
-        );
+        await insert('medication_logs', { medication_id: med.id, log_date: fmtDate(day), status });
         logCount++;
       } catch (e) { /* ignore duplicates */ }
       day = addDays(day, 1);
@@ -509,11 +446,10 @@ async function main() {
   // -------------------------------------------------------------------
   let notifCount = 0;
   async function notify(userId, type, title, message, relatedType, relatedId, daysAgo) {
-    await conn.query(
-      `INSERT INTO notifications (user_id, type, title, message, is_read, related_type, related_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY))`,
-      [userId, type, title, message, rand() > 0.5 ? 1 : 0, relatedType, relatedId, daysAgo]
-    );
+    await insert('notifications', {
+      user_id: userId, type, title, message, is_read: rand() > 0.5 ? 1 : 0, related_type: relatedType, related_id: relatedId,
+      created_at: new Date(Date.now() - daysAgo * 86400000),
+    });
     notifCount++;
   }
   for (const patient of patients) {
@@ -548,10 +484,7 @@ async function main() {
     ['Emergency Guidance', 'Creating a Family Emergency Contact Plan', 'Simple steps so everyone knows who to call and where to go.', 'Keep a written list of emergency contacts, known allergies and chronic conditions for each family member in an accessible place, and share it with caregivers.', 3],
   ];
   for (const [category, title, summary, content, readMins] of resources) {
-    await conn.query(
-      `INSERT INTO healthcare_resources (category, title, summary, content, read_mins) VALUES (?, ?, ?, ?, ?)`,
-      [category, title, summary, content, readMins]
-    );
+    await insert('healthcare_resources', { category, title, summary, content, read_mins: readMins });
   }
   console.log(`Inserted ${resources.length} healthcare resources.`);
 
@@ -567,15 +500,11 @@ async function main() {
   ];
   for (const [category, subject, description, status] of reportDefs) {
     const reporter = pick(patients);
-    await conn.query(
-      `INSERT INTO reported_issues (reporter_id, category, subject, description, status, admin_notes, resolved_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        reporter.userId, category, subject, description, status,
-        status === 'resolved' ? 'Reviewed and corrected.' : status === 'dismissed' ? 'Could not reproduce the issue.' : null,
-        status === 'resolved' ? fmtDate(addDays(TODAY, -2)) : null,
-      ]
-    );
+    await insert('reported_issues', {
+      reporter_id: reporter.userId, category, subject, description, status,
+      admin_notes: status === 'resolved' ? 'Reviewed and corrected.' : status === 'dismissed' ? 'Could not reproduce the issue.' : null,
+      resolved_at: status === 'resolved' ? addDays(TODAY, -2) : null,
+    });
   }
   console.log(`Inserted ${reportDefs.length} reported issues.`);
 
@@ -588,15 +517,17 @@ async function main() {
   ];
   for (let i = 0; i < 20; i++) {
     const actor = pick([...patients, ...doctors]);
-    await conn.query(
-      `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details, created_at)
-       VALUES (?, ?, ?, ?, ?, DATE_SUB(NOW(), INTERVAL ? DAY))`,
-      [actor.userId, pick(auditActions), 'system', randInt(1, 100), 'Automated seed activity log entry.', randInt(0, 40)]
-    );
+    const action = pick(auditActions);
+    const entityId = randInt(1, 100);
+    const daysAgo = randInt(0, 40);
+    await insert('audit_logs', {
+      user_id: actor.userId, action, entity_type: 'system', entity_id: entityId, details: 'Automated seed activity log entry.',
+      created_at: new Date(Date.now() - daysAgo * 86400000),
+    });
   }
   console.log('Inserted 20 audit log entries.');
 
-  await conn.end();
+  await mongoose.disconnect();
 
   console.log('\nSeed complete.\n');
   console.log('Demo credentials:');

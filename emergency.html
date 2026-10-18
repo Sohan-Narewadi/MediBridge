@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f0e7">
+  <title>Emergency Profile — MediBridge</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/emergency-redesign.css">
+</head>
+<body class="emergency-page">
+  <div id="site-header"></div>
+
+  <main class="emergency-shell">
+    <section class="emergency-topline" aria-label="Emergency page status">
+      <div>
+        <div class="eyebrow-label">MEDIBRIDGE · EMERGENCY CONNECT</div>
+        <h1>Critical information.<br><em>Without the guesswork.</em></h1>
+        <p class="emergency-intro">A concise, patient-specific handover for the moments when explaining your history is difficult.</p>
+      </div>
+      <div class="profile-status" id="profile-status">
+        <span class="status-pulse" aria-hidden="true"></span>
+        <span><strong id="status-title">Profile not verified</strong><small id="status-subtitle">Sign in to load your saved details</small></span>
+      </div>
+    </section>
+
+    <section class="emergency-callout" aria-labelledby="urgent-title">
+      <div class="callout-symbol" aria-hidden="true">!</div>
+      <div class="callout-copy">
+        <div class="callout-kicker">If this is happening now</div>
+        <h2 id="urgent-title">Call emergency services first.</h2>
+        <p>MediBridge does not dispatch an ambulance and this page is not a diagnosis or substitute for emergency care.</p>
+      </div>
+      <div class="callout-actions">
+        <a class="emergency-call-button" href="tel:112" aria-label="Call India's emergency number 112">Call 112 <span aria-hidden="true">↗</span></a>
+        <span>India · emergency response</span>
+      </div>
+    </section>
+
+    <section class="patient-banner" aria-labelledby="patient-name">
+      <div class="patient-avatar" id="patient-avatar" aria-hidden="true">?</div>
+      <div class="patient-primary">
+        <div class="eyebrow-label">PATIENT IDENTIFICATION</div>
+        <h2 id="patient-name">Sign in to load your profile</h2>
+        <div class="patient-meta" id="patient-meta"><span>Identity details appear here</span></div>
+      </div>
+      <div class="patient-quickfacts" aria-label="Key patient facts">
+        <div><span>Blood group</span><strong id="blood-group">Not recorded</strong></div>
+        <div><span>Known allergies</span><strong id="allergy-count">Not confirmed</strong></div>
+        <div><span>Current medicines</span><strong id="medicine-count">Not confirmed</strong></div>
+      </div>
+    </section>
+
+    <div class="emergency-grid">
+      <section class="emergency-card critical-card" aria-labelledby="allergy-heading">
+        <div class="section-heading">
+          <div class="section-icon allergy-icon" aria-hidden="true">!</div>
+          <div><div class="eyebrow-label">PRIORITY 01</div><h2 id="allergy-heading">Allergies & reactions</h2></div>
+          <span class="section-tag tag-critical">Tell clinicians first</span>
+        </div>
+        <div id="allergy-list" class="fact-list">
+          <div class="data-placeholder">Your recorded allergies will appear here after sign-in.</div>
+        </div>
+        <p class="section-footnote">A blank list does not mean “no allergies”. Confirm this with the patient or their clinician.</p>
+      </section>
+
+      <section class="emergency-card" aria-labelledby="meds-heading">
+        <div class="section-heading">
+          <div class="section-icon meds-icon" aria-hidden="true">Rx</div>
+          <div><div class="eyebrow-label">PRIORITY 02</div><h2 id="meds-heading">Current medication</h2></div>
+        </div>
+        <div id="medication-list" class="fact-list">
+          <div class="data-placeholder">Current prescriptions and medication records will appear here.</div>
+        </div>
+        <p class="section-footnote">Include dose and last dose when known. Do not stop or change medicines based on this page.</p>
+      </section>
+
+      <section class="emergency-card" aria-labelledby="conditions-heading">
+        <div class="section-heading">
+          <div class="section-icon condition-icon" aria-hidden="true">+</div>
+          <div><div class="eyebrow-label">PRIORITY 03</div><h2 id="conditions-heading">Conditions & clinical notes</h2></div>
+        </div>
+        <div id="condition-list" class="fact-list">
+          <div class="data-placeholder">Recorded diagnoses and relevant clinical notes will appear here.</div>
+        </div>
+      </section>
+
+      <section class="emergency-card" aria-labelledby="contacts-heading">
+        <div class="section-heading">
+          <div class="section-icon contact-icon" aria-hidden="true">↗</div>
+          <div><div class="eyebrow-label">PRIORITY 04</div><h2 id="contacts-heading">Emergency contacts</h2></div>
+        </div>
+        <div id="contact-list" class="fact-list">
+          <div class="data-placeholder">Your saved emergency contact details will appear here if available in your profile.</div>
+        </div>
+        <a class="subtle-link" href="/patient/profile.html">Review your profile <span aria-hidden="true">→</span></a>
+      </section>
+
+      <section class="emergency-card records-card" aria-labelledby="records-heading">
+        <div class="section-heading">
+          <div class="section-icon records-icon" aria-hidden="true">▤</div>
+          <div><div class="eyebrow-label">RECENT CONTEXT</div><h2 id="records-heading">Latest medical records</h2></div>
+          <a class="subtle-link" href="/patient/medical-records.html">View all <span aria-hidden="true">→</span></a>
+        </div>
+        <div id="record-list" class="record-list">
+          <div class="data-placeholder">Recent records will appear here when available.</div>
+        </div>
+      </section>
+
+      <section class="emergency-card handover-card" aria-labelledby="handover-heading">
+        <div class="section-heading">
+          <div class="section-icon handover-icon" aria-hidden="true">↗</div>
+          <div><div class="eyebrow-label">HANDOVER</div><h2 id="handover-heading">Share a clear summary</h2></div>
+        </div>
+        <p class="handover-copy">Give a clinician a concise snapshot of the information currently visible on this page.</p>
+        <div class="handover-actions">
+          <button class="btn btn-primary" type="button" id="print-summary">Print / Save PDF</button>
+          <button class="btn btn-outline" type="button" id="copy-summary">Copy summary</button>
+        </div>
+        <div class="privacy-note"><span aria-hidden="true">◈</span><p><strong>Share deliberately.</strong> This summary can contain sensitive health information. Only share it with the patient’s consent or where legally permitted for emergency care.</p></div>
+      </section>
+    </div>
+
+    <section class="freshness-bar" aria-label="Data freshness">
+      <div class="freshness-mark" aria-hidden="true">✓</div>
+      <div><strong id="freshness-title">Data status: not yet checked</strong><p id="freshness-copy">Sign in to retrieve the latest information available to your account.</p></div>
+      <button class="btn btn-outline btn-sm" type="button" id="refresh-profile">Refresh details</button>
+    </section>
+
+    <p class="emergency-disclaimer">MediBridge is a college project using fictional demonstration data. It is not a certified emergency medical record. Always verify critical information with the patient, caregiver, or treating clinician.</p>
+  </main>
+
+  <div id="site-footer"></div>
+  <script src="/js/api.js"></script>
+  <script src="/js/toast.js"></script>
+  <script src="/js/layout.js"></script>
+  <script src="/js/nav.js"></script>
+  <script src="/js/emergency-redesign.js"></script>
+</body>
+</html>

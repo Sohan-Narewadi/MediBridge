@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="/css/main.css">
 </head>
 <body>
+<script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
@@ -16,8 +17,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <h2>Medical Records</h2>
-    <p class="text-muted">Consultation summaries documented by your doctors. Always discuss results with a qualified professional.</p>
+    <h2>Records</h2>
     <div id="records-list"><div class="card skeleton" style="height:100px;"></div></div>
   </main>
 </div>
@@ -34,13 +34,13 @@
     const el = document.getElementById('records-list');
     try {
       const { records } = await api.get('/medical-records');
-      if (!records.length) { el.innerHTML = '<div class="empty-state"><div class="icon">&#128203;</div><h4>No medical records yet</h4><p>Records appear here after a completed consultation.</p></div>'; return; }
+      if (!records.length) { el.innerHTML = '<div class="empty-state"><div class="icon" data-icon="clipboard"></div><p>No records yet.</p></div>'; MB_LAYOUT.hydrate(); return; }
       el.innerHTML = records.map((r) => `
         <div class="card card-interactive" style="margin-bottom:var(--space-3); cursor:pointer;" onclick="openRecord(${r.id})">
           <div class="flex justify-between items-start">
-            <div>
-              <h4 style="margin-bottom:2px;">${r.diagnosis}</h4>
-              <p class="text-sm text-muted mb-0">${r.doctor_name} &#8226; ${r.specialization} &#8226; ${r.record_date}</p>
+            <div class="min-w-0">
+              <div style="font-weight:600;">${r.diagnosis}</div>
+              <div class="text-sm text-muted">${r.doctor_name} &#183; ${r.record_date}</div>
             </div>
             ${r.follow_up_date ? `<span class="badge badge-info">Follow-up ${r.follow_up_date}</span>` : ''}
           </div>
@@ -61,15 +61,15 @@
             <div><strong>Blood pressure:</strong> ${record.vitals_bp || '—'}</div>
             <div><strong>Pulse:</strong> ${record.vitals_pulse || '—'}</div>
           </div>
-          ${record.follow_up_date ? `<div class="alert alert-info" style="margin-top:var(--space-3);">Follow-up recommended by ${record.follow_up_date}. ${record.follow_up_notes || ''}</div>` : ''}
+          ${record.follow_up_date ? `<div class="alert alert-info" style="margin-top:var(--space-3);">Follow-up by ${record.follow_up_date}. ${record.follow_up_notes || ''}</div>` : ''}
           <hr class="divider">
-          <h4>Prescriptions</h4>
+          <h4>Medicines</h4>
           ${prescriptions.length ? prescriptions.map((p) => `
             <div style="padding:var(--space-2) 0; border-bottom:1px solid var(--color-ink-100);">
               <strong class="text-sm">${p.medicine_name}</strong> — <span class="text-sm">${p.dosage}, ${p.frequency}</span>
               ${p.instructions ? `<div class="text-sm text-muted">${p.instructions}</div>` : ''}
             </div>
-          `).join('') : '<p class="text-muted text-sm">No prescriptions for this visit.</p>'}
+          `).join('') : '<p class="text-muted text-sm">None.</p>'}
         </div>
       </div>`;
     document.getElementById('rec-close').addEventListener('click', () => document.getElementById('modal-root').innerHTML = '');

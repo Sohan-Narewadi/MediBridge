@@ -5,6 +5,8 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const morgan = require('morgan');
 
+const { connectDb } = require('../database/db');
+const { fmtDateTime } = require('../database/store');
 const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
 
 const app = express();
@@ -12,7 +14,21 @@ const app = express();
 app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || true, credentials: true }));
 app.use(express.json());
+
+// Timestamps are stored as real Dates. Send them to the browser as local
+// 'YYYY-MM-DD HH:MM:SS' strings, the format every page already parses.
+app.set('json replacer', function replacer(key, value) {
+  const raw = this[key];
+  return raw instanceof Date ? fmtDateTime(raw) : value;
+});
 app.use(cookieParser());
+
+// ---- Database ----
+// Connect lazily on the first API call. Cached after that, which also makes
+// this safe on serverless platforms where the app is re-entered per request.
+app.use('/api', async (req, res, next) => {
+  try { await connectDb(); next(); } catch (err) { next(err); }
+});
 
 // ---- API routes ----
 app.use('/api/auth', require('./routes/auth'));
@@ -29,6 +45,11 @@ app.use('/api/reviews', require('./routes/reviews'));
 app.use('/api/care', require('./routes/care'));
 app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/admin', require('./routes/admin'));
+// v2 modules: Smart Brief + Visit Loop, Discharge Flow, TransferConnect
+app.use('/api/visit-loop', require('./routes/visitLoop'));
+app.use('/api/discharge', require('./routes/discharge'));
+app.use('/api/transfers', require('./routes/transfers'));
+app.use('/api/staff', require('./routes/staff'));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
 
@@ -48,9 +69,15 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 4000;
 if (!process.env.VERCEL) {
-  app.listen(PORT, () => {
-    console.log(`MediBridge server running on http://localhost:${PORT}`);
-  });
+  connectDb()
+    .then(() => {
+      app.listen(PORT, () => console.log(`MediBridge server running on http://localhost:${PORT} (MongoDB connected)`));
+    })
+    .catch((err) => {
+      console.error('Could not connect to MongoDB:', err.message);
+      console.error('Start MongoDB (mongod) or set MONGO_URI in .env, then restart.');
+      process.exit(1);
+    });
 }
 
 module.exports = app;
