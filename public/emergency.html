@@ -5,72 +5,87 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Emergency Guidance — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
+<link rel="stylesheet" href="/css/emergency.css">
 <style>
-  .sos { text-align: center; padding: var(--space-8) var(--space-5); background: var(--color-danger-100); border: 1px solid #ecc4ba; border-radius: var(--radius-lg); }
-  .sos-label { font-family: var(--font-display); font-size: clamp(1.4rem, 3vw, 2rem); color: var(--color-danger-700); }
-  .sos-numbers { display: flex; justify-content: center; gap: var(--space-4); margin: var(--space-5) 0 var(--space-4); flex-wrap: wrap; }
-  .sos-numbers a { display: flex; flex-direction: column; align-items: center; min-width: 120px; padding: var(--space-4) var(--space-5); background: var(--color-surface); border-radius: var(--radius-lg); border: 1px solid #ecc4ba; text-decoration: none; }
-  .sos-numbers a:hover { background: var(--color-danger-500); text-decoration: none; }
-  .sos-numbers a:hover span, .sos-numbers a:hover small { color: #fff; }
-  .sos-numbers span { font-family: var(--font-display); font-size: 2.6rem; line-height: 1; color: var(--color-danger-700); }
-  .sos-numbers small { font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); margin-top: 4px; }
-  .sos-note { font-size: 0.86rem; color: var(--color-ink-700); }
-  .grid.two { grid-template-columns: repeat(2, 1fr); }
-  @media (max-width: 720px) { .grid.two { grid-template-columns: 1fr; } }
-  .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); }
-  .chip-s { padding: 0.35rem 0.8rem; border-radius: var(--radius-full); background: var(--color-ink-100); font-size: 0.86rem; }
-  .steps { margin: var(--space-3) 0 0; padding-left: 1.2rem; font-size: 0.92rem; display: flex; flex-direction: column; gap: 0.4rem; }
+  .em-numbers { display: flex; gap: var(--space-3); flex-wrap: wrap; margin: var(--space-4) 0 0; }
+  .em-numbers a { display: flex; flex-direction: column; align-items: center; min-width: 110px; padding: var(--space-3) var(--space-4); background: var(--color-surface); border: 1px solid #e6b7ad; border-radius: 14px; text-decoration: none; }
+  .em-numbers a:hover { background: var(--color-danger-700); }
+  .em-numbers a:hover span, .em-numbers a:hover small { color: #fff; }
+  .em-numbers span { font-family: var(--font-display); font-size: 2.2rem; line-height: 1; color: var(--color-danger-700); }
+  .em-numbers small { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-500); margin-top: 4px; }
+  .em-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+  @media (max-width: 720px) { .em-two { grid-template-columns: 1fr; } }
+  .em-chips { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .em-chips span { padding: .35rem .75rem; border-radius: 999px; background: var(--color-ink-100); font-size: .82rem; }
+  .em-steps { margin: 0; padding-left: 1.2rem; font-size: .88rem; display: flex; flex-direction: column; gap: .4rem; }
+  .em-signin { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .em-signin p { margin: 0; font-size: .85rem; color: var(--color-ink-500); }
+  .em-profile-title { margin: 1.6rem 0 .8rem; }
 </style>
 </head>
 <body>
 <div id="site-header"></div>
 
-<div class="container section-tight">
-  <a id="my-card" href="/patient/emergency.html" class="card card-interactive flex items-center justify-between gap-3" style="text-decoration:none; color:inherit; margin-bottom:var(--space-4);" hidden>
-    <span><strong>Your emergency card</strong><br><span class="text-sm text-muted">Blood group, allergies, medicines and emergency contact</span></span><span class="btn btn-primary btn-sm">Open</span>
-  </a>
-  <div class="sos">
-    <div class="sos-label">Life-threatening emergency?</div>
-    <div class="sos-numbers">
-      <a href="tel:112"><span>112</span><small>India</small></a>
-      <a href="tel:108"><span>108</span><small>Ambulance</small></a>
-      <a href="tel:911"><span>911</span><small>US</small></a>
+<main class="emergency-shell">
+  <section class="emergency-topline">
+    <div>
+      <div class="eyebrow-label">MEDIBRIDGE &middot; EMERGENCY</div>
+      <h1>Critical information.<br><em>Without the guesswork.</em></h1>
+      <p class="emergency-intro">What to do first, and your own emergency profile ready to show a clinician.</p>
     </div>
-    <div class="sos-note">Call now. MediBridge cannot dispatch help.</div>
+  </section>
+
+  <section class="emergency-callout" aria-labelledby="urgent-title">
+    <div class="callout-symbol" aria-hidden="true">!</div>
+    <div class="callout-copy">
+      <div class="callout-kicker">Life-threatening emergency?</div>
+      <h2 id="urgent-title">Call emergency services first.</h2>
+      <p>MediBridge cannot dispatch help and this page is not a diagnosis or a substitute for emergency care.</p>
+    </div>
+    <div class="callout-actions">
+      <a class="emergency-call-button" href="tel:112">Call 112 <span aria-hidden="true">&nearr;</span></a>
+      <span>India &middot; emergency response</span>
+    </div>
+  </section>
+
+  <div class="em-numbers" style="margin-bottom:1rem;">
+    <a href="tel:112"><span>112</span><small>India</small></a>
+    <a href="tel:108"><span>108</span><small>Ambulance</small></a>
+    <a href="tel:911"><span>911</span><small>US</small></a>
   </div>
 
-  <div class="grid two" style="margin-top: var(--space-6);">
-    <div class="card">
-      <h4 class="flex items-center gap-2"><span class="dot dot-danger"></span>Go to the ER for</h4>
-      <div class="chips">
-        <span class="chip-s">Chest pain</span><span class="chip-s">Trouble breathing</span><span class="chip-s">Stroke signs</span>
-        <span class="chip-s">Heavy bleeding</span><span class="chip-s">Unconscious</span><span class="chip-s">Severe allergy</span>
-        <span class="chip-s">Poisoning</span>
-      </div>
-    </div>
-    <div class="card">
-      <h4 class="flex items-center gap-2"><span class="dot dot-warning"></span>While you wait</h4>
-      <ol class="steps">
-        <li>Call the number</li>
-        <li>Keep the person still</li>
-        <li>Note allergies and medicines</li>
-        <li>No food or drink</li>
-      </ol>
-    </div>
+  <div class="em-two">
+    <section class="emergency-card critical-card">
+      <div class="section-heading"><div class="section-icon allergy-icon" aria-hidden="true">!</div><div><div class="eyebrow-label">GO TO THE ER</div><h2>Do not wait for these</h2></div></div>
+      <div class="em-chips"><span>Chest pain</span><span>Trouble breathing</span><span>Stroke signs</span><span>Heavy bleeding</span><span>Unconscious</span><span>Severe allergy</span><span>Poisoning</span></div>
+    </section>
+    <section class="emergency-card">
+      <div class="section-heading"><div class="section-icon records-icon" aria-hidden="true">&#9636;</div><div><div class="eyebrow-label">WHILE YOU WAIT</div><h2>First steps</h2></div></div>
+      <ol class="em-steps"><li>Call the number</li><li>Keep the person still</li><li>Note allergies and medicines</li><li>No food or drink</li></ol>
+    </section>
   </div>
 
-  <div class="text-center" style="margin-top:var(--space-6);">
-    <a href="/resources.html" class="btn btn-outline">Health resources</a>
-  </div>
-</div>
+  <h2 class="em-profile-title">Your emergency profile</h2>
+  <div id="em-profile"></div>
+
+  <div class="text-center" style="margin-top:1.5rem;"><a href="/resources.html" class="btn btn-outline">Health resources</a></div>
+</main>
 
 <div id="site-footer"></div>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
 <script src="/js/nav.js"></script>
+<script src="/js/emergency.js"></script>
 <script>
-  api.get('/auth/me').then(({ user }) => { if (user.role === 'patient') document.getElementById('my-card').hidden = false; }).catch(() => {});
+  const box = document.getElementById('em-profile');
+  const prompt = (html) => { box.innerHTML = `<section class="emergency-card em-signin">${html}</section>`; };
+  api.get('/auth/me').then(({ user }) => {
+    if (user.role === 'patient') MB_EMERGENCY.mount(box, { callout: false });
+    else prompt('<p>Emergency profiles belong to patient accounts.</p>');
+  }).catch(() => {
+    prompt('<p>Sign in to see your blood group, allergies, medicines and emergency contact here.</p><a class="btn btn-primary btn-sm" href="/auth/login.html?next=/emergency.html">Sign in</a>');
+  });
 </script>
 </body>
 </html>

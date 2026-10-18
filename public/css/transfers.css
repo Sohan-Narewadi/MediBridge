@@ -64,3 +64,87 @@
 .tc-stepper span.on { color: var(--color-primary-700); border-bottom-color: var(--color-primary-600); font-weight: 600; }
 
 .tc-incoming-list > .empty-state { grid-column: 1 / -1; text-align: left; padding-left: 0; }
+
+/* ---- Redesign (ported from the TransferConnect draft) ---- */
+.tc-eyebrow { font-size: 0.64rem; letter-spacing: 0.13em; font-weight: 700; color: var(--color-primary-500); margin-bottom: 0.5rem; }
+
+.tc-hero {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-6);
+  padding: 2rem; margin-bottom: var(--space-4);
+  border: 1px solid var(--color-line); border-radius: 18px;
+  background: linear-gradient(115deg, #f8eee5, #f0e3d7 60%, #dbe6e9);
+}
+.tc-hero > div:first-child { max-width: 700px; }
+.tc-hero h1 { font-size: clamp(2rem, 4vw, 3.4rem); line-height: 1.02; letter-spacing: -0.04em; margin: 0 0 var(--space-4); }
+.tc-hero h1 em { font-style: normal; color: var(--color-primary-500); }
+.tc-hero p { font-size: 0.92rem; line-height: 1.7; color: var(--color-ink-700); max-width: 620px; margin: 0; }
+.tc-pills { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: var(--space-4); }
+.tc-pills span { font-size: 0.7rem; font-weight: 600; background: rgba(255, 255, 255, 0.6); border: 1px solid var(--color-ink-200); border-radius: 99px; padding: 0.38rem 0.7rem; }
+.tc-hero-card { width: 250px; flex-shrink: 0; background: rgba(255, 253, 249, 0.85); border: 1px solid var(--color-ink-200); border-radius: 14px; padding: 1.2rem; }
+.tc-hero-card strong { display: block; font-size: 1.05rem; margin: 0.5rem 0; }
+.tc-hero-card small { font-size: 0.72rem; line-height: 1.5; color: var(--color-ink-500); }
+.tc-orbit { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; background: #f4e5d8; color: var(--color-primary-500); font-size: 1.4rem; margin-bottom: var(--space-3); }
+
+.tc-notice { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-4); background: #fbf0df; border: 1px solid #e8c7a8; border-radius: 12px; margin-bottom: var(--space-4); }
+.tc-notice > b { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: #f2dfc3; color: #86521b; }
+.tc-notice > div { flex: 1; min-width: 0; }
+.tc-notice strong { font-size: 0.85rem; }
+.tc-notice p { font-size: 0.78rem; line-height: 1.55; color: #7d6c5b; margin: 0.15rem 0 0; }
+.tc-notice-sm { padding: var(--space-3); margin-bottom: var(--space-3); }
+
+.tc-patient { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.tc-patient-main { flex: 1; min-width: 180px; }
+.tc-patient-badges { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.tc-avatar, .tc-logo { display: grid; place-items: center; flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; background: #e5e9da; color: #4c6037; font-weight: 700; font-size: 0.8rem; }
+.tc-logo.alt { background: #e2eaf0; color: #3e6380; }
+.tc-logo.sm { width: 32px; height: 32px; border-radius: 9px; font-size: 0.66rem; }
+
+.tc-journey { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); margin-top: var(--space-4); }
+.tc-step-j { border-top: 2px solid var(--color-ink-200); padding: var(--space-3) var(--space-2) 0; display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
+.tc-step-j > b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 8px; background: var(--color-ink-100); color: var(--color-ink-500); font-size: 0.7rem; }
+.tc-step-j strong { font-size: 0.74rem; }
+.tc-step-j small { font-size: 0.66rem; color: var(--color-ink-500); overflow-wrap: anywhere; }
+.tc-step-j.done { border-color: #7c8e61; }
+.tc-step-j.done > b { background: var(--color-success-100); color: var(--color-success-700); }
+.tc-step-j.active { border-color: #a66e37; }
+.tc-step-j.active > b { background: var(--color-warning-100); color: var(--color-warning-700); }
+
+.tc-facility { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-3); margin-bottom: 0.5rem; background: #fffdf9; border: 1px solid var(--color-ink-150); border-radius: 12px; cursor: pointer; }
+.tc-facility:has(input:checked) { background: #f8f9f3; border-color: #cbd7b9; }
+.tc-facility input { width: auto; margin: 0; accent-color: var(--color-primary-600); }
+.tc-facility-info { min-width: 0; font-size: 0.85rem; }
+.tc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.35rem; }
+.tc-tags span { font-size: 0.64rem; background: #f1e9dc; padding: 0.22rem 0.4rem; border-radius: 5px; }
+.tc-score-box { text-align: center; }
+.tc-score-box small { display: block; font-size: 0.6rem; color: var(--color-ink-500); }
+
+.tc-handover { margin-bottom: var(--space-4); }
+.tc-handover ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.tc-handover li { display: block; position: relative; padding: 0.6rem 0.7rem 0.6rem 2rem; border: 1px solid var(--color-ink-150); border-radius: 9px; background: #fffdf9; }
+.tc-handover li::before { content: '\2713'; position: absolute; left: 0.7rem; top: 0.6rem; color: var(--color-success-500); font-weight: 700; }
+.tc-handover b { display: block; font-size: 0.8rem; }
+.tc-handover small { display: block; font-size: 0.7rem; color: var(--color-ink-500); margin-top: 0.15rem; }
+
+.tc-offers li { gap: var(--space-3); }
+.tc-offer-main { flex: 1; min-width: 140px; }
+
+.tc-activity { margin: var(--space-2) 0 0; }
+.tc-activity > div { border-left: 2px solid var(--color-ink-200); padding: 0 0 var(--space-3) var(--space-3); margin-left: 0.25rem; }
+.tc-activity b { font-size: 0.8rem; }
+.tc-activity p, .tc-activity small { display: block; font-size: 0.72rem; color: var(--color-ink-500); margin: 0.15rem 0; line-height: 1.5; }
+
+@media (max-width: 900px) {
+  .tc-hero { align-items: flex-start; }
+  .tc-hero-card { width: 210px; }
+}
+@media (max-width: 620px) {
+  .tc-hero { flex-direction: column; padding: 1.3rem; }
+  .tc-hero-card { width: auto; align-self: stretch; }
+  .tc-journey { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tc-facility { grid-template-columns: auto auto minmax(0, 1fr); }
+  .tc-score-box { grid-column: 1 / -1; text-align: left; }
+  .tc-notice { flex-wrap: wrap; align-items: flex-start; }
+}
+@media print {
+  .tc-hero-card, .tc-notice, .tc-pills { display: none !important; }
+}

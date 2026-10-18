@@ -5,218 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Emergency Connect — MediBridge</title>
 <link rel="stylesheet" href="/css/main.css">
-<style>
-  .em-hero { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); flex-wrap: wrap; padding: var(--space-5) var(--space-6); background: var(--color-danger-100); border: 1px solid #ecc4ba; border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
-  .em-hero h2 { margin: 0 0 0.25rem; color: var(--color-danger-700); }
-  .em-hero p { margin: 0; max-width: 540px; color: var(--color-ink-700); font-size: 0.9rem; }
-  .em-call { display: inline-flex; flex-direction: column; align-items: center; padding: 0.7rem 1.6rem; border-radius: var(--radius-lg); background: var(--color-danger-500); color: #fff; text-decoration: none; }
-  .em-call:hover { background: var(--color-danger-700); color: #fff; text-decoration: none; }
-  .em-call strong { font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; }
-  .em-call small { opacity: 0.85; font-size: 0.76rem; }
-
-  .em-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-4); align-items: start; }
-  @media (max-width: 860px) { .em-grid { grid-template-columns: 1fr; } }
-  .em-card h3 { display: flex; align-items: center; gap: 0.5rem; margin-bottom: var(--space-4); }
-  .em-card h3 .count { margin-left: auto; }
-  .em-card h3 .mb-icon { color: var(--color-ink-500); }
-  .em-card.is-danger h3 .mb-icon { color: var(--color-danger-500); }
-  .em-card.is-danger { border-color: #ecc4ba; }
-
-  .em-id { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-5); align-items: center; }
-  @media (max-width: 760px) { .em-id { grid-template-columns: auto 1fr; } .em-blood { grid-column: 1 / -1; } }
-  .em-photo { width: 84px; height: 84px; border-radius: 50%; background: var(--color-primary-50); border: 1px solid var(--color-primary-100); color: var(--color-primary-700); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 1.9rem; overflow: hidden; }
-  .em-photo img { width: 100%; height: 100%; object-fit: cover; }
-  .em-name { font-family: var(--font-display); font-size: 1.6rem; letter-spacing: -0.02em; line-height: 1.2; margin: 0; }
-  .em-meta { display: flex; flex-wrap: wrap; gap: 0.3rem var(--space-5); margin-top: var(--space-2); font-size: 0.88rem; color: var(--color-ink-700); }
-  .em-meta span { display: inline-flex; align-items: center; gap: 0.4rem; }
-  .em-meta .mb-icon { color: var(--color-ink-400); }
-  .em-blood { text-align: center; padding: var(--space-4) var(--space-6); border: 1px solid #ecc4ba; background: var(--color-danger-100); border-radius: var(--radius-lg); min-width: 150px; }
-  .em-blood .l { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-danger-700); }
-  .em-blood .v { font-family: var(--font-display); font-size: 2.6rem; line-height: 1.1; letter-spacing: -0.02em; color: var(--color-danger-700); }
-  .em-blood .v.unknown { font-size: 1.1rem; color: var(--color-ink-500); padding: 0.9rem 0; font-family: var(--font-body); }
-
-  .em-list { list-style: none; margin: 0; padding: 0; }
-  .em-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0.6rem 0; border-top: 1px solid var(--color-ink-150); }
-  .em-list li:first-child { border-top: 0; padding-top: 0; }
-  .em-list .p { font-weight: 500; }
-  .em-list .s { font-size: 0.82rem; color: var(--color-ink-500); }
-  .em-none { color: var(--color-ink-500); font-size: 0.9rem; margin: 0; }
-  .em-none a { font-weight: 500; }
-  .em-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
-  .em-table th { text-align: left; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-ink-500); padding: 0 0.5rem 0.5rem 0; }
-  .em-table td { padding: 0.6rem 0.5rem 0.6rem 0; border-top: 1px solid var(--color-ink-150); vertical-align: top; }
-  .em-table td:first-child { font-weight: 500; }
-  .em-contact { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-  .em-contact .n { font-weight: 600; font-size: 1.02rem; }
-  .em-contact .t { font-size: 0.86rem; color: var(--color-ink-500); }
-
-  .em-summary { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-4); }
-  .em-summary p { margin: 0; color: var(--color-ink-500); font-size: 0.88rem; }
-  .em-disclaimer { margin-top: var(--space-4); padding: 0.8rem 1rem; border-radius: var(--radius-md); background: var(--color-danger-100); border: 1px solid #ecc4ba; font-size: 0.84rem; color: var(--color-danger-700); }
-
-  @media print {
-    .dash-sidebar, .app-topbar, .sidebar-scrim, .no-print, #toast-root { display: none !important; }
-    .dash-shell { margin-left: 0 !important; }
-    body { background: #fff; }
-    .dash-main { padding: 0; max-width: none; }
-    .card, .em-hero, .em-blood { break-inside: avoid; }
-  }
-</style>
+<link rel="stylesheet" href="/css/emergency.css">
 </head>
 <body>
 <script src="/js/icons.js"></script>
 <script src="/js/api.js"></script>
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
+<script src="/js/emergency.js"></script>
 <script src="/js/guard.js" data-role="patient"></script>
 
 <div id="dash-topbar"></div>
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
-  <main class="dash-main" id="em-root"><div class="skeleton" style="height:120px;margin-bottom:var(--space-4);"></div><div class="skeleton" style="height:200px;"></div></main>
+  <main class="dash-main" id="em-root"></main>
 </div>
 
 <script>
-  const { esc, icon } = MB_LAYOUT;
-  let summaryText = '';
-
-  const parseDate = (iso) => { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); };
-  const fmtDate = (iso) => parseDate(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-  const splitList = (s) => String(s || '').split(/[,;\n]+/).map((x) => x.trim()).filter(Boolean);
-  function ageOf(dob) {
-    if (!dob) return null;
-    const d = parseDate(dob); const n = new Date();
-    let a = n.getFullYear() - d.getFullYear();
-    if (n.getMonth() < d.getMonth() || (n.getMonth() === d.getMonth() && n.getDate() < d.getDate())) a -= 1;
-    return a;
-  }
-  const GENDER = { male: 'Male', female: 'Female', other: 'Other' };
-  const none = (what) => `<p class="em-none">No ${what} recorded. <a href="/patient/profile.html">Add in profile</a></p>`;
-
-  MB_LAYOUT.onAuthReady(async (e) => {
+  MB_LAYOUT.onAuthReady((e) => {
     MB_LAYOUT.renderDashboardShell('patient', 'Emergency Connect');
     MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
-    const root = document.getElementById('em-root');
-    try {
-      const [{ profile: p }, medsRes, recRes] = await Promise.all([
-        api.get('/users/me/profile'),
-        api.get('/medications').catch(() => ({ medications: [] })),
-        api.get('/medical-records').catch(() => ({ records: [] })),
-      ]);
-      render(root, p, medsRes.medications || [], recRes.records || []);
-    } catch (err) {
-      root.innerHTML = `<div class="alert alert-danger">Could not load your emergency details. ${esc(err.message)}</div>`;
-    }
+    MB_EMERGENCY.mount(document.getElementById('em-root'));
     MB_LAYOUT.hydrate();
   });
-
-  function render(root, p, allMeds, allRecords) {
-    const today = new Date().toISOString().slice(0, 10);
-    const meds = allMeds.filter((m) => m.is_active && String(m.start_date).slice(0, 10) <= today && (!m.end_date || String(m.end_date).slice(0, 10) >= today));
-    const allergies = splitList(p.allergies);
-    const conditions = splitList(p.chronic_conditions);
-    const records = allRecords.slice(0, 3);
-    const age = ageOf(p.date_of_birth);
-    const pid = `MB-${String(p.id).padStart(6, '0')}`;
-    const initials = MB_LAYOUT.initials(p.full_name);
-
-    const rows = [
-      `Name: ${p.full_name}`,
-      `Patient ID: ${pid}`,
-      age != null ? `Age: ${age} years (DOB ${fmtDate(p.date_of_birth)})` : null,
-      p.gender ? `Gender: ${GENDER[p.gender] || 'Not stated'}` : null,
-      `Blood group: ${p.blood_group || 'Not recorded'}`,
-      `Allergies: ${allergies.length ? allergies.join(', ') : 'None recorded'}`,
-      `Conditions: ${conditions.length ? conditions.join(', ') : 'None recorded'}`,
-      `Current medications: ${meds.length ? meds.map((m) => `${m.medicine_name} (${m.dosage}, ${m.frequency})`).join('; ') : 'None recorded'}`,
-      p.emergency_contact_name ? `Emergency contact: ${p.emergency_contact_name}${p.emergency_contact_phone ? `, ${p.emergency_contact_phone}` : ''}` : 'Emergency contact: Not recorded',
-      p.height_cm || p.weight_kg ? `Height / weight: ${p.height_cm ? `${Number(p.height_cm)} cm` : '-'} / ${p.weight_kg ? `${Number(p.weight_kg)} kg` : '-'}` : null,
-    ].filter(Boolean);
-    summaryText = `EMERGENCY SUMMARY (MediBridge, ${new Date().toLocaleDateString()})\n` + rows.join('\n');
-
-    root.innerHTML = `
-      <section class="em-hero">
-        <div>
-          <h2>${icon('siren', 22)} Emergency Connect</h2>
-          <p>Your critical health details in one place, so doctors and responders can act faster. MediBridge does not dispatch ambulances.</p>
-        </div>
-        <a class="em-call no-print" href="tel:108"><strong>${icon('phone', 16)} Call 108</strong><small>Ambulance, India</small></a>
-      </section>
-
-      <section class="card">
-        <div class="card-header"><h3>${icon('user', 16)} Patient information</h3><a href="/patient/profile.html" class="no-print">Edit in profile</a></div>
-        <div class="em-id">
-          <div class="em-photo">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="">` : esc(initials)}</div>
-          <div class="min-w-0">
-            <h1 class="em-name">${esc(p.full_name)}</h1>
-            <div class="text-sm text-muted">Patient ID <span class="mono">${esc(pid)}</span></div>
-            <div class="em-meta">
-              ${age != null ? `<span>${icon('calendar', 14)}${age} years &middot; DOB ${esc(fmtDate(p.date_of_birth))}</span>` : ''}
-              ${p.gender ? `<span>${icon('user', 14)}${esc(GENDER[p.gender] || 'Not stated')}</span>` : ''}
-              ${p.phone ? `<span>${icon('phone', 14)}${esc(p.phone)}</span>` : ''}
-              ${p.city ? `<span>${icon('mapPin', 14)}${esc(p.city)}</span>` : ''}
-            </div>
-          </div>
-          <div class="em-blood"><div class="l">Blood group</div>${p.blood_group ? `<div class="v">${esc(p.blood_group)}</div>` : '<div class="v unknown">Not recorded</div>'}</div>
-        </div>
-      </section>
-
-      <div class="em-grid">
-        <section class="card em-card is-danger">
-          <h3>${icon('alert', 16)} Allergies <span class="count badge badge-danger badge-plain">${allergies.length} recorded</span></h3>
-          ${allergies.length ? `<ul class="em-list">${allergies.map((a) => `<li><span class="p">${esc(a)}</span></li>`).join('')}</ul>` : none('allergies')}
-        </section>
-
-        <section class="card em-card">
-          <h3>${icon('pill', 16)} Current medications <span class="count badge badge-info badge-plain">${meds.length} active</span></h3>
-          ${meds.length ? `<table class="em-table"><thead><tr><th>Medication</th><th>Dose</th><th>Frequency</th></tr></thead><tbody>${meds.map((m) => `<tr><td>${esc(m.medicine_name)}</td><td>${esc(m.dosage)}</td><td>${esc(m.frequency)}</td></tr>`).join('')}</tbody></table>` : none('active medications')}
-        </section>
-
-        <section class="card em-card">
-          <h3>${icon('heartPulse', 16)} Medical conditions <span class="count badge badge-neutral badge-plain">${conditions.length} recorded</span></h3>
-          ${conditions.length ? `<ul class="em-list">${conditions.map((c) => `<li><span class="p">${esc(c)}</span></li>`).join('')}</ul>` : none('conditions')}
-        </section>
-
-        <section class="card em-card">
-          <h3>${icon('users', 16)} Emergency contact</h3>
-          ${p.emergency_contact_name ? `<div class="em-contact"><div><div class="n">${esc(p.emergency_contact_name)}</div><div class="t">${esc(p.emergency_contact_phone || 'No number recorded')}</div></div>
-            ${p.emergency_contact_phone ? `<a class="btn btn-outline btn-sm no-print" href="tel:${esc(p.emergency_contact_phone.replace(/[^+\d]/g, ''))}">${icon('phone', 14)}Call</a>` : ''}</div>` : none('emergency contact')}
-        </section>
-
-        <section class="card em-card">
-          <h3>${icon('clipboard', 16)} Recent medical records <span class="count badge badge-success badge-plain">${records.length} shown</span></h3>
-          ${records.length ? `<table class="em-table"><thead><tr><th>Date</th><th>Details</th><th>Doctor</th></tr></thead><tbody>${records.map((r) => `<tr><td style="white-space:nowrap;">${esc(fmtDate(r.record_date))}</td><td>${esc(r.diagnosis || 'Consultation')}</td><td>${esc(r.doctor_name || '')}</td></tr>`).join('')}</tbody></table>
-            <p class="text-sm" style="margin:var(--space-3) 0 0;"><a class="no-print" href="/patient/medical-records.html">View all records</a></p>` : none('medical records')}
-        </section>
-
-        <section class="card em-card">
-          <h3>${icon('activity', 16)} Body measurements</h3>
-          ${p.height_cm || p.weight_kg ? `<ul class="em-list">
-            <li><span class="p">Height</span><span>${p.height_cm ? `${Number(p.height_cm)} cm` : 'Not recorded'}</span></li>
-            <li><span class="p">Weight</span><span>${p.weight_kg ? `${Number(p.weight_kg)} kg` : 'Not recorded'}</span></li></ul>` : none('measurements')}
-        </section>
-      </div>
-
-      <section class="card em-summary no-print">
-        <div><h3 class="mb-0" style="margin-bottom:2px;">Emergency summary</h3><p>A short copy of the details above to share with healthcare providers.</p></div>
-        <div class="flex gap-2 flex-wrap">
-          <button type="button" class="btn btn-accent" id="em-print">${icon('fileText', 15)}Print / Save PDF</button>
-          <button type="button" class="btn btn-outline" id="em-copy">${icon('clipboard', 15)}Copy summary</button>
-        </div>
-      </section>
-
-      <div class="em-disclaimer"><strong>Important:</strong> MediBridge does not provide emergency medical services. In a medical emergency call 108 (India) or your local emergency number, or go to the nearest hospital. This card shows only what has been recorded in your profile.</div>`;
-
-    document.getElementById('em-print').addEventListener('click', () => window.print());
-    document.getElementById('em-copy').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(summaryText); toast.success('Summary copied.'); }
-      catch (err) {
-        const ta = document.createElement('textarea'); ta.value = summaryText; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); toast.success('Summary copied.'); } catch (e2) { toast.error('Could not copy. Use Print instead.'); }
-        ta.remove();
-      }
-    });
-  }
 </script>
 </body>
 </html>

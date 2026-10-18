@@ -48,6 +48,7 @@
 
     if (Number(desk.is_home)) {
       main.innerHTML = `
+        ${MB_TRANSFERS.hero('outgoing')}
         <div class="page-head"><div><h2>Transfers</h2><p>${esc(desk.hospital_name)}</p></div></div>
         <div class="tc-layout">
           <section class="card">
@@ -65,6 +66,7 @@
     }
 
     main.innerHTML = `
+      ${MB_TRANSFERS.hero('incoming')}
       <div class="page-head"><div><h2>Incoming</h2><p>${esc(desk.hospital_name)}</p></div></div>
       <div class="stat-grid" id="tc-stats" style="margin-bottom:var(--space-5);"></div>
       <div id="tc-incoming"><div class="skeleton" style="height:140px;"></div></div>`;

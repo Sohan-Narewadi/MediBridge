@@ -38,6 +38,36 @@ const MB_TRANSFERS = (() => {
       el.textContent = minutesLabel(Number(el.dataset.liveMinutes) + extra);
     });
   }, 15000);
+  const initialsOf = (name) => String(name || '?').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+  const refId = (id) => `TC-${String(id).padStart(5, '0')}`;
+
+  // Page header shared by the doctor page and the transfer desk.
+  function hero(kind) {
+    const copy = kind === 'incoming'
+      ? ['The right next hospital.', 'Answer fast, with the facts.', 'Requests from other hospitals arrive with the specialty, urgency and a consent-gated clinical summary, so your team can decide in minutes.', ['Summary on open', 'First to accept wins', 'Every view logged']]
+      : ['The right next hospital.', 'With fewer blind spots.', 'Ranked hospitals, one request to several at once, a clinical summary written for you, and a visible timeline from referral to arrival.', ['Ranked matches', 'Auto handover summary', 'Live acceptance tracking']];
+    return `
+      <section class="tc-hero">
+        <div>
+          <div class="tc-eyebrow">MEDIBRIDGE &middot; TRANSFERCONNECT</div>
+          <h1>${copy[0]}<br><em>${copy[1]}</em></h1>
+          <p>${copy[2]}</p>
+          <div class="tc-pills">${copy[3].map((t) => `<span>&check; ${t}</span>`).join('')}</div>
+        </div>
+        <aside class="tc-hero-card">
+          <div class="tc-orbit" aria-hidden="true">&nearr;</div>
+          <div class="tc-eyebrow">TRANSFER OVERVIEW</div>
+          <strong>One coordinated handover</strong>
+          <small>Referral &rarr; acceptance &rarr; bed reserved &rarr; arrival</small>
+        </aside>
+      </section>
+      <div class="tc-notice"><b>!</b>
+        <div><strong>Urgent transfer?</strong>
+        <p>Also phone the receiving clinical team and arrange emergency transport directly. MediBridge shows listed beds and responses; it does not dispatch an ambulance.</p></div>
+        <span class="badge badge-warning">Verify by phone</span>
+      </div>`;
+  }
+
   const live = (mins) => `<span data-live-minutes="${Number(mins) || 0}">${minutesLabel(mins)}</span>`;
 
   // -------------------------------------------------------------------------
@@ -88,13 +118,22 @@ const MB_TRANSFERS = (() => {
         </section>
 
         <section class="tc-step" id="tc-step2" hidden>
-          <div class="tc-step-head"><h4 class="mb-0">Hospitals</h4><span class="text-sm text-muted">first to accept wins</span></div>
+          <div class="tc-step-head"><h4 class="mb-0">Hospitals</h4><span class="text-sm text-muted">first to accept wins &middot; confirm capacity by phone</span></div>
           <div id="tc-matches"></div>
         </section>
 
         <section class="tc-step" id="tc-step3" hidden>
           <div class="tc-step-head"><h4 class="mb-0">Send</h4><span class="text-sm text-muted">auto-written summary</span></div>
-          <details class="tc-sum"><summary>Preview what they will see</summary><pre class="tc-summary" id="tc-summary">Generating summary...</pre></details>
+          <div class="tc-handover">
+            <div class="tc-eyebrow">INCLUDED IN THE HANDOVER</div>
+            <ul>
+              <li><b>Reason and urgency</b><small>The line you wrote above</small></li>
+              <li><b>Diagnoses, vitals and history</b><small>Latest record and admission details</small></li>
+              <li><b>Medicines and allergies</b><small>Active medicines and recorded allergies</small></li>
+              <li><b>Identity held back until opened</b><small>Receiving desks see initials, age and sex first; every view is logged</small></li>
+            </ul>
+          </div>
+          <details class="tc-sum"><summary>Preview exactly what they will see</summary><pre class="tc-summary" id="tc-summary">Generating summary...</pre></details>
           <div class="field">
             <label class="tc-check"><input type="checkbox" id="tc-consent"> Patient or guardian consents to sharing</label>
           </div>
@@ -181,15 +220,14 @@ const MB_TRANSFERS = (() => {
           return;
         }
         $('tc-matches').innerHTML = matches.map((m, i) => `
-          <label class="tc-match ${m.score < 40 ? 'tc-match-weak' : ''}">
+          <label class="tc-facility ${m.score < 40 ? 'tc-match-weak' : ''}">
             <input type="checkbox" class="tc-match-pick" value="${m.hospital_id}" ${i < 3 && m.score >= 40 ? 'checked' : ''}>
-            <div class="tc-match-body">
-              <div class="flex items-center justify-between gap-3">
-                <strong>${esc(m.name)}</strong>
-                <span class="tc-score">${m.score}</span>
-              </div>
-              <div class="tc-chips">${m.reasons.slice(0, 3).map((r) => `<span class="badge badge-plain">${esc(r)}</span>`).join('')}</div>
+            <div class="tc-logo ${i % 2 ? 'alt' : ''}">${esc(initialsOf(m.name))}</div>
+            <div class="tc-facility-info">
+              <strong>${esc(m.name)}</strong> ${i === 0 && m.score >= 40 ? badge('badge-success', 'Best match') : ''}
+              <div class="tc-tags">${m.reasons.slice(0, 4).map((r) => `<span>${esc(r)}</span>`).join('')}</div>
             </div>
+            <div class="tc-score-box"><span class="tc-score">${m.score}</span><small>of 100</small></div>
           </label>`).join('');
         root.querySelectorAll('.tc-match-pick').forEach((c) => c.addEventListener('change', syncSend));
         $('tc-step3').hidden = false;
@@ -239,6 +277,35 @@ const MB_TRANSFERS = (() => {
     return '';
   }
 
+  // Four-step journey derived from the request and its offers.
+  function journey(r) {
+    const total = r.offers.length;
+    const answered = r.offers.filter((o) => o.responded_at).length;
+    const st = r.status;
+    const idx = st === 'open' ? 1 : st === 'accepted' ? 3 : st === 'completed' ? 4 : 1;
+    const steps = [
+      ['Request sent', `${total} hospital${total === 1 ? '' : 's'} asked`],
+      ['Receiving review', st === 'cancelled' ? 'Cancelled' : `${answered} of ${total} replied`],
+      ['Accepted', r.accepted_hospital ? esc(r.accepted_hospital) : 'Not yet'],
+      ['Transfer complete', st === 'completed' ? 'Patient moved' : 'Not started'],
+    ];
+    return `<div class="tc-journey">${steps.map(([t, sub], i) => {
+      const cls = st === 'cancelled' ? (i === 0 ? 'done' : '') : i < idx ? 'done' : i === idx ? 'active' : '';
+      return `<div class="tc-step-j ${cls}"><b>${cls === 'done' ? '&check;' : i + 1}</b><strong>${t}</strong><small>${sub}</small></div>`;
+    }).join('')}</div>`;
+  }
+
+  function activity(r) {
+    const ev = [`<div><b>Request created</b><p>${esc(r.patient_name)} &middot; ${esc(r.specialization)} &middot; consent recorded</p><small>${minutesLabel(r.minutes_ago)} ago</small></div>`];
+    r.offers.filter((o) => o.responded_at).forEach((o) => {
+      ev.push(`<div><b>${esc(o.hospital_name)} ${o.status === 'accepted' ? 'accepted' : 'declined'}</b>${o.response_note ? `<p>&ldquo;${esc(o.response_note)}&rdquo;</p>` : ''}<small>${minutesLabel(o.response_minutes)} after sending</small></div>`);
+    });
+    if (r.status === 'open') ev.push('<div><b>Waiting for responses</b><p>First hospital to accept wins; the others are stood down.</p><small>Live</small></div>');
+    if (r.status === 'completed') ev.push('<div><b>Transfer completed</b><p>Admission marked as transferred.</p><small>Closed</small></div>');
+    if (r.status === 'cancelled') ev.push('<div><b>Request cancelled</b><p>Hospitals that were asked were told.</p><small>Closed</small></div>');
+    return `<div class="tc-activity">${ev.join('')}</div>`;
+  }
+
   function renderOutgoing(root, { emptyText = 'None' } = {}) {
     let filter = 'active';
     root.innerHTML = `
@@ -269,27 +336,32 @@ const MB_TRANSFERS = (() => {
           const [cls, label] = REQUEST_STATUS[r.status] || ['badge-neutral', r.status];
           return `
           <article class="card tc-request">
-            <div class="flex items-center justify-between gap-3" style="flex-wrap:wrap;">
-              <div>
-                <h4 class="mb-0">${esc(r.patient_name)} <span class="text-muted text-sm">&middot; ${esc(r.specialization)}${r.needs_icu ? ' &middot; ICU' : ''}</span></h4>
-                <div class="text-sm text-muted">${minutesLabel(r.minutes_ago)} ago</div>
+            <div class="tc-patient">
+              <div class="tc-avatar">${esc(initialsOf(r.patient_name))}</div>
+              <div class="tc-patient-main">
+                <h4 class="mb-0">${esc(r.patient_name)}</h4>
+                <div class="text-sm text-muted">${refId(r.id)} &middot; ${esc(r.specialization)}${r.needs_icu ? ' &middot; ICU' : ''} &middot; sent ${minutesLabel(r.minutes_ago)} ago</div>
               </div>
-              <div class="flex items-center gap-2">${urgencyBadge(r.urgency)} ${badge(cls, label)}</div>
+              <div class="tc-patient-badges">${urgencyBadge(r.urgency)} ${badge(cls, label)}</div>
             </div>
-            ${r.status === 'accepted' ? `<div class="alert alert-success" style="margin:var(--space-3) 0 0;">${esc(r.accepted_hospital)} accepted.</div>` : ''}
+            ${journey(r)}
+            ${r.status === 'accepted' ? `<div class="alert alert-success" style="margin:var(--space-3) 0 0;">${esc(r.accepted_hospital)} accepted. Confirm the bed and transport by phone.</div>` : ''}
+            <div class="tc-eyebrow" style="margin-top:var(--space-4);">RECEIVING FACILITIES</div>
             <ul class="tc-offers">
               ${r.offers.map((o) => {
                 const shownStatus = o.status === 'pending' && r.status !== 'open' ? 'withdrawn' : o.status;
                 const [oc, ol] = OFFER_STATUS[shownStatus] || ['badge-neutral', shownStatus];
                 return `<li>
-                  <div><strong class="text-sm">${esc(o.hospital_name)}</strong> ${o.response_note ? `<div class="text-sm text-muted">&ldquo;${esc(o.response_note)}&rdquo;</div>` : ''}</div>
+                  <div class="tc-logo sm">${esc(initialsOf(o.hospital_name))}</div>
+                  <div class="tc-offer-main"><strong class="text-sm">${esc(o.hospital_name)}</strong> ${o.response_note ? `<div class="text-sm text-muted">&ldquo;${esc(o.response_note)}&rdquo;</div>` : ''}</div>
                   <div class="flex items-center gap-2"><span class="text-sm text-muted">${offerTiming(o, r.status)}</span>${badge(oc, ol)}</div>
                 </li>`;
               }).join('')}
             </ul>
+            <details class="tc-sum"><summary>Activity log</summary>${activity(r)}</details>
             ${['open', 'accepted'].includes(r.status) ? `
             <div class="flex gap-2" style="margin-top:var(--space-3);">
-              ${r.status === 'accepted' ? `<button class="btn btn-primary btn-sm" data-act="complete" data-id="${r.id}">Complete</button>` : ''}
+              ${r.status === 'accepted' ? `<button class="btn btn-primary btn-sm" data-act="complete" data-id="${r.id}">Mark transfer complete</button>` : ''}
               <button class="btn btn-ghost btn-sm" data-act="cancel" data-id="${r.id}">Cancel</button>
             </div>` : ''}
           </article>`;
@@ -343,7 +415,10 @@ const MB_TRANSFERS = (() => {
               <div class="flex items-center gap-2">${urgencyBadge(o.urgency)} <strong>${esc(o.specialization)}</strong>${o.needs_icu ? ' ' + badge('badge-danger', 'ICU bed') : ''}</div>
               <span class="text-sm">Waiting <strong>${live(o.minutes_waiting)}</strong></span>
             </div>
-            <p class="mb-0" style="margin-top:var(--space-2);">${esc(o.patient_initials)}, ${o.patient_age ?? '?'}y ${esc(o.patient_gender)} &middot; from ${esc(o.from_hospital)}</p>
+            <div class="tc-patient" style="margin-top:var(--space-3);">
+              <div class="tc-avatar">${esc(o.patient_initials)}</div>
+              <div class="tc-patient-main"><strong>${esc(o.patient_initials)}, ${o.patient_age ?? '?'}y ${esc(o.patient_gender)}</strong><div class="text-sm text-muted">from ${esc(o.from_hospital)}</div></div>
+            </div>
             <p class="text-sm text-muted">${esc(o.reason)}</p>
             <button class="btn btn-primary btn-sm" data-open="${o.request_id}">Open</button>
           </article>`).join('')
@@ -392,7 +467,7 @@ const MB_TRANSFERS = (() => {
               ${urgencyBadge(r.urgency)} ${r.needs_icu ? badge('badge-danger', 'ICU bed required') : ''}
               <span class="text-sm text-muted">Sent ${minutesLabel(r.minutes_ago)} ago by ${esc(r.requested_by_name || 'care team')}</span>
             </div>
-            <p class="text-sm text-muted" style="display:flex;gap:.4rem;align-items:center;">Shared with consent · this view is logged</p>
+            <div class="tc-notice tc-notice-sm"><b>i</b><div><p>Shared with the patient's consent and limited to what the transfer needs. Opening this view is logged. Confirm bed and transport with the sending team by phone.</p></div></div>
             <pre class="tc-summary">${esc(r.clinical_summary)}</pre>
             ${canRespond ? `
               <div class="field">
@@ -431,5 +506,5 @@ const MB_TRANSFERS = (() => {
     }
   }
 
-  return { esc, renderWizard, renderOutgoing, renderIncoming, minutesLabel };
+  return { esc, hero, renderWizard, renderOutgoing, renderIncoming, minutesLabel };
 })();

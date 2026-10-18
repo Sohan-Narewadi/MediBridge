@@ -18,7 +18,7 @@
 <div class="dash-shell">
   <div id="dash-sidebar"></div>
   <main class="dash-main">
-    <div class="page-head"><div><h2>TransferConnect</h2></div></div>
+    <div id="tc-hero"></div>
 
     <div class="tc-layout">
       <section class="card">
@@ -38,6 +38,7 @@
   document.addEventListener('mb:auth-ready', (e) => {
     MB_LAYOUT.renderDashboardShell('doctor', 'TransferConnect');
     MB_LAYOUT.renderUserMenu(e.detail, { showDashboardLink: false });
+    document.getElementById('tc-hero').innerHTML = MB_TRANSFERS.hero('outgoing');
     const outgoing = MB_TRANSFERS.renderOutgoing(document.getElementById('tc-outgoing'), {
       emptyText: 'None active',
     });
