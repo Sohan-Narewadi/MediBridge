@@ -26,6 +26,9 @@
 <div id="site-header"></div>
 
 <div class="container section-tight">
+  <a id="my-card" href="/patient/emergency.html" class="card card-interactive flex items-center justify-between gap-3" style="text-decoration:none; color:inherit; margin-bottom:var(--space-4);" hidden>
+    <span><strong>Your emergency card</strong><br><span class="text-sm text-muted">Blood group, allergies, medicines and emergency contact</span></span><span class="btn btn-primary btn-sm">Open</span>
+  </a>
   <div class="sos">
     <div class="sos-label">Life-threatening emergency?</div>
     <div class="sos-numbers">
@@ -66,5 +69,8 @@
 <script src="/js/toast.js"></script>
 <script src="/js/layout.js"></script>
 <script src="/js/nav.js"></script>
+<script>
+  api.get('/auth/me').then(({ user }) => { if (user.role === 'patient') document.getElementById('my-card').hidden = false; }).catch(() => {});
+</script>
 </body>
 </html>

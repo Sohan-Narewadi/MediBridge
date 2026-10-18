@@ -9,7 +9,7 @@ patient is waiting on.
 
 It connects **patients**, **doctors**, **hospital department staff** and **administrators**, built
 on real appointment booking, medical records, prescriptions, medication tracking and a personal
-**Care Score**. It is a college full-stack project: Node.js/Express/MySQL backend and a vanilla
+**Care Score**. It is a college full-stack project: Node.js/Express/MongoDB backend and a vanilla
 HTML/CSS/JavaScript multi-page frontend with no framework, so the engineering is directly visible.
 
 ### What's new and why (v2)
@@ -55,7 +55,7 @@ secure system for discovery, scheduling, records and medication adherence.
 - **★ Care Score (signature feature)**: a 0–100 score blending medication adherence (40%), checkup recency (35%) and follow-up completion (25%) — computed live from real data with a visible breakdown, plus a unified Health Timeline merging appointments, records and medications chronologically.
 - **Admin dashboard**: platform stats, charts (status breakdown, specialization distribution, user growth), patient/doctor management (search, pagination, activate/deactivate, verify), specialization & resource CRUD, reported-issue moderation, and a system audit log.
 - **Healthcare resources library**: general educational articles across preventive care, nutrition, mental wellness, first aid, healthy lifestyle and emergency guidance — explicitly non-diagnostic.
-- **Security**: bcrypt password hashing, JWT in an httpOnly cookie, role-based middleware, parameterized SQL everywhere, centralized input validation and error handling.
+- **Security**: bcrypt password hashing, JWT in an httpOnly cookie, role-based middleware, schema-validated Mongoose models, injection-safe queries, centralized input validation and error handling.
 - **UX details**: loading skeletons, empty states, toasts, modals, confirmation prompts, a real 404 page and an Unauthorized page, responsive layout down to ~360px.
 
 ## 4. Technology stack
@@ -64,7 +64,7 @@ secure system for discovery, scheduling, records and medication adherence.
 |---|---|
 | Frontend | HTML5, CSS3 (custom design system, no framework), vanilla JavaScript, Chart.js, Leaflet/OpenStreetMap |
 | Backend | Node.js, Express.js, REST API |
-| Database | MySQL (`mysql2/promise`), parameterized queries |
+| Database | MongoDB (Mongoose ODM): schema-validated models, indexes, aggregation pipelines |
 | Auth | bcryptjs password hashing, JWT (httpOnly cookie), role-based middleware |
 | Validation | express-validator |
 
@@ -79,10 +79,12 @@ medibridge/
 │   ├── middleware/            auth (JWT + role guard), validation, error handling
 │   └── utils/                 slot-builder, Care Score algorithm, JWT helpers, ApiError
 ├── database/
-│   ├── schema.sql             Full normalized schema (15 tables, FKs, indexes)
-│   ├── db.js                  Shared MySQL connection pool
-│   ├── migrate.js             Applies schema.sql  → `npm run db:create`
-│   └── seed.js                Realistic fictional demo data → `npm run db:seed`
+│   ├── db.js                  MongoDB connection (cached, reused by app, seeds and serverless)
+│   ├── store.js               Mongoose models for every collection + query/date helpers
+│   ├── migrate.js             Creates collections and indexes → `npm run db:create`
+│   ├── seed.js                Core fictional demo data → `npm run db:seed`
+│   ├── seed_v2.js             Hospitals, staff, discharge, transfers, care plans → `npm run db:v2`
+│   └── seed_demo_extra.js     Extra demo layer (more cases in every state) → `npm run db:demo`
 ├── public/                    Static multi-page frontend
 │   ├── css/main.css           Design system: tokens, buttons, forms, cards, tables, modals...
 │   ├── js/                    api.js (fetch wrapper), layout.js (header/footer/sidebar),
@@ -101,64 +103,76 @@ medibridge/
 ```
 
 **Why this structure:** routes stay thin (path + middleware only), all query/business logic lives
-in controllers, and `database/db.js` is the single place that knows how to connect — so switching
+in controllers, and `database/db.js` plus `database/store.js` are the only places that know about the database — so switching
 databases or adding caching later touches one file. The frontend has no build step: every page is
 a real, addressable `.html` file; shared chrome (header, footer, sidebar) is injected by
 `layout.js` so it never has to be hand-copied across 30+ pages.
 
 ## 6. Database design
 
-15 tables, fully normalized: `users` (shared identity + role) → `patients` / `doctors` (1:1
-role profiles) → `specializations`, `doctor_availability`, `appointments`, `medical_records` →
-`prescriptions` → `medications` → `medication_logs`, plus `reviews`, `notifications`,
-`healthcare_resources`, `reported_issues`, `audit_logs`. Every foreign key is enforced, and the
-`appointments` table has a `UNIQUE (doctor_id, appointment_date, start_time)` constraint so a
-double-booking is rejected at the database level even if application logic is bypassed. See
-`database/schema.sql` for full column definitions, keys and indexes.
+MongoDB, one collection per entity, with the same field names and numeric `id`s the API has
+always returned, so the frontend did not need to change. `users` holds shared identity and role;
+`patients`, `doctors` and `staff` are one-to-one role profiles keyed by `user_id`. Around them:
+`specializations`, `doctor_availability`, `appointments`, `medical_records`, `prescriptions`,
+`medications`, `medication_logs`, `reviews`, `notifications`, `healthcare_resources`,
+`reported_issues`, `audit_logs`, and the care-handoff collections (`hospitals`,
+`hospital_capabilities`, `admissions`, `discharge_tasks`, `discharge_events`, `transfer_requests`,
+`transfer_offers`, `intake_forms`, `care_plans`, `commitments`).
+
+How it maps from a relational design:
+- **Ids:** a `counters` collection hands out auto-incrementing integer ids with an atomic `$inc`.
+- **Relationships:** documents reference each other by id. Lists that need names (for example an
+  appointment's doctor) fetch the related documents in one batched query; the doctor directory and
+  admin tables use `$lookup` aggregation pipelines.
+- **Dates:** calendar dates and times are `'YYYY-MM-DD'` / `'HH:MM:SS'` strings (they sort correctly);
+  timestamps are real `Date`s, serialised as local `'YYYY-MM-DD HH:MM:SS'` strings.
+- **Constraints:** unique indexes replace unique keys. `appointments` has a unique index on
+  `(doctor_id, appointment_date, start_time)`, so a double-booking is rejected by the database even
+  if application logic is bypassed. Other unique indexes cover reviews per appointment, medication
+  logs per day, and one offer per hospital per transfer.
+- **Concurrency without transactions:** a standalone MongoDB server has no multi-document
+  transactions, so races are settled by single atomic conditional updates. For example, when two
+  hospitals accept the same transfer at once, the bed reservation and the request claim are each a
+  conditional update, so exactly one hospital wins and the other bed is never taken.
+
+See `database/store.js` for every field, type, default and index.
 
 ## 7. Getting started
 
 ### Prerequisites
 - Node.js 18+ and npm (already verified on this machine: Node v24, npm 11)
-- A running MySQL server (8.x recommended) reachable from this machine
+- A running MongoDB server (local `mongod`, or a free MongoDB Atlas cluster)
 
-### Install MySQL (if you don't already have it)
-```powershell
-# In an elevated (Run as Administrator) PowerShell window:
-choco install mysql -y
-# then create the app's database user (optional but recommended over using root):
-mysql -u root
-```
-```sql
-CREATE DATABASE medibridge;
-CREATE USER 'medibridge_app'@'localhost' IDENTIFIED BY 'choose-a-password';
-GRANT ALL PRIVILEGES ON medibridge.* TO 'medibridge_app'@'localhost';
-FLUSH PRIVILEGES;
-```
+### MongoDB
+Install MongoDB Community Server and make sure it is running (on Windows it normally runs as a
+service on `mongodb://127.0.0.1:27017`). Nothing needs creating by hand: the `medibridge`
+database and its collections are created by the setup script.
 
 ### Setup
 ```bash
 npm install
-cp .env.example .env   # then edit .env with your real DB credentials
-npm run setup          # creates the schema AND seeds realistic demo data (incl. v2 modules)
+cp .env.example .env   # then set JWT_SECRET (and MONGO_URI if MongoDB is not on this machine)
+npm run setup          # creates collections + indexes AND seeds realistic demo data
 npm start               # http://localhost:4000
 ```
-`npm run setup` also runs `db:v2` (applies `database/migrate_v2.sql` and seeds hospitals, staff,
-admissions with live discharge tasks, transfer requests, pre-visit intakes and care plans).
+`npm run setup` runs `db:create` (collections and indexes), `db:seed` (24 doctors, 15 patients,
+about 60 days of appointment history, medical records, prescriptions, medication logs, reviews,
+notifications, resources, reported issues and audit entries) and `db:v2` (hospitals, staff logins,
+inpatients and discharge cases in every state, transfer requests in every status, pre-visit
+intakes and care plans). All data is fictional.
+
 **Demo data is dated relative to the day you seed it**, so run `npm run setup` again on the day
-of a demo to get "upcoming" appointments and "cleared 3 hours ago" admissions. `npm run db:v2`
-alone resets just the v2 modules.
-`npm run setup` runs `db:create` (applies `database/schema.sql`) then `db:seed` (populates 24
-doctors, 15 patients, ~45 days of appointment history, medical records, prescriptions, medication
-logs, reviews, notifications, resources, reported issues and audit entries — all fictional).
-Re-running `npm run db:seed` truncates and regenerates the same dataset deterministically (a
-seeded PRNG keeps it consistent across runs).
+of a demo to get "upcoming" appointments and "cleared 3 hours ago" admissions.
+- `npm run db:seed` wipes the `medibridge` database and regenerates the core data deterministically
+  (a seeded PRNG keeps it consistent). Run `npm run db:v2` after it.
+- `npm run db:v2` resets only the care-handoff modules and re-adds the extra demo layer.
+- `npm run db:demo` adds just the extra demo layer (it skips itself if it is already present).
 
 ### Environment variables (`.env`)
 | Variable | Purpose |
 |---|---|
 | `PORT` | Port the Express server listens on (default 4000) |
-| `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL connection |
+| `MONGO_URI` | MongoDB connection string (default `mongodb://127.0.0.1:27017/medibridge`) |
 | `JWT_SECRET` | Secret used to sign session tokens — set this to a long random string |
 | `JWT_EXPIRES_IN` | Session lifetime (default `7d`) |
 | `CLIENT_ORIGIN` | Allowed CORS origin (default: same origin) |
@@ -209,7 +223,7 @@ code and never leak raw database errors or stack traces to the client.
 
 ## 10. The Care Score — how it's computed
 
-See `server/utils/careScore.js`. It blends three signals, each a real SQL aggregate over the
+See `server/utils/careScore.js`. It blends three signals, each computed from real queries over the
 patient's own data:
 - **Medication adherence (40%)** — % of logged doses marked "taken" in the last 30 days.
 - **Checkup recency (35%)** — 100 if the last completed visit was within 90 days, decaying
@@ -233,21 +247,19 @@ plan, and the full breakdown is always shown alongside the number.
 
 MediBridge can be deployed as a single Vercel project — the whole Express app (API + static
 pages) runs as one serverless function via `api/index.js` and `vercel.json`. Vercel does not
-host MySQL itself, so you need a separate free MySQL-compatible database (Aiven, Railway,
-Clever Cloud, or PlanetScale all have free tiers).
+host a database, so use a free MongoDB Atlas cluster (cloud.mongodb.com).
 
-1. **Provision a MySQL database** with one of the hosts above and note its host, port, user,
-   password and database name.
-2. **Apply the schema and seed data** against that remote database — from your machine, point
-   `.env` at the remote host's credentials temporarily and run:
+1. **Create an Atlas cluster**, add a database user, allow network access, and copy the
+   connection string (it looks like `mongodb+srv://user:password@cluster.mongodb.net/medibridge`).
+2. **Create the collections and seed data** in Atlas — from your machine, point `MONGO_URI` in
+   `.env` at the Atlas string temporarily and run:
    ```bash
    npm run setup
    ```
 3. **Push this repo to GitHub** (if not already).
 4. **Import the repo into Vercel** (vercel.com → Add New Project → import from GitHub).
 5. **Set environment variables** in the Vercel project settings (Settings → Environment
-   Variables) — the same keys as `.env.example`: `DB_HOST`, `DB_PORT`, `DB_USER`,
-   `DB_PASSWORD`, `DB_NAME`, `JWT_SECRET`, `JWT_EXPIRES_IN`. Leave `PORT` unset (Vercel manages
+   Variables) — the same keys as `.env.example`: `MONGO_URI`, `JWT_SECRET`, `JWT_EXPIRES_IN`. Leave `PORT` unset (Vercel manages
    this). `NODE_ENV` is set to `production` by Vercel automatically, which makes auth cookies
    `secure` — this requires the site be served over HTTPS, which Vercel does by default.
 6. **Deploy.** Vercel builds `api/index.js` (which re-exports `server/app.js`) and routes every
@@ -268,7 +280,7 @@ for browsing the design only, not a functional demo.
 
 ## 13. Quality checklist (self-assessment)
 
-- ✅ Real Express + MySQL backend with parameterized queries throughout.
+- ✅ Real Express + MongoDB backend (Mongoose models, indexes, aggregation pipelines).
 - ✅ Role-based authentication (bcrypt + JWT) and authorization enforced server-side.
 - ✅ Full CRUD across appointments, medical records, medications, specializations, resources, users.
 - ✅ Appointment slot computation and conflict prevention enforced in the backend and the database.

@@ -1,0 +1,49 @@
+- generic [active] [ref=f1e1]:
+  - banner [ref=f1e3]:
+    - generic [ref=f1e4]:
+      - generic [ref=f1e5]: Doctor
+      - generic [ref=f1e6]: /
+      - generic [ref=f1e7]: Inpatients
+    - generic [ref=f1e8]:
+      - generic [ref=f1e9]: Sun, Oct 18
+      - link "Notifications (5 unread)" [ref=f1e10] [cursor=pointer]:
+        - /url: /doctor/notifications.html
+      - link "AI" [ref=f1e16] [cursor=pointer]:
+        - /url: /doctor/profile.html
+  - generic [ref=f1e17]:
+    - complementary [ref=f1e18]:
+      - link "MediBridge home" [ref=f1e20] [cursor=pointer]:
+        - /url: /doctor/dashboard.html
+        - text: MediBridge
+      - navigation "Doctor navigation" [ref=f1e26]:
+        - generic [ref=f1e27]: Today
+        - link "Dashboard" [ref=f1e28] [cursor=pointer]:
+          - /url: /doctor/dashboard.html
+        - link "Appointments" [ref=f1e35] [cursor=pointer]:
+          - /url: /doctor/appointments.html
+        - generic [ref=f1e40]: Patients
+        - link "My Patients" [ref=f1e41] [cursor=pointer]:
+          - /url: /doctor/patients.html
+        - link "Inpatients & Discharge" [ref=f1e47] [cursor=pointer]:
+          - /url: /doctor/inpatients.html
+        - link "TransferConnect" [ref=f1e51] [cursor=pointer]:
+          - /url: /doctor/transfers.html
+        - generic [ref=f1e55]: Practice
+        - link "Availability" [ref=f1e56] [cursor=pointer]:
+          - /url: /doctor/availability.html
+        - link "Notifications" [ref=f1e61] [cursor=pointer]:
+          - /url: /doctor/notifications.html
+        - link "Profile" [ref=f1e66] [cursor=pointer]:
+          - /url: /doctor/profile.html
+      - generic [ref=f1e71]:
+        - generic [ref=f1e72]: AI
+        - generic [ref=f1e73]:
+          - generic "Dr. Ananya Iyer" [ref=f1e74]
+          - generic [ref=f1e75]: Doctor
+        - button "Log out" [ref=f1e76] [cursor=pointer]
+    - main [ref=f1e79]:
+      - heading "Inpatients & Discharge" [level=2] [ref=f1e82]
+      - generic [ref=f1e84]:
+        - button "Waiting to leave" [ref=f1e85] [cursor=pointer]
+        - button "In treatment" [ref=f1e86] [cursor=pointer]
+        - button "Discharged" [ref=f1e87] [cursor=pointer]

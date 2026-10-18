@@ -1,0 +1,191 @@
+- generic [active] [ref=f2e1]:
+  - banner [ref=f2e3]:
+    - generic [ref=f2e4]:
+      - generic [ref=f2e5]: Doctor
+      - generic [ref=f2e6]: /
+      - generic [ref=f2e7]: TransferConnect
+    - generic [ref=f2e8]:
+      - generic [ref=f2e9]: Sun, Oct 18
+      - link "Notifications (5 unread)" [ref=f2e10] [cursor=pointer]:
+        - /url: /doctor/notifications.html
+      - link "AI" [ref=f2e16] [cursor=pointer]:
+        - /url: /doctor/profile.html
+  - generic [ref=f2e17]:
+    - complementary [ref=f2e18]:
+      - link "MediBridge home" [ref=f2e20] [cursor=pointer]:
+        - /url: /doctor/dashboard.html
+        - text: MediBridge
+      - navigation "Doctor navigation" [ref=f2e26]:
+        - generic [ref=f2e27]: Today
+        - link "Dashboard" [ref=f2e28] [cursor=pointer]:
+          - /url: /doctor/dashboard.html
+        - link "Appointments" [ref=f2e35] [cursor=pointer]:
+          - /url: /doctor/appointments.html
+        - generic [ref=f2e40]: Patients
+        - link "My Patients" [ref=f2e41] [cursor=pointer]:
+          - /url: /doctor/patients.html
+        - link "Inpatients & Discharge" [ref=f2e47] [cursor=pointer]:
+          - /url: /doctor/inpatients.html
+        - link "TransferConnect" [ref=f2e51] [cursor=pointer]:
+          - /url: /doctor/transfers.html
+        - generic [ref=f2e55]: Practice
+        - link "Availability" [ref=f2e56] [cursor=pointer]:
+          - /url: /doctor/availability.html
+        - link "Notifications" [ref=f2e61] [cursor=pointer]:
+          - /url: /doctor/notifications.html
+        - link "Profile" [ref=f2e66] [cursor=pointer]:
+          - /url: /doctor/profile.html
+      - generic [ref=f2e71]:
+        - generic [ref=f2e72]: AI
+        - generic [ref=f2e73]:
+          - generic "Dr. Ananya Iyer" [ref=f2e74]
+          - generic [ref=f2e75]: Doctor
+        - button "Log out" [ref=f2e76] [cursor=pointer]
+    - main [ref=f2e79]:
+      - heading "TransferConnect" [level=2] [ref=f2e82]
+      - generic [ref=f2e83]:
+        - generic [ref=f2e84]:
+          - heading "New" [level=3] [ref=f2e86]
+          - generic [ref=f2e87]:
+            - generic [ref=f2e88]:
+              - generic [ref=f2e89]: 1 Patient
+              - generic [ref=f2e90]: 2 Hospitals
+              - generic [ref=f2e91]: 3 Send
+            - generic [ref=f2e93]:
+              - heading "Patient" [level=4] [ref=f2e95]
+              - generic [ref=f2e96]:
+                - generic [ref=f2e97]:
+                  - generic [ref=f2e98]: Patient
+                  - combobox "Patient" [ref=f2e99]:
+                    - option "Select a patient" [selected]
+                    - option "Tanvi Reddy, 35y — admitted, General Ward G-06"
+                    - option "Kabir Khan, 47y — admitted, ICU ICU-2"
+                    - option "Arnav Pillai, 43y — admitted, ICU ICU-4"
+                    - option "Myra Joshi, 29y — admitted, Orthopaedic Ward O-02"
+                    - option "Aarav Sharma, 34y — admitted, Cardiac Ward C-12"
+                    - option "Saanvi Iyer, 33y — admitted, Medical Ward M-03"
+                    - option "Dhruv Malhotra, 51y — admitted, Cardiac Ward C-08"
+                    - option "Ananya Das, 27y — outpatient"
+                    - option "Anika Gupta, 23y — outpatient"
+                    - option "Rohan Chatterjee, 36y — outpatient"
+                - generic [ref=f2e100]:
+                  - generic [ref=f2e101]: Care needed
+                  - combobox "Care needed" [ref=f2e102]:
+                    - option "Select specialty" [selected]
+                    - option "Cardiology"
+                    - option "Dentistry"
+                    - option "Dermatology"
+                    - option "Endocrinology"
+                    - option "ENT"
+                    - option "Gastroenterology"
+                    - option "General Medicine"
+                    - option "Gynecology"
+                    - option "Neurology"
+                    - option "Ophthalmology"
+                    - option "Orthopedics"
+                    - option "Pediatrics"
+                    - option "Psychiatry"
+                    - option "Pulmonology"
+                    - option "Urology"
+              - generic [ref=f2e103]:
+                - generic [ref=f2e104]:
+                  - generic [ref=f2e105]: Urgency
+                  - generic [ref=f2e106]:
+                    - button "Routine" [ref=f2e107] [cursor=pointer]
+                    - button "Urgent" [ref=f2e108] [cursor=pointer]
+                    - button "Critical" [ref=f2e109] [cursor=pointer]
+                - generic [ref=f2e111] [cursor=pointer]:
+                  - checkbox "ICU bed required" [ref=f2e112]
+                  - text: ICU bed required
+              - generic [ref=f2e113]:
+                - generic [ref=f2e114]: Reason
+                - textbox "Reason" [ref=f2e115]:
+                  - /placeholder: One line, e.g. needs neurosurgery
+              - button "Find hospitals" [ref=f2e116] [cursor=pointer]
+        - generic [ref=f2e117]:
+          - heading "Requests" [level=3] [ref=f2e118]
+          - generic [ref=f2e119]:
+            - generic [ref=f2e121]:
+              - button "Active" [ref=f2e122] [cursor=pointer]
+              - button "History" [ref=f2e123] [cursor=pointer]
+            - generic [ref=f2e124]:
+              - article [ref=f2e125]:
+                - generic [ref=f2e126]:
+                  - generic [ref=f2e127]:
+                    - heading "Myra Joshi · Orthopedics" [level=4] [ref=f2e128]
+                    - generic [ref=f2e129]: 1h 36m ago
+                  - generic [ref=f2e130]:
+                    - generic [ref=f2e131]: urgent
+                    - generic [ref=f2e132]: Awaiting responses
+                - list [ref=f2e133]:
+                  - listitem [ref=f2e134]:
+                    - strong [ref=f2e136]: Cedar Valley Trauma Centre
+                    - generic [ref=f2e137]:
+                      - generic [ref=f2e138]: waiting 1h 36m
+                      - generic [ref=f2e139]: Waiting
+                  - listitem [ref=f2e140]:
+                    - generic [ref=f2e141]:
+                      - strong [ref=f2e142]: St. Agnes Neuro Centre
+                      - generic [ref=f2e143]: “Orthopaedic theatre fully booked until tomorrow”
+                    - generic [ref=f2e144]:
+                      - generic [ref=f2e145]: 30 min
+                      - generic [ref=f2e146]: Declined
+                - button "Cancel" [ref=f2e148] [cursor=pointer]
+              - article [ref=f2e149]:
+                - generic [ref=f2e150]:
+                  - generic [ref=f2e151]:
+                    - heading "Arnav Pillai · Pulmonology · ICU" [level=4] [ref=f2e152]
+                    - generic [ref=f2e153]: 2h 24m ago
+                  - generic [ref=f2e154]:
+                    - generic [ref=f2e155]: critical
+                    - generic [ref=f2e156]: Awaiting responses
+                - list [ref=f2e157]:
+                  - listitem [ref=f2e158]:
+                    - generic [ref=f2e159]:
+                      - strong [ref=f2e160]: Sunrise Heart & Vascular Institute
+                      - generic [ref=f2e161]: “No ICU bed free tonight”
+                    - generic [ref=f2e162]:
+                      - generic [ref=f2e163]: 18 min
+                      - generic [ref=f2e164]: Declined
+                  - listitem [ref=f2e165]:
+                    - generic [ref=f2e166]:
+                      - strong [ref=f2e167]: Lakeview Multispeciality Hospital
+                      - generic [ref=f2e168]: “Pulmonologist off-site until 8am”
+                    - generic [ref=f2e169]:
+                      - generic [ref=f2e170]: 36 min
+                      - generic [ref=f2e171]: Declined
+                  - listitem [ref=f2e172]:
+                    - generic [ref=f2e173]:
+                      - strong [ref=f2e174]: Riverside Children's Hospital
+                      - generic [ref=f2e175]: “Paediatric centre, adult admissions not accepted”
+                    - generic [ref=f2e176]:
+                      - generic [ref=f2e177]: 42 min
+                      - generic [ref=f2e178]: Declined
+                - button "Cancel" [ref=f2e180] [cursor=pointer]
+              - article [ref=f2e181]:
+                - generic [ref=f2e182]:
+                  - generic [ref=f2e183]:
+                    - heading "Kabir Khan · Cardiology · ICU" [level=4] [ref=f2e184]
+                    - generic [ref=f2e185]: 42 min ago
+                  - generic [ref=f2e186]:
+                    - generic [ref=f2e187]: critical
+                    - generic [ref=f2e188]: Accepted
+                - generic [ref=f2e189]: Sunrise Heart & Vascular Institute accepted.
+                - list [ref=f2e190]:
+                  - listitem [ref=f2e191]:
+                    - generic [ref=f2e192]:
+                      - strong [ref=f2e193]: Sunrise Heart & Vascular Institute
+                      - generic [ref=f2e194]: “Cath lab ready, CCU bed 4 reserved. Send ambulance now.”
+                    - generic [ref=f2e195]:
+                      - generic [ref=f2e196]: 18 min
+                      - generic [ref=f2e197]: Accepted
+                  - listitem [ref=f2e198]:
+                    - generic [ref=f2e199]:
+                      - strong [ref=f2e200]: Cedar Valley Trauma Centre
+                      - generic [ref=f2e201]: “No cardiology cover tonight.”
+                    - generic [ref=f2e202]:
+                      - generic [ref=f2e203]: 12 min
+                      - generic [ref=f2e204]: Declined
+                - generic [ref=f2e205]:
+                  - button "Complete" [ref=f2e206] [cursor=pointer]
+                  - button "Cancel" [ref=f2e207] [cursor=pointer]

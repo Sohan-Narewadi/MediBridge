@@ -1,47 +1,41 @@
-const pool = require('../../database/db');
+const { M, find, findOne, insert, update, remove, contains } = require('../../database/store');
 const asyncHandler = require('../utils/asyncHandler');
 const ApiError = require('../utils/ApiError');
 
 const list = asyncHandler(async (req, res) => {
   const { category, q } = req.query;
-  const where = [];
-  const params = [];
-  if (category) { where.push('category = ?'); params.push(category); }
-  if (q) { where.push('(title LIKE ? OR summary LIKE ?)'); params.push(`%${q}%`, `%${q}%`); }
-  const whereClause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const filter = {};
+  if (category) filter.category = category;
+  if (q) filter.$or = [{ title: contains(q) }, { summary: contains(q) }];
 
-  const [rows] = await pool.query(`SELECT id, category, title, summary, image_url, read_mins, created_at FROM healthcare_resources ${whereClause} ORDER BY created_at DESC`, params);
-  const [categories] = await pool.query(`SELECT category, COUNT(*) AS count FROM healthcare_resources GROUP BY category`);
-  res.json({ resources: rows, categories });
+  const [resources, grouped] = await Promise.all([
+    find('healthcare_resources', filter, { sort: { created_at: -1, id: -1 }, select: 'id category title summary image_url read_mins created_at' }),
+    M.healthcare_resources.aggregate([{ $group: { _id: '$category', count: { $sum: 1 } } }, { $sort: { _id: 1 } }]),
+  ]);
+  res.json({ resources, categories: grouped.map((g) => ({ category: g._id, count: g.count })) });
 });
 
 const getById = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(`SELECT * FROM healthcare_resources WHERE id = ?`, [req.params.id]);
-  if (!rows.length) throw new ApiError(404, 'Resource not found.');
-  res.json({ resource: rows[0] });
+  const resource = await findOne('healthcare_resources', { id: Number(req.params.id) });
+  if (!resource) throw new ApiError(404, 'Resource not found.');
+  res.json({ resource });
 });
 
 const create = asyncHandler(async (req, res) => {
   const { category, title, summary, content, imageUrl, readMins } = req.body;
-  const [result] = await pool.query(
-    `INSERT INTO healthcare_resources (category, title, summary, content, image_url, read_mins) VALUES (?, ?, ?, ?, ?, ?)`,
-    [category, title, summary, content, imageUrl || null, readMins || 3]
-  );
-  res.status(201).json({ id: result.insertId });
+  const created = await insert('healthcare_resources', { category, title, summary, content, image_url: imageUrl || null, read_mins: readMins || 3 });
+  res.status(201).json({ id: created.id });
 });
 
-const update = asyncHandler(async (req, res) => {
+const updateResource = asyncHandler(async (req, res) => {
   const { category, title, summary, content, imageUrl, readMins } = req.body;
-  await pool.query(
-    `UPDATE healthcare_resources SET category = ?, title = ?, summary = ?, content = ?, image_url = ?, read_mins = ? WHERE id = ?`,
-    [category, title, summary, content, imageUrl || null, readMins || 3, req.params.id]
-  );
+  await update('healthcare_resources', { id: Number(req.params.id) }, { category, title, summary, content, image_url: imageUrl || null, read_mins: readMins || 3 });
   res.json({ message: 'Resource updated.' });
 });
 
-const remove = asyncHandler(async (req, res) => {
-  await pool.query('DELETE FROM healthcare_resources WHERE id = ?', [req.params.id]);
+const removeResource = asyncHandler(async (req, res) => {
+  await remove('healthcare_resources', { id: Number(req.params.id) });
   res.json({ message: 'Resource deleted.' });
 });
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getById, create, update: updateResource, remove: removeResource };

@@ -1,25 +1,21 @@
-const pool = require('../../database/db');
+const { find, count, update, updateMany } = require('../../database/store');
 const asyncHandler = require('../utils/asyncHandler');
 
 const list = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`,
-    [req.user.id]
-  );
-  const [[{ unread }]] = await pool.query(
-    `SELECT COUNT(*) AS unread FROM notifications WHERE user_id = ? AND is_read = 0`,
-    [req.user.id]
-  );
-  res.json({ notifications: rows, unread });
+  const [notifications, unread] = await Promise.all([
+    find('notifications', { user_id: req.user.id }, { sort: { created_at: -1, id: -1 }, limit: 50 }),
+    count('notifications', { user_id: req.user.id, is_read: 0 }),
+  ]);
+  res.json({ notifications, unread });
 });
 
 const markRead = asyncHandler(async (req, res) => {
-  await pool.query(`UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`, [req.params.id, req.user.id]);
+  await update('notifications', { id: Number(req.params.id), user_id: req.user.id }, { is_read: 1 });
   res.json({ message: 'Marked as read.' });
 });
 
 const markAllRead = asyncHandler(async (req, res) => {
-  await pool.query(`UPDATE notifications SET is_read = 1 WHERE user_id = ?`, [req.user.id]);
+  await updateMany('notifications', { user_id: req.user.id }, { is_read: 1 });
   res.json({ message: 'All notifications marked as read.' });
 });
 

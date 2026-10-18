@@ -1,30 +1,23 @@
-// Runs schema.sql against the configured MySQL server.
+// Creates every collection and index in MongoDB (idempotent, never deletes data).
+// MongoDB needs no schema file: the models in database/store.js are the schema,
+// and this script makes the unique/compound indexes they declare exist.
 // Usage: npm run db:create
-require('dotenv').config();
-const fs = require('fs');
-const path = require('path');
-const mysql = require('mysql2/promise');
-const { getSslConfig } = require('./sslConfig');
+const { connectDb, MONGO_URI } = require('./db');
+const { mongoose, M } = require('./store');
 
-async function migrate() {
-  const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || 'localhost',
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    multipleStatements: true,
-    ssl: getSslConfig(),
-  });
-
-  console.log('Connected. Applying schema.sql ...');
-  await connection.query(sql);
-  console.log('Schema created successfully.');
-  await connection.end();
+async function init() {
+  await connectDb();
+  console.log(`Connected to ${MONGO_URI.replace(/\/\/[^@]*@/, '//***@')}`);
+  for (const [name, model] of Object.entries(M)) {
+    await model.createCollection().catch(() => {});
+    await model.syncIndexes();
+    console.log(`  ${name}`);
+  }
+  console.log('Collections and indexes are ready.');
+  await mongoose.disconnect();
 }
 
-migrate().catch((err) => {
-  console.error('Migration failed:', err.message);
+init().catch((err) => {
+  console.error('Setup failed:', err.message);
   process.exit(1);
 });

@@ -1,0 +1,216 @@
+- generic [ref=e1]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - link "MediBridge home" [ref=e5] [cursor=pointer]:
+        - /url: /index.html
+        - text: MediBridge
+      - navigation [ref=e11]:
+        - link "Home" [ref=e12] [cursor=pointer]:
+          - /url: /index.html
+        - link "Find Doctors" [ref=e13] [cursor=pointer]:
+          - /url: /doctors.html
+        - link "Health Resources" [ref=e14] [cursor=pointer]:
+          - /url: /resources.html
+        - link "Emergency" [ref=e15] [cursor=pointer]:
+          - /url: /emergency.html
+        - link "About" [ref=e16] [cursor=pointer]:
+          - /url: /about.html
+      - generic [ref=e18]:
+        - link "Log in" [ref=e19] [cursor=pointer]:
+          - /url: /auth/login.html
+        - link "Get started" [ref=e20] [cursor=pointer]:
+          - /url: /auth/register.html
+  - generic [ref=e23]:
+    - heading [level=1] [ref=e24]:
+      - text: Care that doesn't fall through
+      - emphasis [ref=e25]: the gaps.
+    - paragraph [ref=e26]: One record that follows the patient everywhere.
+    - search [ref=e27]:
+      - generic [ref=e28]:
+        - generic [ref=e29]: Specialty
+        - button "Specialty Dentistry" [active] [ref=e289] [cursor=pointer]:
+          - generic [ref=e31]: Dentistry
+      - generic [ref=e36]:
+        - generic [ref=e37]: Doctor or condition
+        - textbox "Doctor or condition" [ref=e38]:
+          - /placeholder: e.g. Dr. Rao, back pain
+      - button [ref=e39] [cursor=pointer]
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - generic [ref=e46]: "24"
+        - generic [ref=e47]: Verified doctors
+      - generic [ref=e48]:
+        - generic [ref=e49]: "15"
+        - generic [ref=e50]: Specialties
+      - generic [ref=e51]:
+        - generic [ref=e52]: "21"
+        - generic [ref=e53]: Offer video visits
+  - generic [ref=e55]:
+    - heading "How it works" [level=2] [ref=e58]
+    - list [ref=e59]:
+      - listitem [ref=e60]:
+        - heading "Find a doctor" [level=3] [ref=e61]
+        - paragraph [ref=e62]: Search by specialty or condition.
+      - listitem [ref=e63]:
+        - heading "Book a slot" [level=3] [ref=e64]
+        - paragraph [ref=e65]: Pick a time that works.
+      - listitem [ref=e66]:
+        - heading "Stay on track" [level=3] [ref=e67]
+        - paragraph [ref=e68]: Records and follow-ups in one place.
+  - generic [ref=e70]:
+    - heading "What's inside" [level=2] [ref=e73]
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - heading "Smart Brief" [level=3] [ref=e76]
+        - paragraph [ref=e77]: A ready patient summary before the visit.
+      - generic [ref=e78]:
+        - heading "Discharge Flow" [level=3] [ref=e79]
+        - paragraph [ref=e80]: See which desk is holding a patient.
+      - generic [ref=e81]:
+        - heading "TransferConnect" [level=3] [ref=e82]
+        - paragraph [ref=e83]: One request to the best-matched hospitals.
+      - generic [ref=e84]:
+        - heading "Visit Loop" [level=3] [ref=e85]
+        - paragraph [ref=e86]: A plain plan and checklist after every visit.
+  - generic [ref=e88]:
+    - generic [ref=e89]:
+      - heading "Top-rated doctors" [level=2] [ref=e91]
+      - link [ref=e92] [cursor=pointer]:
+        - /url: /doctors.html
+    - generic [ref=e96]:
+      - link "VR Dr. Vikram Rao Orthopedics 16 yrs experience Banashankari Medical Centre 5.0 (2) Video ₹850" [ref=e97] [cursor=pointer]:
+        - /url: /doctor.html?id=8
+        - generic [ref=e98]:
+          - generic [ref=e99]: VR
+          - generic [ref=e100]:
+            - heading "Dr. Vikram Rao" [level=4] [ref=e101]
+            - generic [ref=e102]: Orthopedics
+        - generic [ref=e103]:
+          - generic [ref=e104]: 16 yrs experience
+          - generic [ref=e108]: Banashankari Medical Centre
+        - generic [ref=e112]:
+          - generic [ref=e113]:
+            - text: "5.0"
+            - generic [ref=e116]: (2)
+          - generic [ref=e117]: Video
+          - generic [ref=e121]: ₹850
+      - link "IV Dr. Ishaan Verma Neurology 15 yrs experience Indiranagar Family Care Centre 5.0 (1) Video ₹1100" [ref=e122] [cursor=pointer]:
+        - /url: /doctor.html?id=9
+        - generic [ref=e123]:
+          - generic [ref=e124]: IV
+          - generic [ref=e125]:
+            - heading "Dr. Ishaan Verma" [level=4] [ref=e126]
+            - generic [ref=e127]: Neurology
+        - generic [ref=e128]:
+          - generic [ref=e129]: 15 yrs experience
+          - generic [ref=e133]: Indiranagar Family Care Centre
+        - generic [ref=e137]:
+          - generic [ref=e138]:
+            - text: "5.0"
+            - generic [ref=e141]: (1)
+          - generic [ref=e142]: Video
+          - generic [ref=e146]: ₹1100
+      - link "SJ Dr. Siddharth Joshi Psychiatry 9 yrs experience Koramangala Health Clinic 5.0 (2) Video ₹700" [ref=e147] [cursor=pointer]:
+        - /url: /doctor.html?id=11
+        - generic [ref=e148]:
+          - generic [ref=e149]: SJ
+          - generic [ref=e150]:
+            - heading "Dr. Siddharth Joshi" [level=4] [ref=e151]
+            - generic [ref=e152]: Psychiatry
+        - generic [ref=e153]:
+          - generic [ref=e154]: 9 yrs experience
+          - generic [ref=e158]: Koramangala Health Clinic
+        - generic [ref=e162]:
+          - generic [ref=e163]:
+            - text: "5.0"
+            - generic [ref=e166]: (2)
+          - generic [ref=e167]: Video
+          - generic [ref=e171]: ₹700
+    - generic [ref=e172]:
+      - generic [ref=e173]: Browse by specialty
+      - generic [ref=e174]:
+        - link "Cardiology 2" [ref=e175] [cursor=pointer]:
+          - /url: /doctors.html?specialization=1
+          - text: Cardiology
+          - generic [ref=e176]: "2"
+        - link "Dentistry 1" [ref=e177] [cursor=pointer]:
+          - /url: /doctors.html?specialization=11
+          - text: Dentistry
+          - generic [ref=e178]: "1"
+        - link "Dermatology 2" [ref=e179] [cursor=pointer]:
+          - /url: /doctors.html?specialization=2
+          - text: Dermatology
+          - generic [ref=e180]: "2"
+        - link "Endocrinology 1" [ref=e181] [cursor=pointer]:
+          - /url: /doctors.html?specialization=12
+          - text: Endocrinology
+          - generic [ref=e182]: "1"
+        - link "ENT 1" [ref=e183] [cursor=pointer]:
+          - /url: /doctors.html?specialization=9
+          - text: ENT
+          - generic [ref=e184]: "1"
+        - link "Gastroenterology 1" [ref=e185] [cursor=pointer]:
+          - /url: /doctors.html?specialization=13
+          - text: Gastroenterology
+          - generic [ref=e186]: "1"
+        - link "General Medicine 3" [ref=e187] [cursor=pointer]:
+          - /url: /doctors.html?specialization=7
+          - text: General Medicine
+          - generic [ref=e188]: "3"
+        - link "Gynecology 2" [ref=e189] [cursor=pointer]:
+          - /url: /doctors.html?specialization=8
+          - text: Gynecology
+          - generic [ref=e190]: "2"
+        - link "Neurology 2" [ref=e191] [cursor=pointer]:
+          - /url: /doctors.html?specialization=5
+          - text: Neurology
+          - generic [ref=e192]: "2"
+        - link "Ophthalmology 1" [ref=e193] [cursor=pointer]:
+          - /url: /doctors.html?specialization=10
+          - text: Ophthalmology
+          - generic [ref=e194]: "1"
+        - link "Orthopedics 2" [ref=e195] [cursor=pointer]:
+          - /url: /doctors.html?specialization=4
+          - text: Orthopedics
+          - generic [ref=e196]: "2"
+        - link "Pediatrics 2" [ref=e197] [cursor=pointer]:
+          - /url: /doctors.html?specialization=3
+          - text: Pediatrics
+          - generic [ref=e198]: "2"
+  - generic [ref=e200]:
+    - heading "Built for everyone" [level=2] [ref=e203]
+    - generic [ref=e204]:
+      - generic [ref=e205]:
+        - generic [ref=e206]: Patients
+        - paragraph [ref=e207]: Book, track your stay, keep your records.
+      - generic [ref=e208]:
+        - generic [ref=e209]: Doctors
+        - paragraph [ref=e210]: Ready briefs, quick discharge, easy transfers.
+      - generic [ref=e211]:
+        - generic [ref=e212]: Hospital teams
+        - paragraph [ref=e213]: A clear queue with timers and blockers.
+  - generic [ref=e215]:
+    - heading "Keep every handoff in one place." [level=2] [ref=e216]
+    - generic [ref=e217]:
+      - link "Get started" [ref=e218] [cursor=pointer]:
+        - /url: /auth/register.html
+      - link "Try the demo" [ref=e219] [cursor=pointer]:
+        - /url: /auth/login.html
+  - paragraph [ref=e220]:
+    - link "Emergency help" [ref=e221] [cursor=pointer]:
+      - /url: /emergency.html
+  - contentinfo [ref=e223]:
+    - generic [ref=e224]:
+      - link "MediBridge home" [ref=e225] [cursor=pointer]:
+        - /url: /index.html
+        - text: MediBridge
+      - navigation "Footer" [ref=e231]:
+        - link "Doctors" [ref=e232] [cursor=pointer]:
+          - /url: /doctors.html
+        - link "Resources" [ref=e233] [cursor=pointer]:
+          - /url: /resources.html
+        - link "Emergency" [ref=e234] [cursor=pointer]:
+          - /url: /emergency.html
+        - link "About" [ref=e235] [cursor=pointer]:
+          - /url: /about.html
+      - generic [ref=e236]: Demo project · fictional data · not medical advice

@@ -1,38 +1,35 @@
-// Shared helpers for writing in-app notifications and audit-trail rows.
-// `conn` may be the pool or a transaction connection.
+// Shared helpers for writing in-app notifications and audit-trail entries.
+const { insert, insertMany, find, findOne, byIds } = require('../../database/store');
 
-async function notify(conn, userId, type, title, message, relatedType = null, relatedId = null) {
-  await conn.query(
-    `INSERT INTO notifications (user_id, type, title, message, related_type, related_id) VALUES (?, ?, ?, ?, ?, ?)`,
-    [userId, type, title, message, relatedType, relatedId]
-  );
+async function notify(userId, type, title, message, relatedType = null, relatedId = null) {
+  await insert('notifications', { user_id: userId, type, title, message, related_type: relatedType, related_id: relatedId });
 }
 
 // Notifies every staff member of a department (optionally limited to one hospital).
-async function notifyDepartment(conn, department, hospitalId, type, title, message, relatedType = null, relatedId = null) {
-  const params = [department];
-  let sql = 'SELECT user_id FROM staff WHERE department = ?';
-  if (hospitalId) { sql += ' AND hospital_id = ?'; params.push(hospitalId); }
-  const [rows] = await conn.query(sql, params);
-  for (const r of rows) await notify(conn, r.user_id, type, title, message, relatedType, relatedId);
+async function notifyDepartment(department, hospitalId, type, title, message, relatedType = null, relatedId = null) {
+  const filter = { department };
+  if (hospitalId) filter.hospital_id = hospitalId;
+  const rows = await find('staff', filter, { select: 'user_id' });
+  await insertMany('notifications', rows.map((r) => ({
+    user_id: r.user_id, type, title, message, related_type: relatedType, related_id: relatedId,
+  })));
   return rows.length;
 }
 
-async function audit(conn, userId, action, entityType, entityId, details) {
-  await conn.query(
-    `INSERT INTO audit_logs (user_id, action, entity_type, entity_id, details) VALUES (?, ?, ?, ?, ?)`,
-    [userId || null, action, entityType || null, entityId || null, details ? String(details).slice(0, 255) : null]
-  );
+async function audit(userId, action, entityType, entityId, details) {
+  await insert('audit_logs', {
+    user_id: userId || null, action, entity_type: entityType || null, entity_id: entityId || null,
+    details: details ? String(details).slice(0, 255) : null,
+  });
 }
 
-// Returns { user_id, hospital_id, department, hospital_name } for a staff user, or null.
-async function getStaffProfile(conn, userId) {
-  const [rows] = await conn.query(
-    `SELECT s.user_id, s.hospital_id, s.department, h.name AS hospital_name, h.is_home
-       FROM staff s JOIN hospitals h ON h.id = s.hospital_id WHERE s.user_id = ?`,
-    [userId]
-  );
-  return rows[0] || null;
+// Returns { user_id, hospital_id, department, hospital_name, is_home } for a staff user, or null.
+async function getStaffProfile(userId) {
+  const s = await findOne('staff', { user_id: userId });
+  if (!s) return null;
+  const h = await findOne('hospitals', { id: s.hospital_id });
+  if (!h) return null;
+  return { user_id: s.user_id, hospital_id: s.hospital_id, department: s.department, hospital_name: h.name, is_home: h.is_home };
 }
 
 module.exports = { notify, notifyDepartment, audit, getStaffProfile };
