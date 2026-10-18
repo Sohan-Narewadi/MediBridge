@@ -7,7 +7,7 @@ function errorHandler(err, req, res, next) {
     return res.status(err.statusCode).json({ error: err.message, details: err.details });
   }
 
-  if (err.code === 'ER_DUP_ENTRY') {
+  if (err.code === 11000) {
     return res.status(409).json({ error: 'That slot or record already exists.' });
   }
 

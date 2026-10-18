@@ -1,4 +1,4 @@
-const pool = require('../../database/db');
+const { M, find, findOne, insert, insertMany, update, count, exists, byIds, minutesBetween, todayStr } = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { notify, notifyDepartment, audit } = require('../utils/notify');
@@ -31,47 +31,38 @@ function ageFrom(dob) {
 }
 
 const GENDER_LABEL = { male: 'Male', female: 'Female', other: 'Other', prefer_not_to_say: 'Not stated' };
+const URGENCY_ORDER = ['critical', 'urgent', 'routine'];
+const REQUEST_STATUS_ORDER = ['open', 'accepted', 'completed', 'cancelled'];
 
-async function getHomeHospital(conn) {
-  const [rows] = await conn.query('SELECT * FROM hospitals WHERE is_home = 1 ORDER BY id LIMIT 1');
-  if (!rows.length) throw new ApiError(500, 'No home hospital is configured.');
-  return rows[0];
+async function getHomeHospital() {
+  const h = await findOne('hospitals', { is_home: 1 }, { sort: { id: 1 } });
+  if (!h) throw new ApiError(500, 'No home hospital is configured.');
+  return h;
 }
 
 // The hospital a request is sent *from*: the desk's own hospital, the admission's
 // hospital when one is given, otherwise the home hospital.
-async function resolveFromHospital(conn, req, admission) {
-  if (req.staff) {
-    const [rows] = await conn.query('SELECT * FROM hospitals WHERE id = ?', [req.staff.hospital_id]);
-    return rows[0];
-  }
-  if (admission) {
-    const [rows] = await conn.query('SELECT * FROM hospitals WHERE id = ?', [admission.hospital_id]);
-    return rows[0];
-  }
-  return getHomeHospital(conn);
+async function resolveFromHospital(req, admission) {
+  if (req.staff) return findOne('hospitals', { id: req.staff.hospital_id });
+  if (admission) return findOne('hospitals', { id: admission.hospital_id });
+  return getHomeHospital();
 }
 
 // May this user start a transfer for this patient?
-async function assertCanTransferPatient(conn, req, patientId, admissionId) {
-  const [p] = await conn.query('SELECT user_id FROM patients WHERE user_id = ?', [patientId]);
-  if (!p.length) throw new ApiError(404, 'Patient not found.');
+async function assertCanTransferPatient(req, patientId, admissionId) {
+  if (!(await exists('patients', { user_id: Number(patientId) }))) throw new ApiError(404, 'Patient not found.');
 
   let admission = null;
   if (admissionId) {
-    const [rows] = await conn.query('SELECT * FROM admissions WHERE id = ? AND patient_id = ?', [admissionId, patientId]);
-    if (!rows.length) throw new ApiError(404, 'Admission not found for this patient.');
-    admission = rows[0];
+    admission = await findOne('admissions', { id: Number(admissionId), patient_id: Number(patientId) });
+    if (!admission) throw new ApiError(404, 'Admission not found for this patient.');
     if (!['admitted', 'cleared'].includes(admission.status)) throw new ApiError(400, 'This admission is already closed.');
   }
 
   if (req.user.role === 'doctor') {
-    const [rel] = await conn.query(
-      `SELECT 1 FROM appointments WHERE doctor_id = ? AND patient_id = ? AND status <> 'cancelled'
-       UNION SELECT 1 FROM admissions WHERE doctor_id = ? AND patient_id = ? LIMIT 1`,
-      [req.user.id, patientId, req.user.id, patientId]
-    );
-    if (!rel.length) throw new ApiError(403, 'You can only transfer patients under your care.');
+    const related = (await exists('appointments', { doctor_id: req.user.id, patient_id: Number(patientId), status: { $ne: 'cancelled' } }))
+      || (await exists('admissions', { doctor_id: req.user.id, patient_id: Number(patientId) }));
+    if (!related) throw new ApiError(403, 'You can only transfer patients under your care.');
   } else if (req.staff) {
     if (!req.staff.is_home) throw new ApiError(403, 'Only the sending hospital\'s transfer desk can start a transfer.');
     if (admission && admission.hospital_id !== req.staff.hospital_id) throw new ApiError(403, 'This patient is admitted at another hospital.');
@@ -80,40 +71,35 @@ async function assertCanTransferPatient(conn, req, patientId, admissionId) {
 }
 
 // Is the caller on the *sending* side of this request (can see everything, complete, cancel)?
-async function isSenderSide(conn, req, request) {
+async function isSenderSide(req, request) {
   if (req.user.role === 'admin') return true;
   if (req.user.role === 'doctor') {
     if (request.requested_by === req.user.id) return true;
-    if (request.admission_id) {
-      const [rows] = await conn.query('SELECT 1 FROM admissions WHERE id = ? AND doctor_id = ?', [request.admission_id, req.user.id]);
-      return rows.length > 0;
-    }
+    if (request.admission_id) return exists('admissions', { id: request.admission_id, doctor_id: req.user.id });
     return false;
   }
   return !!req.staff && req.staff.hospital_id === request.from_hospital_id;
 }
 
 // Ranked, explainable list of hospitals that can take a patient needing `specializationId`.
-async function computeMatches(conn, { specializationId, needsIcu, fromHospital }) {
-  const [caps] = await conn.query(
-    `SELECT h.id AS hospital_id, h.name, h.city, h.latitude, h.longitude, s.name AS specialization,
-            c.beds_available, c.icu_available
-       FROM hospital_capabilities c
-       JOIN hospitals h ON h.id = c.hospital_id
-       JOIN specializations s ON s.id = c.specialization_id
-      WHERE c.specialization_id = ? AND h.id <> ?`,
-    [specializationId, fromHospital.id]
-  );
-  const [history] = await conn.query(
-    `SELECT hospital_id,
-            SUM(status = 'accepted') AS accepted,
-            SUM(status = 'declined') AS declined,
-            AVG(TIMESTAMPDIFF(MINUTE, sent_at, responded_at)) AS avg_minutes
-       FROM transfer_offers WHERE responded_at IS NOT NULL GROUP BY hospital_id`
-  );
-  const historyBy = Object.fromEntries(history.map((h) => [h.hospital_id, h]));
+async function computeMatches({ specializationId, needsIcu, fromHospital }) {
+  const caps = await find('hospital_capabilities', { specialization_id: specializationId, hospital_id: { $ne: fromHospital.id } });
+  const hospitals = await byIds('hospitals', caps.map((c) => c.hospital_id));
+  const spec = await findOne('specializations', { id: specializationId });
+
+  // Each hospital's track record: how often it accepted, and how fast it replied.
+  const answered = await find('transfer_offers', { responded_at: { $ne: null } }, { select: 'hospital_id status sent_at responded_at' });
+  const historyBy = {};
+  for (const o of answered) {
+    const h = (historyBy[o.hospital_id] ||= { accepted: 0, declined: 0, minutes: 0, n: 0 });
+    if (o.status === 'accepted') h.accepted += 1;
+    if (o.status === 'declined') h.declined += 1;
+    h.minutes += minutesBetween(o.sent_at, o.responded_at);
+    h.n += 1;
+  }
 
   const matches = caps.map((c) => {
+    const h = hospitals.get(c.hospital_id);
     const reasons = [];
     let score = 30; // has the specialization at all
     const beds = Number(c.beds_available);
@@ -122,10 +108,10 @@ async function computeMatches(conn, { specializationId, needsIcu, fromHospital }
     // Capacity: up to 20 points, full marks at 5+ free beds
     if (beds > 0) {
       score += Math.round(Math.min(beds, 5) / 5 * 20);
-      reasons.push(`${c.specialization}: ${beds} bed${beds === 1 ? '' : 's'} free`);
+      reasons.push(`${spec.name}: ${beds} bed${beds === 1 ? '' : 's'} free`);
     } else {
       score -= 20;
-      reasons.push(`${c.specialization}: no beds free right now`);
+      reasons.push(`${spec.name}: no beds free right now`);
     }
 
     // ICU: 15 points; if ICU is required and none is free, heavy penalty
@@ -139,7 +125,7 @@ async function computeMatches(conn, { specializationId, needsIcu, fromHospital }
     }
 
     // Distance: 20 points within 5 km, falling to 0 at 40 km
-    const km = haversineKm(fromHospital.latitude, fromHospital.longitude, c.latitude, c.longitude);
+    const km = haversineKm(fromHospital.latitude, fromHospital.longitude, h.latitude, h.longitude);
     if (km !== null) {
       score += Math.round(Math.max(0, Math.min(1, (40 - km) / 35)) * 20);
       reasons.push(`${km.toFixed(1)} km away`);
@@ -148,11 +134,11 @@ async function computeMatches(conn, { specializationId, needsIcu, fromHospital }
     }
 
     // Responsiveness: 15 points from acceptance rate + response speed history
-    const h = historyBy[c.hospital_id];
-    const answered = h ? Number(h.accepted) + Number(h.declined) : 0;
-    if (answered > 0) {
-      const rate = Number(h.accepted) / answered;
-      const avgMin = Number(h.avg_minutes) || 0;
+    const hist = historyBy[c.hospital_id];
+    const answeredCount = hist ? hist.accepted + hist.declined : 0;
+    if (answeredCount > 0) {
+      const rate = hist.accepted / answeredCount;
+      const avgMin = hist.minutes / hist.n || 0;
       const speed = Math.max(0, 1 - avgMin / 60);
       score += Math.round(15 * (0.6 * rate + 0.4 * speed));
       reasons.push(`Usually responds in ~${Math.max(1, Math.round(avgMin))} min`);
@@ -164,8 +150,8 @@ async function computeMatches(conn, { specializationId, needsIcu, fromHospital }
 
     return {
       hospital_id: c.hospital_id,
-      name: c.name,
-      city: c.city,
+      name: h.name,
+      city: h.city,
       score: Math.max(0, Math.min(100, score)),
       beds_available: beds,
       icu_available: icu,
@@ -178,24 +164,16 @@ async function computeMatches(conn, { specializationId, needsIcu, fromHospital }
 }
 
 // Builds the transfer summary from data MediBridge already holds - the sender types nothing twice.
-async function buildClinicalSummary(conn, { patientId, admission, specializationId, needsIcu, urgency, reason, fromHospital, senderName }) {
-  const [[patient]] = await conn.query(
-    `SELECT u.full_name, u.phone, p.* FROM patients p JOIN users u ON u.id = p.user_id WHERE p.user_id = ?`,
-    [patientId]
-  );
-  const [[spec]] = await conn.query('SELECT name FROM specializations WHERE id = ?', [specializationId]);
-  const [meds] = await conn.query(
-    `SELECT medicine_name, dosage, frequency FROM medications
-      WHERE patient_id = ? AND is_active = 1 AND start_date <= CURDATE() AND (end_date IS NULL OR end_date >= CURDATE())
-      ORDER BY start_date DESC LIMIT 8`,
-    [patientId]
-  );
-  const [records] = await conn.query(
-    `SELECT mr.record_date, mr.diagnosis, mr.vitals_bp, mr.vitals_pulse, mr.vitals_temp, u.full_name AS doctor_name
-       FROM medical_records mr JOIN users u ON u.id = mr.doctor_id
-      WHERE mr.patient_id = ? ORDER BY mr.record_date DESC, mr.id DESC LIMIT 1`,
-    [patientId]
-  );
+async function buildClinicalSummary({ patientId, admission, specializationId, needsIcu, urgency, reason, fromHospital, senderName }) {
+  const user = await findOne('users', { id: patientId }, { select: 'full_name phone' });
+  const patient = { ...(await findOne('patients', { user_id: patientId })), full_name: user.full_name, phone: user.phone };
+  const spec = await findOne('specializations', { id: specializationId }, { select: 'name' });
+  const today = todayStr();
+  const meds = await find('medications', {
+    patient_id: patientId, is_active: 1, start_date: { $lte: today }, $or: [{ end_date: null }, { end_date: { $gte: today } }],
+  }, { sort: { start_date: -1, id: -1 }, limit: 8 });
+  const lastRecord = await findOne('medical_records', { patient_id: patientId }, { sort: { record_date: -1, id: -1 } });
+  const recordDoctor = lastRecord ? await findOne('users', { id: lastRecord.doctor_id }, { select: 'full_name' }) : null;
 
   const age = ageFrom(patient.date_of_birth);
   const lines = [];
@@ -209,15 +187,17 @@ async function buildClinicalSummary(conn, { patientId, admission, specialization
   lines.push(`Reason for transfer: ${reason}`);
   lines.push('');
   if (admission) {
-    lines.push(`Current admission: ${admission.ward || 'Ward'}${admission.bed ? `, bed ${admission.bed}` : ''} since ${String(admission.admitted_at).slice(0, 16)}`);
+    const admitted = new Date(admission.admitted_at);
+    const stamp = `${String(admitted.getFullYear())}-${String(admitted.getMonth() + 1).padStart(2, '0')}-${String(admitted.getDate()).padStart(2, '0')} ${String(admitted.getHours()).padStart(2, '0')}:${String(admitted.getMinutes()).padStart(2, '0')}`;
+    lines.push(`Current admission: ${admission.ward || 'Ward'}${admission.bed ? `, bed ${admission.bed}` : ''} since ${stamp}`);
     lines.push(`Admission diagnosis: ${admission.diagnosis || 'Not recorded'}`);
     if (admission.insurance_provider) lines.push(`Insurance: ${admission.insurance_provider}${admission.insurance_policy_no ? ` (${admission.insurance_policy_no})` : ''}`);
     else lines.push('Insurance: self-pay');
   }
-  if (records.length) {
-    const r = records[0];
+  if (lastRecord) {
+    const r = lastRecord;
     const vitals = [r.vitals_bp && `BP ${r.vitals_bp}`, r.vitals_pulse && `pulse ${r.vitals_pulse}`, r.vitals_temp && `temp ${r.vitals_temp}`].filter(Boolean).join(', ');
-    lines.push(`Latest record (${r.record_date}, ${r.doctor_name}): ${r.diagnosis || 'No diagnosis recorded'}`);
+    lines.push(`Latest record (${r.record_date}, ${recordDoctor ? recordDoctor.full_name : 'doctor'}): ${r.diagnosis || 'No diagnosis recorded'}`);
     if (vitals) lines.push(`Last recorded vitals: ${vitals}`);
   }
   lines.push(`Allergies: ${patient.allergies || 'None recorded'}`);
@@ -231,53 +211,59 @@ async function buildClinicalSummary(conn, { patientId, admission, specialization
   return lines.join('\n');
 }
 
-async function loadOffers(conn, requestIds) {
+// Offers for a set of requests, grouped by request id, best match first.
+async function loadOffers(requestIds) {
   if (!requestIds.length) return {};
-  const [rows] = await conn.query(
-    `SELECT o.id AS offer_id, o.request_id, o.hospital_id, h.name AS hospital_name, o.status, o.match_score,
-            o.response_note, o.sent_at, o.responded_at, o.summary_viewed_at,
-            CASE WHEN o.responded_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, o.sent_at, o.responded_at) END AS response_minutes,
-            TIMESTAMPDIFF(MINUTE, o.sent_at, NOW()) AS minutes_since_sent
-       FROM transfer_offers o JOIN hospitals h ON h.id = o.hospital_id
-      WHERE o.request_id IN (?)
-      ORDER BY o.match_score DESC`,
-    [requestIds]
-  );
+  const rows = await find('transfer_offers', { request_id: { $in: requestIds } }, { sort: { match_score: -1, id: 1 } });
+  const hospitals = await byIds('hospitals', rows.map((o) => o.hospital_id), 'id', 'id name');
   const by = {};
-  for (const r of rows) (by[r.request_id] = by[r.request_id] || []).push(r);
+  for (const o of rows) {
+    (by[o.request_id] ||= []).push({
+      offer_id: o.id, request_id: o.request_id, hospital_id: o.hospital_id, hospital_name: hospitals.get(o.hospital_id)?.name || null,
+      status: o.status, match_score: o.match_score, response_note: o.response_note, sent_at: o.sent_at, responded_at: o.responded_at,
+      summary_viewed_at: o.summary_viewed_at,
+      response_minutes: o.responded_at ? minutesBetween(o.sent_at, o.responded_at) : null,
+      minutes_since_sent: minutesBetween(o.sent_at),
+    });
+  }
   return by;
 }
 
-const REQUEST_SELECT = `
-  SELECT r.id, r.patient_id, r.admission_id, r.from_hospital_id, r.requested_by, r.specialization_id, r.needs_icu,
-         r.urgency, r.reason, r.consent_given, r.consent_note, r.status, r.accepted_hospital_id, r.created_at, r.accepted_at,
-         TIMESTAMPDIFF(MINUTE, r.created_at, NOW()) AS minutes_ago,
-         pu.full_name AS patient_name, p.date_of_birth, p.gender,
-         s.name AS specialization, fh.name AS from_hospital, ah.name AS accepted_hospital,
-         ru.full_name AS requested_by_name
-    FROM transfer_requests r
-    JOIN users pu ON pu.id = r.patient_id
-    JOIN patients p ON p.user_id = r.patient_id
-    JOIN specializations s ON s.id = r.specialization_id
-    JOIN hospitals fh ON fh.id = r.from_hospital_id
-    LEFT JOIN hospitals ah ON ah.id = r.accepted_hospital_id
-    LEFT JOIN users ru ON ru.id = r.requested_by`;
+// Requests joined to patient, specialization and hospital names, plus time elapsed since creation.
+async function loadRequests(filter, { limit, newestFirst } = {}) {
+  let rows = await find('transfer_requests', filter);
+  rows.sort((a, b) => (newestFirst ? 0 : REQUEST_STATUS_ORDER.indexOf(a.status) - REQUEST_STATUS_ORDER.indexOf(b.status)) || (new Date(b.created_at) - new Date(a.created_at)));
+  if (limit) rows = rows.slice(0, limit);
+  const [users, patients, specs, hospitals] = await Promise.all([
+    byIds('users', [...rows.map((r) => r.patient_id), ...rows.map((r) => r.requested_by)], 'id', 'id full_name'),
+    byIds('patients', rows.map((r) => r.patient_id), 'user_id', 'user_id date_of_birth gender'),
+    byIds('specializations', rows.map((r) => r.specialization_id)),
+    byIds('hospitals', [...rows.map((r) => r.from_hospital_id), ...rows.map((r) => r.accepted_hospital_id)]),
+  ]);
+  return rows.map((r) => ({
+    ...r,
+    minutes_ago: minutesBetween(r.created_at),
+    patient_name: users.get(r.patient_id)?.full_name || null,
+    date_of_birth: patients.get(r.patient_id)?.date_of_birth || null,
+    gender: patients.get(r.patient_id)?.gender || null,
+    specialization: specs.get(r.specialization_id)?.name || null,
+    from_hospital: hospitals.get(r.from_hospital_id)?.name || null,
+    accepted_hospital: hospitals.get(r.accepted_hospital_id)?.name || null,
+    requested_by_name: users.get(r.requested_by)?.full_name || null,
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Middleware: staff must be a transfer desk; attaches req.staff
 // ---------------------------------------------------------------------------
 const loadDesk = asyncHandler(async (req, res, next) => {
   if (req.user.role !== 'staff') return next();
-  const [rows] = await pool.query(
-    `SELECT s.user_id, s.hospital_id, s.department, h.name AS hospital_name, h.is_home
-       FROM staff s JOIN hospitals h ON h.id = s.hospital_id WHERE s.user_id = ?`,
-    [req.user.id]
-  );
-  const staff = rows[0];
-  if (!staff || staff.department !== 'transfer_desk') {
+  const s = await findOne('staff', { user_id: req.user.id });
+  const h = s && (await findOne('hospitals', { id: s.hospital_id }));
+  if (!s || !h || s.department !== 'transfer_desk') {
     throw new ApiError(403, 'TransferConnect is handled by the transfer desk.');
   }
-  req.staff = staff;
+  req.staff = { user_id: s.user_id, hospital_id: s.hospital_id, department: s.department, hospital_name: h.name, is_home: h.is_home };
   next();
 });
 
@@ -288,21 +274,24 @@ const loadDesk = asyncHandler(async (req, res, next) => {
 // GET /api/transfers/desk - who am I on the transfer network (fallback for /api/staff/me)
 const getDesk = asyncHandler(async (req, res) => {
   if (req.staff) return res.json({ desk: { ...req.staff, role: 'staff' } });
-  const home = await getHomeHospital(pool);
+  const home = await getHomeHospital();
   res.json({ desk: { hospital_id: home.id, hospital_name: home.name, is_home: 1, role: req.user.role } });
 });
 
 // GET /api/transfers/hospitals
 const listHospitals = asyncHandler(async (req, res) => {
-  const [hospitals] = await pool.query('SELECT id, name, city, address, phone, is_home, latitude, longitude FROM hospitals ORDER BY is_home DESC, name');
-  const [caps] = await pool.query(
-    `SELECT c.hospital_id, s.id AS specialization_id, s.name AS specialization, c.beds_available, c.icu_available
-       FROM hospital_capabilities c JOIN specializations s ON s.id = c.specialization_id ORDER BY s.name`
-  );
+  const hospitals = await find('hospitals', {}, { select: 'id name city address phone is_home latitude longitude' });
+  hospitals.sort((a, b) => (b.is_home - a.is_home) || a.name.localeCompare(b.name));
+  const caps = await find('hospital_capabilities');
+  const specs = await byIds('specializations', caps.map((c) => c.specialization_id));
+  const capRows = caps.map((c) => ({
+    hospital_id: c.hospital_id, specialization_id: c.specialization_id, specialization: specs.get(c.specialization_id)?.name || null,
+    beds_available: c.beds_available, icu_available: c.icu_available,
+  })).sort((a, b) => String(a.specialization).localeCompare(String(b.specialization)));
   res.json({
     hospitals: hospitals.map((h) => ({
       ...h,
-      capabilities: caps.filter((c) => c.hospital_id === h.id).map(({ hospital_id, ...rest }) => rest),
+      capabilities: capRows.filter((c) => c.hospital_id === h.id).map(({ hospital_id, ...rest }) => rest),
     })),
   });
 });
@@ -310,39 +299,41 @@ const listHospitals = asyncHandler(async (req, res) => {
 // GET /api/transfers/candidates - patients the caller may start a transfer for
 const listCandidates = asyncHandler(async (req, res) => {
   if (req.staff && !req.staff.is_home) return res.json({ patients: [] });
-  const params = [];
-  let admissionWhere = `a.status IN ('admitted', 'cleared')`;
-  if (req.user.role === 'doctor') { admissionWhere += ' AND a.doctor_id = ?'; params.push(req.user.id); }
-  if (req.staff) { admissionWhere += ' AND a.hospital_id = ?'; params.push(req.staff.hospital_id); }
+  const filter = { status: { $in: ['admitted', 'cleared'] } };
+  if (req.user.role === 'doctor') filter.doctor_id = req.user.id;
+  if (req.staff) filter.hospital_id = req.staff.hospital_id;
 
-  const [admitted] = await pool.query(
-    `SELECT u.id, u.full_name, p.date_of_birth, p.gender, a.id AS admission_id, a.ward, a.bed, a.diagnosis
-       FROM admissions a JOIN users u ON u.id = a.patient_id JOIN patients p ON p.user_id = a.patient_id
-      WHERE ${admissionWhere} ORDER BY a.admitted_at DESC`,
-    params
-  );
+  const admissions = await find('admissions', filter, { sort: { admitted_at: -1 } });
+  const admittedIds = new Set(admissions.map((a) => a.patient_id));
+  const users = await byIds('users', admissions.map((a) => a.patient_id), 'id', 'id full_name');
+  const profiles = await byIds('patients', admissions.map((a) => a.patient_id), 'user_id', 'user_id date_of_birth gender');
+  const admitted = admissions.map((a) => ({
+    id: a.patient_id, full_name: users.get(a.patient_id)?.full_name, date_of_birth: profiles.get(a.patient_id)?.date_of_birth,
+    gender: profiles.get(a.patient_id)?.gender, admission_id: a.id, ward: a.ward, bed: a.bed, diagnosis: a.diagnosis,
+  }));
+
   let outpatients = [];
   if (req.user.role === 'doctor') {
-    [outpatients] = await pool.query(
-      `SELECT DISTINCT u.id, u.full_name, p.date_of_birth, p.gender
-         FROM appointments ap JOIN users u ON u.id = ap.patient_id JOIN patients p ON p.user_id = ap.patient_id
-        WHERE ap.doctor_id = ? AND ap.status <> 'cancelled' ORDER BY u.full_name`,
-      [req.user.id]
-    );
+    const appts = await find('appointments', { doctor_id: req.user.id, status: { $ne: 'cancelled' } }, { select: 'patient_id' });
+    const ids = [...new Set(appts.map((a) => a.patient_id))].filter((id) => !admittedIds.has(id));
+    const outUsers = await byIds('users', ids, 'id', 'id full_name');
+    const outProfiles = await byIds('patients', ids, 'user_id', 'user_id date_of_birth gender');
+    outpatients = ids.map((id) => ({
+      id, full_name: outUsers.get(id)?.full_name, date_of_birth: outProfiles.get(id)?.date_of_birth, gender: outProfiles.get(id)?.gender,
+    })).sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
   }
-  const admittedIds = new Set(admitted.map((a) => a.id));
   const shape = (r) => ({
     id: r.id, full_name: r.full_name, age: ageFrom(r.date_of_birth), gender: r.gender,
     admission_id: r.admission_id || null, ward: r.ward || null, bed: r.bed || null, diagnosis: r.diagnosis || null,
   });
-  res.json({ patients: [...admitted.map(shape), ...outpatients.filter((o) => !admittedIds.has(o.id)).map(shape)] });
+  res.json({ patients: [...admitted.map(shape), ...outpatients.map(shape)] });
 });
 
 // POST /api/transfers/match
 const match = asyncHandler(async (req, res) => {
   if (req.staff && !req.staff.is_home) throw new ApiError(403, 'Only the sending hospital can search for receiving hospitals.');
-  const fromHospital = await resolveFromHospital(pool, req, null);
-  const matches = await computeMatches(pool, {
+  const fromHospital = await resolveFromHospital(req, null);
+  const matches = await computeMatches({
     specializationId: Number(req.body.specializationId),
     needsIcu: !!req.body.needsIcu,
     fromHospital,
@@ -353,10 +344,10 @@ const match = asyncHandler(async (req, res) => {
 // POST /api/transfers/preview-summary - shows the sender exactly what will be shared
 const previewSummary = asyncHandler(async (req, res) => {
   const { patientId, admissionId, specializationId, needsIcu, urgency, reason } = req.body;
-  const admission = await assertCanTransferPatient(pool, req, patientId, admissionId || null);
-  const fromHospital = await resolveFromHospital(pool, req, admission);
-  const summary = await buildClinicalSummary(pool, {
-    patientId, admission, specializationId, needsIcu: !!needsIcu, urgency: urgency || 'urgent',
+  const admission = await assertCanTransferPatient(req, patientId, admissionId || null);
+  const fromHospital = await resolveFromHospital(req, admission);
+  const summary = await buildClinicalSummary({
+    patientId: Number(patientId), admission, specializationId: Number(specializationId), needsIcu: !!needsIcu, urgency: urgency || 'urgent',
     reason: reason || '(reason not entered yet)', fromHospital, senderName: req.user.name || 'Sender',
   });
   res.json({ summary });
@@ -367,85 +358,61 @@ const create = asyncHandler(async (req, res) => {
   const { patientId, admissionId, specializationId, needsIcu, urgency, reason, consentGiven, consentNote, hospitalIds } = req.body;
   if (consentGiven !== true) throw new ApiError(400, 'Patient consent is required before sharing records with another hospital.');
 
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const admission = await assertCanTransferPatient(conn, req, patientId, admissionId || null);
-    const fromHospital = await resolveFromHospital(conn, req, admission);
+  const admission = await assertCanTransferPatient(req, patientId, admissionId || null);
+  const fromHospital = await resolveFromHospital(req, admission);
 
-    const [open] = await conn.query(
-      `SELECT id FROM transfer_requests WHERE patient_id = ? AND status IN ('open', 'accepted') LIMIT 1`,
-      [patientId]
-    );
-    if (open.length) throw new ApiError(409, 'This patient already has an active transfer request.');
-
-    const matches = await computeMatches(conn, { specializationId, needsIcu: !!needsIcu, fromHospital });
-    const byId = Object.fromEntries(matches.map((m) => [m.hospital_id, m]));
-    const targets = [...new Set(hospitalIds.map(Number))].filter((id) => byId[id]);
-    if (!targets.length) throw new ApiError(400, 'None of the selected hospitals can provide this care.');
-
-    const summary = await buildClinicalSummary(conn, {
-      patientId, admission, specializationId, needsIcu: !!needsIcu, urgency, reason, fromHospital,
-      senderName: req.user.name || 'Sender',
-    });
-
-    const [result] = await conn.query(
-      `INSERT INTO transfer_requests (patient_id, admission_id, from_hospital_id, requested_by, specialization_id, needs_icu,
-                                      urgency, reason, clinical_summary, consent_given, consent_note)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
-      [patientId, admission ? admission.id : null, fromHospital.id, req.user.id, specializationId, needsIcu ? 1 : 0,
-        urgency, reason, summary, consentNote || null]
-    );
-    const requestId = result.insertId;
-    const [[spec]] = await conn.query('SELECT name FROM specializations WHERE id = ?', [specializationId]);
-
-    for (const hospitalId of targets) {
-      await conn.query(
-        'INSERT INTO transfer_offers (request_id, hospital_id, match_score) VALUES (?, ?, ?)',
-        [requestId, hospitalId, byId[hospitalId].score]
-      );
-      await notifyDepartment(conn, 'transfer_desk', hospitalId, 'transfer_request',
-        `${urgency === 'critical' ? 'CRITICAL ' : ''}Transfer request: ${spec.name}`,
-        `${fromHospital.name} is asking if you can accept a ${spec.name} patient${needsIcu ? ' needing ICU' : ''}. Please respond.`,
-        'transfer_request', requestId);
-    }
-    await audit(conn, req.user.id, 'transfer.requested', 'transfer_request', requestId,
-      `${urgency} ${spec.name} transfer sent to ${targets.length} hospital(s)`);
-
-    await conn.commit();
-    res.status(201).json({ request: { id: requestId, hospitalsContacted: targets.length } });
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
+  if (await exists('transfer_requests', { patient_id: Number(patientId), status: { $in: ['open', 'accepted'] } })) {
+    throw new ApiError(409, 'This patient already has an active transfer request.');
   }
+
+  const matches = await computeMatches({ specializationId: Number(specializationId), needsIcu: !!needsIcu, fromHospital });
+  const byId = Object.fromEntries(matches.map((m) => [m.hospital_id, m]));
+  const targets = [...new Set(hospitalIds.map(Number))].filter((id) => byId[id]);
+  if (!targets.length) throw new ApiError(400, 'None of the selected hospitals can provide this care.');
+
+  const summary = await buildClinicalSummary({
+    patientId: Number(patientId), admission, specializationId: Number(specializationId), needsIcu: !!needsIcu, urgency, reason, fromHospital,
+    senderName: req.user.name || 'Sender',
+  });
+
+  const request = await insert('transfer_requests', {
+    patient_id: Number(patientId), admission_id: admission ? admission.id : null, from_hospital_id: fromHospital.id, requested_by: req.user.id,
+    specialization_id: Number(specializationId), needs_icu: needsIcu ? 1 : 0, urgency, reason, clinical_summary: summary, consent_given: 1,
+    consent_note: consentNote || null,
+  });
+  const spec = await findOne('specializations', { id: Number(specializationId) }, { select: 'name' });
+
+  await insertMany('transfer_offers', targets.map((hospitalId) => ({ request_id: request.id, hospital_id: hospitalId, match_score: byId[hospitalId].score })));
+  for (const hospitalId of targets) {
+    await notifyDepartment('transfer_desk', hospitalId, 'transfer_request',
+      `${urgency === 'critical' ? 'CRITICAL ' : ''}Transfer request: ${spec.name}`,
+      `${fromHospital.name} is asking if you can accept a ${spec.name} patient${needsIcu ? ' needing ICU' : ''}. Please respond.`,
+      'transfer_request', request.id);
+  }
+  await audit(req.user.id, 'transfer.requested', 'transfer_request', request.id,
+    `${urgency} ${spec.name} transfer sent to ${targets.length} hospital(s)`);
+
+  res.status(201).json({ request: { id: request.id, hospitalsContacted: targets.length } });
 });
 
 // GET /api/transfers - outgoing for senders, incoming for partner desks, everything for admin
 const list = asyncHandler(async (req, res) => {
-  const where = [];
-  const params = [];
+  const filter = {};
   const partnerDesk = req.staff && !req.staff.is_home;
 
   if (req.user.role === 'doctor') {
-    where.push('(r.requested_by = ? OR r.admission_id IN (SELECT id FROM admissions WHERE doctor_id = ?))');
-    params.push(req.user.id, req.user.id);
+    const mine = await find('admissions', { doctor_id: req.user.id }, { select: 'id' });
+    filter.$or = [{ requested_by: req.user.id }, { admission_id: { $in: mine.map((a) => a.id) } }];
   } else if (partnerDesk) {
-    where.push('r.id IN (SELECT request_id FROM transfer_offers WHERE hospital_id = ?)');
-    params.push(req.staff.hospital_id);
+    const offered = await find('transfer_offers', { hospital_id: req.staff.hospital_id }, { select: 'request_id' });
+    filter.id = { $in: offered.map((o) => o.request_id) };
   } else if (req.staff) {
-    where.push('r.from_hospital_id = ?');
-    params.push(req.staff.hospital_id);
+    filter.from_hospital_id = req.staff.hospital_id;
   }
-  if (req.query.status) { where.push('r.status = ?'); params.push(req.query.status); }
+  if (req.query.status) filter.status = req.query.status;
 
-  const [rows] = await pool.query(
-    `${REQUEST_SELECT} ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     ORDER BY FIELD(r.status, 'open', 'accepted', 'completed', 'cancelled'), r.created_at DESC LIMIT 100`,
-    params
-  );
-  const offersBy = await loadOffers(pool, rows.map((r) => r.id));
+  const rows = await loadRequests(filter, { limit: 100 });
+  const offersBy = await loadOffers(rows.map((r) => r.id));
 
   res.json({
     requests: rows.map((r) => {
@@ -478,58 +445,54 @@ const list = asyncHandler(async (req, res) => {
 // GET /api/transfers/incoming - the partner desk's queue (privacy-reduced)
 const incoming = asyncHandler(async (req, res) => {
   if (!req.staff) throw new ApiError(403, 'Only transfer desks receive transfer requests.');
-  const [rows] = await pool.query(
-    `SELECT o.id AS offer_id, o.request_id, o.status, o.match_score, o.response_note, o.summary_viewed_at,
-            o.sent_at, o.responded_at,
-            TIMESTAMPDIFF(MINUTE, o.sent_at, COALESCE(o.responded_at, NOW())) AS minutes_waiting,
-            r.urgency, r.needs_icu, r.reason, r.status AS request_status, s.name AS specialization,
-            fh.name AS from_hospital, pu.full_name AS patient_name, p.date_of_birth, p.gender
-       FROM transfer_offers o
-       JOIN transfer_requests r ON r.id = o.request_id
-       JOIN specializations s ON s.id = r.specialization_id
-       JOIN hospitals fh ON fh.id = r.from_hospital_id
-       JOIN users pu ON pu.id = r.patient_id
-       JOIN patients p ON p.user_id = r.patient_id
-      WHERE o.hospital_id = ?
-      ORDER BY o.status = 'pending' DESC, FIELD(r.urgency, 'critical', 'urgent', 'routine'), o.sent_at DESC
-      LIMIT 100`,
-    [req.staff.hospital_id]
-  );
-  res.json({
-    hospital: { id: req.staff.hospital_id, name: req.staff.hospital_name },
-    offers: rows.map((r) => ({
-      offer_id: r.offer_id,
-      request_id: r.request_id,
-      status: r.status,
-      request_status: r.request_status,
+  const offers = await find('transfer_offers', { hospital_id: req.staff.hospital_id });
+  const requests = await byIds('transfer_requests', offers.map((o) => o.request_id));
+  const [specs, hospitals, users, profiles] = await Promise.all([
+    byIds('specializations', [...requests.values()].map((r) => r.specialization_id)),
+    byIds('hospitals', [...requests.values()].map((r) => r.from_hospital_id), 'id', 'id name'),
+    byIds('users', [...requests.values()].map((r) => r.patient_id), 'id', 'id full_name'),
+    byIds('patients', [...requests.values()].map((r) => r.patient_id), 'user_id', 'user_id date_of_birth gender'),
+  ]);
+
+  const rows = offers.filter((o) => requests.has(o.request_id)).map((o) => {
+    const r = requests.get(o.request_id);
+    return {
+      offer_id: o.id,
+      request_id: o.request_id,
+      status: o.status,
+      request_status: r.status,
       urgency: r.urgency,
-      specialization: r.specialization,
+      specialization: specs.get(r.specialization_id)?.name || null,
       needs_icu: !!r.needs_icu,
       reason: r.reason,
-      minutes_waiting: r.minutes_waiting,
-      from_hospital: r.from_hospital,
-      patient_initials: initials(r.patient_name),
-      patient_age: ageFrom(r.date_of_birth),
-      patient_gender: GENDER_LABEL[r.gender] || 'Not stated',
-      match_score: r.match_score,
-      response_note: r.response_note,
-      summary_viewed: !!r.summary_viewed_at,
-      sent_at: r.sent_at,
-      responded_at: r.responded_at,
-    })),
+      minutes_waiting: minutesBetween(o.sent_at, o.responded_at || new Date()),
+      from_hospital: hospitals.get(r.from_hospital_id)?.name || null,
+      patient_initials: initials(users.get(r.patient_id)?.full_name),
+      patient_age: ageFrom(profiles.get(r.patient_id)?.date_of_birth),
+      patient_gender: GENDER_LABEL[profiles.get(r.patient_id)?.gender] || 'Not stated',
+      match_score: o.match_score,
+      response_note: o.response_note,
+      summary_viewed: !!o.summary_viewed_at,
+      sent_at: o.sent_at,
+      responded_at: o.responded_at,
+    };
   });
+  // Pending first, then most urgent, then newest.
+  rows.sort((a, b) => ((b.status === 'pending') - (a.status === 'pending'))
+    || (URGENCY_ORDER.indexOf(a.urgency) - URGENCY_ORDER.indexOf(b.urgency))
+    || (new Date(b.sent_at) - new Date(a.sent_at)));
+
+  res.json({ hospital: { id: req.staff.hospital_id, name: req.staff.hospital_name }, offers: rows.slice(0, 100) });
 });
 
 // GET /api/transfers/:id
 const getById = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(`${REQUEST_SELECT} WHERE r.id = ?`, [req.params.id]);
-  if (!rows.length) throw new ApiError(404, 'Transfer request not found.');
-  const r = rows[0];
-  const [[full]] = await pool.query('SELECT clinical_summary FROM transfer_requests WHERE id = ?', [r.id]);
-  const offersBy = await loadOffers(pool, [r.id]);
+  const [r] = await loadRequests({ id: Number(req.params.id) });
+  if (!r) throw new ApiError(404, 'Transfer request not found.');
+  const offersBy = await loadOffers([r.id]);
   let offers = offersBy[r.id] || [];
 
-  const sender = await isSenderSide(pool, req, r);
+  const sender = await isSenderSide(req, r);
   let myOffer = null;
   if (!sender) {
     if (!req.staff) throw new ApiError(403, 'You do not have access to this transfer request.');
@@ -537,8 +500,8 @@ const getById = asyncHandler(async (req, res) => {
     if (!myOffer) throw new ApiError(403, 'This request was not sent to your hospital.');
     offers = [myOffer];
     // Opening the request reveals the clinical summary - record that access.
-    await pool.query('UPDATE transfer_offers SET summary_viewed_at = COALESCE(summary_viewed_at, NOW()) WHERE id = ?', [myOffer.offer_id]);
-    await audit(pool, req.user.id, 'transfer.summary_viewed', 'transfer_request', r.id,
+    if (!myOffer.summary_viewed_at) await update('transfer_offers', { id: myOffer.offer_id }, { summary_viewed_at: new Date() });
+    await audit(req.user.id, 'transfer.summary_viewed', 'transfer_request', r.id,
       `${req.staff.hospital_name} viewed the clinical summary`);
   }
 
@@ -560,7 +523,7 @@ const getById = asyncHandler(async (req, res) => {
       accepted_hospital: r.accepted_hospital,
       consent_given: !!r.consent_given,
       consent_note: r.consent_note,
-      clinical_summary: full.clinical_summary,
+      clinical_summary: r.clinical_summary,
       offers,
       my_offer: myOffer,
       viewer: sender ? 'sender' : 'receiver',
@@ -568,190 +531,166 @@ const getById = asyncHandler(async (req, res) => {
   });
 });
 
-// POST /api/transfers/offers/:id/respond - receiving desk accepts or declines
+// POST /api/transfers/offers/:id/respond - receiving desk accepts or declines.
+// There are no multi-document transactions on a standalone MongoDB server, so
+// each step that must win a race is a single atomic conditional update:
+//   1. reserve the bed (only if one is still free),
+//   2. claim the request (only if it is still open),
+//   3. mark this offer accepted and stand the others down.
+// If a later step loses the race, the earlier ones are undone.
 const respond = asyncHandler(async (req, res) => {
   if (!req.staff) throw new ApiError(403, 'Only a receiving transfer desk can respond.');
   const { decision, note } = req.body;
 
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [offers] = await conn.query('SELECT * FROM transfer_offers WHERE id = ? FOR UPDATE', [req.params.id]);
-    if (!offers.length) throw new ApiError(404, 'Offer not found.');
-    const offer = offers[0];
-    if (offer.hospital_id !== req.staff.hospital_id) throw new ApiError(403, 'This request was not sent to your hospital.');
+  const offer = await findOne('transfer_offers', { id: Number(req.params.id) });
+  if (!offer) throw new ApiError(404, 'Offer not found.');
+  if (offer.hospital_id !== req.staff.hospital_id) throw new ApiError(403, 'This request was not sent to your hospital.');
 
-    const [requests] = await conn.query('SELECT * FROM transfer_requests WHERE id = ? FOR UPDATE', [offer.request_id]);
-    const request = requests[0];
-    if (offer.status !== 'pending') throw new ApiError(409, `You already ${offer.status === 'withdrawn' ? 'lost this request to another hospital' : offer.status + ' this request'}.`);
-    if (request.status !== 'open') throw new ApiError(409, 'This request has already been placed with another hospital.');
+  const request = await findOne('transfer_requests', { id: offer.request_id });
+  if (offer.status !== 'pending') throw new ApiError(409, `You already ${offer.status === 'withdrawn' ? 'lost this request to another hospital' : offer.status + ' this request'}.`);
+  if (request.status !== 'open') throw new ApiError(409, 'This request has already been placed with another hospital.');
 
-    const [[spec]] = await conn.query('SELECT name FROM specializations WHERE id = ?', [request.specialization_id]);
-    const [[patient]] = await conn.query('SELECT full_name FROM users WHERE id = ?', [request.patient_id]);
-    const hospitalName = req.staff.hospital_name;
+  const spec = await findOne('specializations', { id: request.specialization_id }, { select: 'name' });
+  const patient = await findOne('users', { id: request.patient_id }, { select: 'full_name' });
+  const hospitalName = req.staff.hospital_name;
+  const now = new Date();
 
-    if (decision === 'decline') {
-      await conn.query(
-        `UPDATE transfer_offers SET status = 'declined', response_note = ?, responded_by = ?, responded_at = NOW(),
-                summary_viewed_at = COALESCE(summary_viewed_at, NOW()) WHERE id = ?`,
-        [note || null, req.user.id, offer.id]
-      );
-      await notify(conn, request.requested_by, 'transfer_declined', `${hospitalName} declined the transfer`,
-        `${hospitalName} cannot take ${patient.full_name} (${spec.name})${note ? `: ${note}` : '.'}`, 'transfer_request', request.id);
+  if (decision === 'decline') {
+    const done = await M.transfer_offers.updateOne(
+      { id: offer.id, status: 'pending' },
+      { $set: { status: 'declined', response_note: note || null, responded_by: req.user.id, responded_at: now, summary_viewed_at: offer.summary_viewed_at || now } }
+    );
+    if (!done.modifiedCount) throw new ApiError(409, 'This request was just updated. Please refresh.');
+    await notify(request.requested_by, 'transfer_declined', `${hospitalName} declined the transfer`,
+      `${hospitalName} cannot take ${patient.full_name} (${spec.name})${note ? `: ${note}` : '.'}`, 'transfer_request', request.id);
 
-      const [[left]] = await conn.query(
-        `SELECT COUNT(*) AS n FROM transfer_offers WHERE request_id = ? AND status = 'pending'`, [request.id]);
-      if (left.n === 0) {
-        await notify(conn, request.requested_by, 'transfer_all_declined', 'All hospitals declined',
-          `Every hospital contacted for ${patient.full_name} has declined. Send the request to more hospitals.`, 'transfer_request', request.id);
-      }
-      await audit(conn, req.user.id, 'transfer.declined', 'transfer_request', request.id, `${hospitalName} declined`);
-    } else {
-      // Accepting reserves a bed, so the hospital must actually list one free.
-      const [[cap]] = await conn.query(
-        'SELECT beds_available, icu_available FROM hospital_capabilities WHERE hospital_id = ? AND specialization_id = ? FOR UPDATE',
-        [offer.hospital_id, request.specialization_id]
-      );
+    const left = await count('transfer_offers', { request_id: request.id, status: 'pending' });
+    if (left === 0) {
+      await notify(request.requested_by, 'transfer_all_declined', 'All hospitals declined',
+        `Every hospital contacted for ${patient.full_name} has declined. Send the request to more hospitals.`, 'transfer_request', request.id);
+    }
+    await audit(req.user.id, 'transfer.declined', 'transfer_request', request.id, `${hospitalName} declined`);
+  } else {
+    // Accepting reserves a bed, so the hospital must actually list one free.
+    const capFilter = { hospital_id: offer.hospital_id, specialization_id: request.specialization_id, beds_available: { $gte: 1 } };
+    if (request.needs_icu) capFilter.icu_available = { $gte: 1 };
+    const reserved = await M.hospital_capabilities.updateOne(capFilter, {
+      $inc: { beds_available: -1, icu_available: request.needs_icu ? -1 : 0 }, $set: { updated_at: now },
+    });
+    if (!reserved.modifiedCount) {
+      const cap = await findOne('hospital_capabilities', { hospital_id: offer.hospital_id, specialization_id: request.specialization_id });
       if (!cap || cap.beds_available < 1) throw new ApiError(409, `Your hospital lists no free ${spec.name} bed right now, so this request can only be declined.`);
-      if (request.needs_icu && cap.icu_available < 1) throw new ApiError(409, 'Your hospital lists no free ICU bed right now, so this request can only be declined.');
-
-      await conn.query(
-        `UPDATE transfer_offers SET status = 'accepted', response_note = ?, responded_by = ?, responded_at = NOW(),
-                summary_viewed_at = COALESCE(summary_viewed_at, NOW()) WHERE id = ?`,
-        [note || null, req.user.id, offer.id]
-      );
-      await conn.query(
-        `UPDATE transfer_requests SET status = 'accepted', accepted_hospital_id = ?, accepted_at = NOW() WHERE id = ?`,
-        [offer.hospital_id, request.id]
-      );
-      // First accept wins: everyone else is stood down.
-      const [others] = await conn.query(
-        `SELECT hospital_id FROM transfer_offers WHERE request_id = ? AND id <> ? AND status = 'pending'`,
-        [request.id, offer.id]
-      );
-      await conn.query(
-        `UPDATE transfer_offers SET status = 'withdrawn' WHERE request_id = ? AND id <> ? AND status = 'pending'`,
-        [request.id, offer.id]
-      );
-      for (const o of others) {
-        await notifyDepartment(conn, 'transfer_desk', o.hospital_id, 'transfer_withdrawn', 'Transfer request filled',
-          `The ${spec.name} transfer from another hospital has been placed elsewhere. No action needed.`, 'transfer_request', request.id);
-      }
-      // Reserve the bed at the receiving hospital (capacity checked above, so cancel can give it back exactly).
-      await conn.query(
-        `UPDATE hospital_capabilities
-            SET beds_available = beds_available - 1,
-                icu_available = IF(?, icu_available - 1, icu_available)
-          WHERE hospital_id = ? AND specialization_id = ?`,
-        [request.needs_icu ? 1 : 0, offer.hospital_id, request.specialization_id]
-      );
-      await notify(conn, request.requested_by, 'transfer_accepted', `${hospitalName} accepted the transfer`,
-        `${hospitalName} will receive ${patient.full_name} (${spec.name}).${note ? ` Note: ${note}` : ''}`, 'transfer_request', request.id);
-      await notify(conn, request.patient_id, 'transfer_accepted', 'Your transfer has been arranged',
-        `${hospitalName} has accepted you for ${spec.name} care. Your care team will arrange the move and has shared your records with your consent.`,
-        'transfer_request', request.id);
-      await audit(conn, req.user.id, 'transfer.accepted', 'transfer_request', request.id, `${hospitalName} accepted the transfer`);
+      throw new ApiError(409, 'Your hospital lists no free ICU bed right now, so this request can only be declined.');
     }
 
-    await conn.commit();
-    res.json({ message: decision === 'accept' ? 'Transfer accepted. The sending team has been notified.' : 'Response sent.' });
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
+    const giveBedBack = () => M.hospital_capabilities.updateOne(
+      { hospital_id: offer.hospital_id, specialization_id: request.specialization_id },
+      { $inc: { beds_available: 1, icu_available: request.needs_icu ? 1 : 0 } }
+    );
+
+    // First accept wins: only one request can move from 'open' to 'accepted'.
+    const claimed = await M.transfer_requests.updateOne(
+      { id: request.id, status: 'open' },
+      { $set: { status: 'accepted', accepted_hospital_id: offer.hospital_id, accepted_at: now } }
+    );
+    if (!claimed.modifiedCount) {
+      await giveBedBack();
+      throw new ApiError(409, 'This request has already been placed with another hospital.');
+    }
+    const accepted = await M.transfer_offers.updateOne(
+      { id: offer.id, status: 'pending' },
+      { $set: { status: 'accepted', response_note: note || null, responded_by: req.user.id, responded_at: now, summary_viewed_at: offer.summary_viewed_at || now } }
+    );
+    if (!accepted.modifiedCount) {
+      await giveBedBack();
+      await update('transfer_requests', { id: request.id }, { status: 'open', accepted_hospital_id: null, accepted_at: null });
+      throw new ApiError(409, 'This request was just updated. Please refresh.');
+    }
+
+    // Everyone else is stood down.
+    const others = await find('transfer_offers', { request_id: request.id, id: { $ne: offer.id }, status: 'pending' }, { select: 'id hospital_id' });
+    await M.transfer_offers.updateMany({ request_id: request.id, id: { $ne: offer.id }, status: 'pending' }, { $set: { status: 'withdrawn' } });
+    for (const o of others) {
+      await notifyDepartment('transfer_desk', o.hospital_id, 'transfer_withdrawn', 'Transfer request filled',
+        `The ${spec.name} transfer from another hospital has been placed elsewhere. No action needed.`, 'transfer_request', request.id);
+    }
+    await notify(request.requested_by, 'transfer_accepted', `${hospitalName} accepted the transfer`,
+      `${hospitalName} will receive ${patient.full_name} (${spec.name}).${note ? ` Note: ${note}` : ''}`, 'transfer_request', request.id);
+    await notify(request.patient_id, 'transfer_accepted', 'Your transfer has been arranged',
+      `${hospitalName} has accepted you for ${spec.name} care. Your care team will arrange the move and has shared your records with your consent.`,
+      'transfer_request', request.id);
+    await audit(req.user.id, 'transfer.accepted', 'transfer_request', request.id, `${hospitalName} accepted the transfer`);
   }
+
+  res.json({ message: decision === 'accept' ? 'Transfer accepted. The sending team has been notified.' : 'Response sent.' });
 });
 
-async function loadRequestForSender(conn, req) {
-  const [rows] = await conn.query('SELECT * FROM transfer_requests WHERE id = ? FOR UPDATE', [req.params.id]);
-  if (!rows.length) throw new ApiError(404, 'Transfer request not found.');
-  if (!(await isSenderSide(conn, req, rows[0]))) throw new ApiError(403, 'Only the sending team can change this request.');
-  return rows[0];
+async function loadRequestForSender(req) {
+  const request = await findOne('transfer_requests', { id: Number(req.params.id) });
+  if (!request) throw new ApiError(404, 'Transfer request not found.');
+  if (!(await isSenderSide(req, request))) throw new ApiError(403, 'Only the sending team can change this request.');
+  return request;
 }
 
 // POST /api/transfers/:id/complete - patient has physically moved
 const complete = asyncHandler(async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const request = await loadRequestForSender(conn, req);
-    if (request.status !== 'accepted') throw new ApiError(400, 'Only an accepted transfer can be completed.');
-    await conn.query(`UPDATE transfer_requests SET status = 'completed' WHERE id = ?`, [request.id]);
-    if (request.admission_id) {
-      await conn.query(
-        `UPDATE admissions SET status = 'transferred', discharged_at = NOW() WHERE id = ? AND status IN ('admitted', 'cleared')`,
-        [request.admission_id]
-      );
-    }
-    await notifyDepartment(conn, 'transfer_desk', request.accepted_hospital_id, 'transfer_completed', 'Patient is on the way',
-      'The sending hospital has marked the transfer complete - the patient has left for your hospital.', 'transfer_request', request.id);
-    await audit(conn, req.user.id, 'transfer.completed', 'transfer_request', request.id, 'Transfer completed');
-    await conn.commit();
-    res.json({ message: 'Transfer marked complete.' });
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
+  const request = await loadRequestForSender(req);
+  if (request.status !== 'accepted') throw new ApiError(400, 'Only an accepted transfer can be completed.');
+  const done = await M.transfer_requests.updateOne({ id: request.id, status: 'accepted' }, { $set: { status: 'completed' } });
+  if (!done.modifiedCount) throw new ApiError(400, 'Only an accepted transfer can be completed.');
+
+  if (request.admission_id) {
+    await M.admissions.updateOne(
+      { id: request.admission_id, status: { $in: ['admitted', 'cleared'] } },
+      { $set: { status: 'transferred', discharged_at: new Date() } }
+    );
   }
+  await notifyDepartment('transfer_desk', request.accepted_hospital_id, 'transfer_completed', 'Patient is on the way',
+    'The sending hospital has marked the transfer complete - the patient has left for your hospital.', 'transfer_request', request.id);
+  await audit(req.user.id, 'transfer.completed', 'transfer_request', request.id, 'Transfer completed');
+  res.json({ message: 'Transfer marked complete.' });
 });
 
 // POST /api/transfers/:id/cancel
 const cancel = asyncHandler(async (req, res) => {
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const request = await loadRequestForSender(conn, req);
-    if (!['open', 'accepted'].includes(request.status)) throw new ApiError(400, 'This request is already closed.');
+  const request = await loadRequestForSender(req);
+  if (!['open', 'accepted'].includes(request.status)) throw new ApiError(400, 'This request is already closed.');
 
-    const [active] = await conn.query(
-      `SELECT hospital_id FROM transfer_offers WHERE request_id = ? AND status IN ('pending', 'accepted')`, [request.id]);
-    await conn.query(`UPDATE transfer_offers SET status = 'withdrawn' WHERE request_id = ? AND status = 'pending'`, [request.id]);
-    await conn.query(`UPDATE transfer_requests SET status = 'cancelled' WHERE id = ?`, [request.id]);
-    if (request.status === 'accepted') {
-      // Give the reserved bed back.
-      await conn.query(
-        `UPDATE hospital_capabilities
-            SET beds_available = beds_available + 1, icu_available = icu_available + IF(?, 1, 0)
-          WHERE hospital_id = ? AND specialization_id = ?`,
-        [request.needs_icu ? 1 : 0, request.accepted_hospital_id, request.specialization_id]
-      );
-    }
-    for (const o of active) {
-      await notifyDepartment(conn, 'transfer_desk', o.hospital_id, 'transfer_cancelled', 'Transfer request cancelled',
-        'The sending hospital cancelled a transfer request sent to you. No action needed.', 'transfer_request', request.id);
-    }
-    await audit(conn, req.user.id, 'transfer.cancelled', 'transfer_request', request.id, 'Transfer request cancelled');
-    await conn.commit();
-    res.json({ message: 'Transfer request cancelled.' });
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
+  const active = await find('transfer_offers', { request_id: request.id, status: { $in: ['pending', 'accepted'] } }, { select: 'hospital_id' });
+  const done = await M.transfer_requests.updateOne({ id: request.id, status: request.status }, { $set: { status: 'cancelled' } });
+  if (!done.modifiedCount) throw new ApiError(400, 'This request is already closed.');
+  await M.transfer_offers.updateMany({ request_id: request.id, status: 'pending' }, { $set: { status: 'withdrawn' } });
+  if (request.status === 'accepted') {
+    // Give the reserved bed back.
+    await M.hospital_capabilities.updateOne(
+      { hospital_id: request.accepted_hospital_id, specialization_id: request.specialization_id },
+      { $inc: { beds_available: 1, icu_available: request.needs_icu ? 1 : 0 } }
+    );
   }
+  for (const o of active) {
+    await notifyDepartment('transfer_desk', o.hospital_id, 'transfer_cancelled', 'Transfer request cancelled',
+      'The sending hospital cancelled a transfer request sent to you. No action needed.', 'transfer_request', request.id);
+  }
+  await audit(req.user.id, 'transfer.cancelled', 'transfer_request', request.id, 'Transfer request cancelled');
+  res.json({ message: 'Transfer request cancelled.' });
 });
 
 // GET /api/transfers/analytics (admin)
 const analytics = asyncHandler(async (req, res) => {
-  const [[counts]] = await pool.query(
-    `SELECT SUM(status = 'open') AS open, SUM(status = 'accepted') AS accepted, SUM(status = 'completed') AS completed
-       FROM transfer_requests`
-  );
-  const [[offerStats]] = await pool.query(
-    `SELECT AVG(TIMESTAMPDIFF(MINUTE, sent_at, responded_at)) AS avg_minutes,
-            SUM(status = 'accepted') AS accepted, SUM(status = 'declined') AS declined
-       FROM transfer_offers WHERE responded_at IS NOT NULL`
-  );
-  const answered = Number(offerStats.accepted || 0) + Number(offerStats.declined || 0);
-  const [recent] = await pool.query(`${REQUEST_SELECT} ORDER BY r.created_at DESC LIMIT 8`);
+  const [open, accepted, completed] = await Promise.all([
+    count('transfer_requests', { status: 'open' }),
+    count('transfer_requests', { status: 'accepted' }),
+    count('transfer_requests', { status: 'completed' }),
+  ]);
+  const answered = await find('transfer_offers', { responded_at: { $ne: null } }, { select: 'status sent_at responded_at' });
+  const acc = answered.filter((o) => o.status === 'accepted').length;
+  const dec = answered.filter((o) => o.status === 'declined').length;
+  const avgMinutes = answered.length ? answered.reduce((s, o) => s + minutesBetween(o.sent_at, o.responded_at), 0) / answered.length : null;
+  const recent = await loadRequests({}, { limit: 8, newestFirst: true });
   res.json({
-    open: Number(counts.open || 0),
-    accepted: Number(counts.accepted || 0),
-    completed: Number(counts.completed || 0),
-    avgResponseMinutes: offerStats.avg_minutes !== null ? Math.round(Number(offerStats.avg_minutes)) : null,
-    acceptanceRate: answered ? Math.round((Number(offerStats.accepted) / answered) * 100) : null,
+    open, accepted, completed,
+    avgResponseMinutes: avgMinutes !== null ? Math.round(avgMinutes) : null,
+    acceptanceRate: acc + dec ? Math.round((acc / (acc + dec)) * 100) : null,
     recent: recent.map((r) => ({
       id: r.id, patient_name: r.patient_name, specialization: r.specialization, urgency: r.urgency,
       status: r.status, created_at: r.created_at, minutes_ago: r.minutes_ago, accepted_hospital: r.accepted_hospital,

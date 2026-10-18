@@ -1,0 +1,180 @@
+- generic [active] [ref=f4e1]:
+  - banner [ref=f4e3]:
+    - generic [ref=f4e4]:
+      - generic [ref=f4e5]: Patient
+      - generic [ref=f4e6]: /
+      - generic [ref=f4e7]: Emergency Connect
+    - generic [ref=f4e8]:
+      - generic [ref=f4e9]: Sun, Oct 18
+      - link "Notifications (4 unread)" [ref=f4e10] [cursor=pointer]:
+        - /url: /patient/notifications.html
+      - link "AS" [ref=f4e16] [cursor=pointer]:
+        - /url: /patient/profile.html
+  - generic [ref=f4e17]:
+    - complementary [ref=f4e18]:
+      - link "MediBridge home" [ref=f4e20] [cursor=pointer]:
+        - /url: /patient/dashboard.html
+        - text: MediBridge
+      - navigation "Patient navigation" [ref=f4e26]:
+        - generic [ref=f4e27]: Overview
+        - link "Dashboard" [ref=f4e28] [cursor=pointer]:
+          - /url: /patient/dashboard.html
+        - generic [ref=f4e35]: Care
+        - link "My Care Plan" [ref=f4e36] [cursor=pointer]:
+          - /url: /patient/care-plan.html
+        - link "Hospital Stay" [ref=f4e40] [cursor=pointer]:
+          - /url: /patient/hospital-stay.html
+        - link "Appointments" [ref=f4e46] [cursor=pointer]:
+          - /url: /patient/appointments.html
+        - link "Find Doctors" [ref=f4e51] [cursor=pointer]:
+          - /url: /patient/doctors.html
+        - link "Emergency" [ref=f4e56] [cursor=pointer]:
+          - /url: /patient/emergency.html
+        - generic [ref=f4e62]: Records
+        - link "Medical Records" [ref=f4e63] [cursor=pointer]:
+          - /url: /patient/medical-records.html
+        - link "Prescriptions" [ref=f4e69] [cursor=pointer]:
+          - /url: /patient/prescriptions.html
+        - link "Medications" [ref=f4e74] [cursor=pointer]:
+          - /url: /patient/medications.html
+        - generic [ref=f4e79]: Account
+        - link "Notifications" [ref=f4e80] [cursor=pointer]:
+          - /url: /patient/notifications.html
+        - link "Profile" [ref=f4e85] [cursor=pointer]:
+          - /url: /patient/profile.html
+      - generic [ref=f4e90]:
+        - generic [ref=f4e91]: AS
+        - generic [ref=f4e92]:
+          - generic "Aarav Sharma" [ref=f4e93]
+          - generic [ref=f4e94]: Patient
+        - button "Log out" [ref=f4e95] [cursor=pointer]
+    - main [ref=f4e98]:
+      - generic [ref=f4e99]:
+        - generic [ref=f4e100]:
+          - heading "Emergency Connect" [level=2] [ref=f4e101]
+          - paragraph [ref=f4e106]: Your critical health details in one place, so doctors and responders can act faster. MediBridge does not dispatch ambulances.
+        - link "Call 108 Ambulance, India" [ref=f4e107] [cursor=pointer]:
+          - /url: tel:108
+          - strong [ref=f4e108]: Call 108
+          - generic [ref=f4e111]: Ambulance, India
+      - generic [ref=f4e112]:
+        - generic [ref=f4e113]:
+          - heading "Patient information" [level=3] [ref=f4e114]
+          - link "Edit in profile" [ref=f4e118] [cursor=pointer]:
+            - /url: /patient/profile.html
+        - generic [ref=f4e119]:
+          - generic [ref=f4e120]: AS
+          - generic [ref=f4e121]:
+            - heading "Aarav Sharma" [level=1] [ref=f4e122]
+            - generic [ref=f4e123]: Patient ID MB-000025
+            - generic [ref=f4e124]:
+              - generic [ref=f4e125]: 34 years · DOB Mar 14, 1992
+              - generic [ref=f4e129]: Male
+              - generic [ref=f4e133]: +91 9955806933
+              - generic [ref=f4e136]: Koramangala
+          - generic [ref=f4e140]:
+            - generic [ref=f4e141]: Blood group
+            - generic [ref=f4e142]: O+
+      - generic [ref=f4e143]:
+        - generic [ref=f4e144]:
+          - heading "Allergies 2 recorded" [level=3] [ref=f4e145]:
+            - text: Allergies
+            - generic [ref=f4e149]: 2 recorded
+          - list [ref=f4e150]:
+            - listitem [ref=f4e151]:
+              - generic [ref=f4e152]: Penicillin (rash)
+            - listitem [ref=f4e153]:
+              - generic [ref=f4e154]: Dust
+        - generic [ref=f4e155]:
+          - heading "Current medications 5 active" [level=3] [ref=f4e156]:
+            - text: Current medications
+            - generic [ref=f4e160]: 5 active
+          - table [ref=f4e161]:
+            - rowgroup [ref=f4e162]:
+              - row [ref=f4e163]:
+                - columnheader "Medication" [ref=f4e164]
+                - columnheader "Dose" [ref=f4e165]
+                - columnheader "Frequency" [ref=f4e166]
+            - rowgroup [ref=f4e167]:
+              - row [ref=f4e168]:
+                - cell "Amlodipine 5mg" [ref=f4e169]
+                - cell "1 tablet" [ref=f4e170]
+                - cell "Once a day morning" [ref=f4e171]
+              - row [ref=f4e172]:
+                - cell "Multivitamin" [ref=f4e173]
+                - cell "1 tablet" [ref=f4e174]
+                - cell "Once a day" [ref=f4e175]
+              - row [ref=f4e176]:
+                - cell "Sertraline 50mg" [ref=f4e177]
+                - cell "1 tablet" [ref=f4e178]
+                - cell "Once a day morning" [ref=f4e179]
+              - row [ref=f4e180]:
+                - cell "Vitamin D3 60000 IU" [ref=f4e181]
+                - cell "1 sachet" [ref=f4e182]
+                - cell "Once a week" [ref=f4e183]
+              - row [ref=f4e184]:
+                - cell "Atorvastatin 10mg" [ref=f4e185]
+                - cell "1 tablet" [ref=f4e186]
+                - cell "Once a day at night" [ref=f4e187]
+        - generic [ref=f4e188]:
+          - heading "Medical conditions 2 recorded" [level=3] [ref=f4e189]:
+            - text: Medical conditions
+            - generic [ref=f4e193]: 2 recorded
+          - list [ref=f4e194]:
+            - listitem [ref=f4e195]:
+              - generic [ref=f4e196]: Hypertension
+            - listitem [ref=f4e197]:
+              - generic [ref=f4e198]: Pre-diabetes
+        - generic [ref=f4e199]:
+          - heading "Emergency contact" [level=3] [ref=f4e200]
+          - generic [ref=f4e205]:
+            - generic [ref=f4e206]:
+              - generic [ref=f4e207]: Ravi Sharma
+              - generic [ref=f4e208]: +91 9738300056
+            - link "Call" [ref=f4e209] [cursor=pointer]:
+              - /url: tel:+919738300056
+        - generic [ref=f4e212]:
+          - heading "Recent medical records 3 shown" [level=3] [ref=f4e213]:
+            - text: Recent medical records
+            - generic [ref=f4e218]: 3 shown
+          - table [ref=f4e219]:
+            - rowgroup [ref=f4e220]:
+              - row [ref=f4e221]:
+                - columnheader "Date" [ref=f4e222]
+                - columnheader "Details" [ref=f4e223]
+                - columnheader "Doctor" [ref=f4e224]
+            - rowgroup [ref=f4e225]:
+              - row [ref=f4e226]:
+                - cell "Oct 14, 2026" [ref=f4e227]
+                - cell "Irritable bowel syndrome" [ref=f4e228]
+                - cell "Dr. Nikhil Saxena" [ref=f4e229]
+              - row [ref=f4e230]:
+                - cell "Oct 6, 2026" [ref=f4e231]
+                - cell "Mild hypertension" [ref=f4e232]
+                - cell "Dr. Ananya Iyer" [ref=f4e233]
+              - row [ref=f4e234]:
+                - cell "Oct 5, 2026" [ref=f4e235]
+                - cell "Prenatal checkup" [ref=f4e236]
+                - cell "Dr. Kavita Srinivasan" [ref=f4e237]
+          - paragraph [ref=f4e238]:
+            - link "View all records" [ref=f4e239] [cursor=pointer]:
+              - /url: /patient/medical-records.html
+        - generic [ref=f4e240]:
+          - heading "Body measurements" [level=3] [ref=f4e241]
+          - list [ref=f4e244]:
+            - listitem [ref=f4e245]:
+              - generic [ref=f4e246]: Height
+              - generic [ref=f4e247]: 184 cm
+            - listitem [ref=f4e248]:
+              - generic [ref=f4e249]: Weight
+              - generic [ref=f4e250]: 84 kg
+      - generic [ref=f4e251]:
+        - generic [ref=f4e252]:
+          - heading "Emergency summary" [level=3] [ref=f4e253]
+          - paragraph [ref=f4e254]: A short copy of the details above to share with healthcare providers.
+        - generic [ref=f4e255]:
+          - button "Print / Save PDF" [ref=f4e256] [cursor=pointer]
+          - button "Copy summary" [ref=f4e260] [cursor=pointer]
+      - generic [ref=f4e265]:
+        - strong [ref=f4e266]: "Important:"
+        - text: MediBridge does not provide emergency medical services. In a medical emergency call 108 (India) or your local emergency number, or go to the nearest hospital. This card shows only what has been recorded in your profile.

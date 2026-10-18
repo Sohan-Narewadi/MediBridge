@@ -1,5 +1,5 @@
 const bcrypt = require('bcryptjs');
-const pool = require('../../database/db');
+const { findOne, insert } = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { signToken, COOKIE_OPTIONS } = require('../utils/jwt');
@@ -7,38 +7,30 @@ const { signToken, COOKIE_OPTIONS } = require('../utils/jwt');
 // Public self-registration is patient-only by design - doctor and admin
 // accounts are provisioned by an admin, so they can be vetted first.
 const register = asyncHandler(async (req, res) => {
-  const { email, password, fullName, phone, dateOfBirth, gender } = req.body;
+  const { password, fullName, phone, dateOfBirth, gender } = req.body;
+  const email = String(req.body.email).trim().toLowerCase();
 
-  const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-  if (existing.length) throw new ApiError(409, 'An account with that email already exists.');
+  if (await findOne('users', { email }, { select: 'id' })) throw new ApiError(409, 'An account with that email already exists.');
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const [userResult] = await pool.query(
-    `INSERT INTO users (email, password_hash, role, full_name, phone) VALUES (?, ?, 'patient', ?, ?)`,
-    [email, passwordHash, fullName, phone || null]
-  );
-  await pool.query(
-    `INSERT INTO patients (user_id, date_of_birth, gender) VALUES (?, ?, ?)`,
-    [userResult.insertId, dateOfBirth || null, gender || 'prefer_not_to_say']
-  );
+  const created = await insert('users', { email, password_hash: passwordHash, role: 'patient', full_name: fullName, phone: phone || null });
+  await insert('patients', { user_id: created.id, date_of_birth: dateOfBirth || null, gender: gender || 'prefer_not_to_say' });
 
-  const user = { id: userResult.insertId, role: 'patient', email, full_name: fullName };
-  const token = signToken(user);
-  res.cookie('token', token, COOKIE_OPTIONS);
+  const user = { id: created.id, role: 'patient', email, full_name: fullName };
+  res.cookie('token', signToken(user), COOKIE_OPTIONS);
   res.status(201).json({ user: { id: user.id, role: user.role, email, fullName } });
 });
 
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-  const [rows] = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-  const user = rows[0];
+  const { password } = req.body;
+  const email = String(req.body.email).trim().toLowerCase();
+  const user = await findOne('users', { email });
   if (!user || !user.is_active) throw new ApiError(401, 'Invalid email or password.');
 
   const matches = await bcrypt.compare(password, user.password_hash);
   if (!matches) throw new ApiError(401, 'Invalid email or password.');
 
-  const token = signToken(user);
-  res.cookie('token', token, COOKIE_OPTIONS);
+  res.cookie('token', signToken(user), COOKIE_OPTIONS);
   res.json({ user: { id: user.id, role: user.role, email: user.email, fullName: user.full_name, avatarUrl: user.avatar_url } });
 });
 
@@ -48,12 +40,8 @@ const logout = (req, res) => {
 };
 
 const me = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    'SELECT id, email, role, full_name, phone, avatar_url FROM users WHERE id = ?',
-    [req.user.id]
-  );
-  if (!rows.length) throw new ApiError(404, 'User not found.');
-  const u = rows[0];
+  const u = await findOne('users', { id: req.user.id }, { select: 'id email role full_name phone avatar_url' });
+  if (!u) throw new ApiError(404, 'User not found.');
   res.json({ user: { id: u.id, email: u.email, role: u.role, fullName: u.full_name, phone: u.phone, avatarUrl: u.avatar_url } });
 });
 

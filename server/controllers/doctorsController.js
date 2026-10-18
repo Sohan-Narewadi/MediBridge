@@ -1,104 +1,87 @@
 const bcrypt = require('bcryptjs');
-const pool = require('../../database/db');
+const { M, find, findOne, insert, insertMany, update, updateMany, remove, withUsers, contains } = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { buildAvailableSlots } = require('../utils/slots');
 
 // GET /api/doctors - the doctor discovery / search endpoint.
+// One aggregation: join each doctor to its user and specialization, filter,
+// sort, then return the requested page together with the total count.
 const list = asyncHandler(async (req, res) => {
   const { q, specialization, city, mode, minExperience, minRating, sort, page = 1, pageSize = 12 } = req.query;
 
-  const where = ["u.is_active = 1"];
-  const params = [];
-
-  if (q) {
-    where.push('(u.full_name LIKE ? OR s.name LIKE ?)');
-    params.push(`%${q}%`, `%${q}%`);
-  }
-  if (specialization) {
-    where.push('s.id = ?');
-    params.push(specialization);
-  }
-  if (city) {
-    where.push('d.city LIKE ?');
-    params.push(`%${city}%`);
-  }
-  if (mode) {
-    where.push('d.consultation_modes LIKE ?');
-    params.push(`%${mode}%`);
-  }
-  if (minExperience) {
-    where.push('d.experience_years >= ?');
-    params.push(Number(minExperience));
-  }
-  if (minRating) {
-    where.push('d.rating_avg >= ?');
-    params.push(Number(minRating));
-  }
+  const match = { 'u.is_active': 1 };
+  if (q) match.$or = [{ 'u.full_name': contains(q) }, { 's.name': contains(q) }];
+  if (specialization) match['s.id'] = Number(specialization);
+  if (city) match.city = contains(city);
+  if (mode) match.consultation_modes = contains(mode);
+  if (minExperience) match.experience_years = { $gte: Number(minExperience) };
+  if (minRating) match.rating_avg = { $gte: Number(minRating) };
 
   const sortMap = {
-    experience: 'd.experience_years DESC',
-    fee_low: 'd.consultation_fee ASC',
-    fee_high: 'd.consultation_fee DESC',
-    rating: 'd.rating_avg DESC',
-    name: 'u.full_name ASC',
+    experience: { experience_years: -1 },
+    fee_low: { consultation_fee: 1 },
+    fee_high: { consultation_fee: -1 },
+    rating: { rating_avg: -1 },
+    name: { 'u.full_name': 1 },
   };
-  const orderBy = sortMap[sort] || 'd.rating_avg DESC';
+  const orderBy = { ...(sortMap[sort] || sortMap.rating), user_id: 1 };
 
   const limit = Math.min(Number(pageSize) || 12, 50);
-  const offset = (Math.max(Number(page) || 1, 1) - 1) * limit;
+  const skip = (Math.max(Number(page) || 1, 1) - 1) * limit;
 
-  const [countRows] = await pool.query(
-    `SELECT COUNT(*) AS total FROM doctors d
-     JOIN users u ON u.id = d.user_id
-     JOIN specializations s ON s.id = d.specialization_id
-     WHERE ${where.join(' AND ')}`,
-    params
-  );
+  const [result] = await M.doctors.aggregate([
+    { $lookup: { from: 'users', localField: 'user_id', foreignField: 'id', as: 'u' } },
+    { $unwind: '$u' },
+    { $lookup: { from: 'specializations', localField: 'specialization_id', foreignField: 'id', as: 's' } },
+    { $unwind: '$s' },
+    { $match: match },
+    { $sort: orderBy },
+    {
+      $facet: {
+        rows: [
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              _id: 0, id: '$u.id', full_name: '$u.full_name', avatar_url: '$u.avatar_url', specialization_id: 1, specialization: '$s.name',
+              qualifications: 1, experience_years: 1, consultation_fee: 1, languages: 1, clinic_name: 1, city: 1,
+              latitude: 1, longitude: 1, consultation_modes: 1, rating_avg: 1, rating_count: 1,
+            },
+          },
+        ],
+        total: [{ $count: 'n' }],
+      },
+    },
+  ]);
 
-  const [rows] = await pool.query(
-    `SELECT u.id, u.full_name, u.avatar_url, d.specialization_id, s.name AS specialization,
-            d.qualifications, d.experience_years, d.consultation_fee, d.languages, d.clinic_name,
-            d.city, d.latitude, d.longitude, d.consultation_modes, d.rating_avg, d.rating_count
-     FROM doctors d
-     JOIN users u ON u.id = d.user_id
-     JOIN specializations s ON s.id = d.specialization_id
-     WHERE ${where.join(' AND ')}
-     ORDER BY ${orderBy}
-     LIMIT ? OFFSET ?`,
-    [...params, limit, offset]
-  );
-
-  res.json({ doctors: rows, total: countRows[0].total, page: Number(page), pageSize: limit });
+  res.json({ doctors: result.rows, total: result.total[0] ? result.total[0].n : 0, page: Number(page), pageSize: limit });
 });
 
 // GET /api/doctors/:id - full profile for the doctor detail page.
 const getById = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT u.id, u.full_name, u.email, u.avatar_url, u.phone, d.specialization_id, s.name AS specialization,
-            d.qualifications, d.experience_years, d.consultation_fee, d.languages, d.bio, d.clinic_name,
-            d.clinic_address, d.city, d.latitude, d.longitude, d.consultation_modes, d.rating_avg, d.rating_count
-     FROM doctors d
-     JOIN users u ON u.id = d.user_id
-     JOIN specializations s ON s.id = d.specialization_id
-     WHERE u.id = ? AND u.is_active = 1`,
-    [req.params.id]
-  );
-  if (!rows.length) throw new ApiError(404, 'Doctor not found.');
+  const id = Number(req.params.id);
+  const user = await findOne('users', { id, is_active: 1 });
+  const d = user && (await findOne('doctors', { user_id: id }));
+  const spec = d && (await findOne('specializations', { id: d.specialization_id }));
+  if (!d || !spec) throw new ApiError(404, 'Doctor not found.');
 
-  const [reviews] = await pool.query(
-    `SELECT r.rating, r.comment, r.created_at, p.user_id, u.full_name AS patient_name
-     FROM reviews r JOIN patients p ON p.user_id = r.patient_id JOIN users u ON u.id = p.user_id
-     WHERE r.doctor_id = ? ORDER BY r.created_at DESC LIMIT 10`,
-    [req.params.id]
-  );
+  const doctor = {
+    id: user.id, full_name: user.full_name, email: user.email, avatar_url: user.avatar_url, phone: user.phone,
+    specialization_id: d.specialization_id, specialization: spec.name, qualifications: d.qualifications,
+    experience_years: d.experience_years, consultation_fee: d.consultation_fee, languages: d.languages, bio: d.bio,
+    clinic_name: d.clinic_name, clinic_address: d.clinic_address, city: d.city, latitude: d.latitude, longitude: d.longitude,
+    consultation_modes: d.consultation_modes, rating_avg: d.rating_avg, rating_count: d.rating_count,
+  };
 
-  const [availability] = await pool.query(
-    `SELECT day_of_week, start_time, end_time FROM doctor_availability WHERE doctor_id = ? AND is_active = 1 ORDER BY day_of_week`,
-    [req.params.id]
-  );
+  const reviewRows = await find('reviews', { doctor_id: id }, { sort: { created_at: -1, id: -1 }, limit: 10 });
+  await withUsers(reviewRows, { patient_id: 'patient_name' });
+  const reviews = reviewRows.map((r) => ({ rating: r.rating, comment: r.comment, created_at: r.created_at, user_id: r.patient_id, patient_name: r.patient_name }));
 
-  res.json({ doctor: rows[0], reviews, availability });
+  const availability = (await find('doctor_availability', { doctor_id: id, is_active: 1 }, { sort: { day_of_week: 1, start_time: 1 } }))
+    .map((a) => ({ day_of_week: a.day_of_week, start_time: a.start_time, end_time: a.end_time }));
+
+  res.json({ doctor, reviews, availability });
 });
 
 // GET /api/doctors/:id/slots?date=YYYY-MM-DD - real backend-computed slots.
@@ -108,16 +91,9 @@ const getSlots = asyncHandler(async (req, res) => {
   const target = new Date(`${date}T00:00:00`);
   if (Number.isNaN(target.getTime())) throw new ApiError(400, 'Invalid date.');
 
-  const dayOfWeek = target.getDay();
-  const [availabilityRows] = await pool.query(
-    `SELECT start_time, end_time, slot_duration_mins FROM doctor_availability
-     WHERE doctor_id = ? AND day_of_week = ? AND is_active = 1`,
-    [req.params.id, dayOfWeek]
-  );
-  const [booked] = await pool.query(
-    `SELECT start_time FROM appointments WHERE doctor_id = ? AND appointment_date = ? AND status != 'cancelled'`,
-    [req.params.id, date]
-  );
+  const doctorId = Number(req.params.id);
+  const availabilityRows = await find('doctor_availability', { doctor_id: doctorId, day_of_week: target.getDay(), is_active: 1 });
+  const booked = await find('appointments', { doctor_id: doctorId, appointment_date: date, status: { $ne: 'cancelled' } }, { select: 'start_time' });
 
   const slots = buildAvailableSlots(availabilityRows, booked, target, new Date());
   res.json({ date, slots });
@@ -126,72 +102,57 @@ const getSlots = asyncHandler(async (req, res) => {
 // ---- Admin-managed doctor profile CRUD ----
 
 const create = asyncHandler(async (req, res) => {
-  const { email, password, fullName, phone, specializationId, qualifications, experienceYears, consultationFee, languages, bio, clinicName, clinicAddress, city, latitude, longitude } = req.body;
+  const { password, fullName, phone, specializationId, qualifications, experienceYears, consultationFee, languages, bio, clinicName, clinicAddress, city, latitude, longitude } = req.body;
+  const email = String(req.body.email).trim().toLowerCase();
 
-  const [existing] = await pool.query('SELECT id FROM users WHERE email = ?', [email]);
-  if (existing.length) throw new ApiError(409, 'An account with that email already exists.');
+  if (await findOne('users', { email }, { select: 'id' })) throw new ApiError(409, 'An account with that email already exists.');
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const [userResult] = await pool.query(
-    `INSERT INTO users (email, password_hash, role, full_name, phone) VALUES (?, ?, 'doctor', ?, ?)`,
-    [email, passwordHash, fullName, phone || null]
-  );
-  await pool.query(
-    `INSERT INTO doctors (user_id, specialization_id, qualifications, experience_years, consultation_fee,
-        languages, bio, clinic_name, clinic_address, city, latitude, longitude)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [userResult.insertId, specializationId, qualifications, experienceYears || 0, consultationFee || 0, languages || 'English', bio || null, clinicName || null, clinicAddress || null, city || null, latitude || null, longitude || null]
-  );
-  res.status(201).json({ id: userResult.insertId });
+  const user = await insert('users', { email, password_hash: passwordHash, role: 'doctor', full_name: fullName, phone: phone || null });
+  await insert('doctors', {
+    user_id: user.id, specialization_id: Number(specializationId), qualifications: qualifications || null,
+    experience_years: experienceYears || 0, consultation_fee: consultationFee || 0, languages: languages || 'English',
+    bio: bio || null, clinic_name: clinicName || null, clinic_address: clinicAddress || null, city: city || null,
+    latitude: latitude || null, longitude: longitude || null,
+  });
+  res.status(201).json({ id: user.id });
 });
 
-const update = asyncHandler(async (req, res) => {
-  const id = req.params.id;
-  if (req.user.role === 'doctor' && Number(req.user.id) !== Number(id)) {
+const updateDoctor = asyncHandler(async (req, res) => {
+  const id = Number(req.params.id);
+  if (req.user.role === 'doctor' && Number(req.user.id) !== id) {
     throw new ApiError(403, 'You can only edit your own profile.');
   }
   const fields = ['qualifications', 'experience_years', 'consultation_fee', 'languages', 'bio', 'clinic_name', 'clinic_address', 'city', 'latitude', 'longitude', 'consultation_modes', 'specialization_id'];
   const camelMap = { specializationId: 'specialization_id', experienceYears: 'experience_years', consultationFee: 'consultation_fee', clinicName: 'clinic_name', clinicAddress: 'clinic_address', consultationModes: 'consultation_modes' };
-  const updates = [];
-  const params = [];
+  const set = {};
   for (const [key, value] of Object.entries(req.body)) {
-    const column = camelMap[key] || key;
-    if (fields.includes(column)) {
-      updates.push(`${column} = ?`);
-      params.push(value);
-    }
+    const field = camelMap[key] || key;
+    if (fields.includes(field)) set[field] = value === '' ? null : value;
   }
-  if (req.body.fullName) {
-    await pool.query('UPDATE users SET full_name = ? WHERE id = ?', [req.body.fullName, id]);
-  }
-  if (updates.length) {
-    await pool.query(`UPDATE doctors SET ${updates.join(', ')} WHERE user_id = ?`, [...params, id]);
-  }
+  if (req.body.fullName) await update('users', { id }, { full_name: req.body.fullName, updated_at: new Date() });
+  if (Object.keys(set).length) await update('doctors', { user_id: id }, set);
   res.json({ message: 'Profile updated.' });
 });
 
 const setAvailability = asyncHandler(async (req, res) => {
-  const id = req.params.id;
-  if (req.user.role === 'doctor' && Number(req.user.id) !== Number(id)) {
+  const id = Number(req.params.id);
+  if (req.user.role === 'doctor' && Number(req.user.id) !== id) {
     throw new ApiError(403, 'You can only manage your own availability.');
   }
   const { blocks } = req.body; // [{ dayOfWeek, startTime, endTime, slotDurationMins }]
   if (!Array.isArray(blocks)) throw new ApiError(400, 'blocks must be an array.');
 
-  await pool.query('DELETE FROM doctor_availability WHERE doctor_id = ?', [id]);
-  for (const b of blocks) {
-    await pool.query(
-      `INSERT INTO doctor_availability (doctor_id, day_of_week, start_time, end_time, slot_duration_mins, is_active)
-       VALUES (?, ?, ?, ?, ?, 1)`,
-      [id, b.dayOfWeek, b.startTime, b.endTime, b.slotDurationMins || 30]
-    );
-  }
+  await remove('doctor_availability', { doctor_id: id });
+  await insertMany('doctor_availability', blocks.map((b) => ({
+    doctor_id: id, day_of_week: b.dayOfWeek, start_time: b.startTime, end_time: b.endTime, slot_duration_mins: b.slotDurationMins || 30, is_active: 1,
+  })));
   res.json({ message: 'Availability updated.' });
 });
 
 const deactivate = asyncHandler(async (req, res) => {
-  await pool.query('UPDATE users SET is_active = 0 WHERE id = ?', [req.params.id]);
+  await updateMany('users', { id: Number(req.params.id) }, { is_active: 0 });
   res.json({ message: 'Doctor deactivated.' });
 });
 
-module.exports = { list, getById, getSlots, create, update, setAvailability, deactivate };
+module.exports = { list, getById, getSlots, create, update: updateDoctor, setAvailability, deactivate };

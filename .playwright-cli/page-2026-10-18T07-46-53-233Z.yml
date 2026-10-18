@@ -1,0 +1,94 @@
+- generic [active] [ref=f3e1]:
+  - banner [ref=f3e3]:
+    - generic [ref=f3e4]:
+      - generic [ref=f3e5]: Doctor
+      - generic [ref=f3e6]: /
+      - generic [ref=f3e7]: Dashboard
+    - generic [ref=f3e8]:
+      - generic [ref=f3e9]: Sun, Oct 18
+      - link "Notifications (5 unread)" [ref=f3e10] [cursor=pointer]:
+        - /url: /doctor/notifications.html
+      - link "AI" [ref=f3e16] [cursor=pointer]:
+        - /url: /doctor/profile.html
+  - generic [ref=f3e17]:
+    - complementary [ref=f3e18]:
+      - link "MediBridge home" [ref=f3e20] [cursor=pointer]:
+        - /url: /doctor/dashboard.html
+        - text: MediBridge
+      - navigation "Doctor navigation" [ref=f3e26]:
+        - generic [ref=f3e27]: Today
+        - link "Dashboard" [ref=f3e28] [cursor=pointer]:
+          - /url: /doctor/dashboard.html
+        - link "Appointments" [ref=f3e35] [cursor=pointer]:
+          - /url: /doctor/appointments.html
+        - generic [ref=f3e40]: Patients
+        - link "My Patients" [ref=f3e41] [cursor=pointer]:
+          - /url: /doctor/patients.html
+        - link "Inpatients & Discharge" [ref=f3e47] [cursor=pointer]:
+          - /url: /doctor/inpatients.html
+        - link "TransferConnect" [ref=f3e51] [cursor=pointer]:
+          - /url: /doctor/transfers.html
+        - generic [ref=f3e55]: Practice
+        - link "Availability" [ref=f3e56] [cursor=pointer]:
+          - /url: /doctor/availability.html
+        - link "Notifications" [ref=f3e61] [cursor=pointer]:
+          - /url: /doctor/notifications.html
+        - link "Profile" [ref=f3e66] [cursor=pointer]:
+          - /url: /doctor/profile.html
+      - generic [ref=f3e71]:
+        - generic [ref=f3e72]: AI
+        - generic [ref=f3e73]:
+          - generic "Dr. Ananya Iyer" [ref=f3e74]
+          - generic [ref=f3e75]: Doctor
+        - button "Log out" [ref=f3e76] [cursor=pointer]
+    - main [ref=f3e79]:
+      - generic [ref=f3e80]:
+        - heading "Good afternoon, Dr. Ananya" [level=2] [ref=f3e82]
+        - link "Transfer" [ref=f3e84] [cursor=pointer]:
+          - /url: /doctor/transfers.html
+      - generic [ref=f3e87]:
+        - generic [ref=f3e89]:
+          - heading "Visits" [level=3] [ref=f3e90]
+          - link "All" [ref=f3e91] [cursor=pointer]:
+            - /url: /doctor/appointments.html
+        - generic [ref=f3e94]:
+          - generic [ref=f3e95]:
+            - generic [ref=f3e96]:
+              - heading "Waiting to leave" [level=3] [ref=f3e97]
+              - link "All" [ref=f3e98] [cursor=pointer]:
+                - /url: /doctor/inpatients.html
+            - generic [ref=f3e99]:
+              - generic [ref=f3e100]:
+                - generic [ref=f3e101]: Dhruv Malhotra
+                - generic [ref=f3e103]: Pharmacy · 6h 30m
+              - generic [ref=f3e104]:
+                - generic [ref=f3e105]: Saanvi Iyer
+                - generic [ref=f3e107]: 4h 00m
+              - generic [ref=f3e108]:
+                - generic [ref=f3e109]: Aarav Sharma
+                - generic [ref=f3e111]: Insurance · 3h 00m
+          - generic [ref=f3e112]:
+            - heading "To confirm" [level=3] [ref=f3e114]
+            - generic [ref=f3e115]:
+              - generic [ref=f3e116]:
+                - generic [ref=f3e117]:
+                  - generic [ref=f3e118]: Anika Gupta
+                  - generic [ref=f3e119]: Today · 09:00
+                - button "Confirm" [ref=f3e120] [cursor=pointer]
+              - generic [ref=f3e121]:
+                - generic [ref=f3e122]:
+                  - generic [ref=f3e123]: Anika Gupta
+                  - generic [ref=f3e124]: Tomorrow · 09:00
+                - button "Confirm" [ref=f3e125] [cursor=pointer]
+              - generic [ref=f3e126]:
+                - generic [ref=f3e127]:
+                  - generic [ref=f3e128]: Arnav Pillai
+                  - generic [ref=f3e129]: Tuesday, Oct 20 · 11:00
+                - button "Confirm" [ref=f3e130] [cursor=pointer]
+              - generic [ref=f3e131]:
+                - generic [ref=f3e132]:
+                  - generic [ref=f3e133]: Ananya Das
+                  - generic [ref=f3e134]: Wednesday, Oct 28 · 12:00
+                - button "Confirm" [ref=f3e135] [cursor=pointer]
+      - group [ref=f3e136]:
+        - generic "Activity & recent consults" [ref=f3e137] [cursor=pointer]

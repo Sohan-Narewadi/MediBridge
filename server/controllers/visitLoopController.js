@@ -1,4 +1,7 @@
-const pool = require('../../database/db');
+const {
+  M, find, findOne, insert, insertMany, update, count, exists, byIds, withUsers,
+  todayStr, shiftDate, daysBetween, fmtDate,
+} = require('../../database/store');
 const ApiError = require('../utils/ApiError');
 const asyncHandler = require('../utils/asyncHandler');
 const { computeCareScore } = require('../utils/careScore');
@@ -15,33 +18,36 @@ const { notify, audit } = require('../utils/notify');
 // A doctor has a care relationship with a patient they've seen (non-cancelled
 // appointment) or are attending as an inpatient.
 async function doctorHasRelationship(doctorId, patientId) {
-  const [rows] = await pool.query(
-    `SELECT 1 FROM appointments WHERE doctor_id = ? AND patient_id = ? AND status != 'cancelled'
-     UNION ALL
-     SELECT 1 FROM admissions WHERE doctor_id = ? AND patient_id = ?
-     LIMIT 1`,
-    [doctorId, patientId, doctorId, patientId]
-  );
-  return rows.length > 0;
+  const d = Number(doctorId);
+  const p = Number(patientId);
+  return (await exists('appointments', { doctor_id: d, patient_id: p, status: { $ne: 'cancelled' } }))
+    || (await exists('admissions', { doctor_id: d, patient_id: p }));
 }
 
+// Appointment plus the doctor's name and specialization.
 async function getAppointment(id) {
-  const [rows] = await pool.query(
-    `SELECT a.*, du.full_name AS doctor_name, s.name AS specialization
-     FROM appointments a
-     JOIN users du ON du.id = a.doctor_id
-     JOIN doctors d ON d.user_id = a.doctor_id
-     JOIN specializations s ON s.id = d.specialization_id
-     WHERE a.id = ?`,
-    [id]
-  );
-  if (!rows.length) throw new ApiError(404, 'Appointment not found.');
-  return rows[0];
+  const appt = await findOne('appointments', { id: Number(id) });
+  if (!appt) throw new ApiError(404, 'Appointment not found.');
+  await withUsers([appt], { doctor_id: 'doctor_name' });
+  const doc = await findOne('doctors', { user_id: appt.doctor_id }, { select: 'specialization_id' });
+  const spec = doc && (await findOne('specializations', { id: doc.specialization_id }));
+  appt.specialization = spec ? spec.name : null;
+  return appt;
+}
+
+// Overdue = open, has a due date, and the date is before today. Null dates never count.
+const isOverdue = (c, today) => c.status === 'open' && !!c.due_date && c.due_date < today;
+// SQL-style ordering for commitments: dated items first (soonest first), undated last.
+const byDueDate = (a, b) => (a.due_date === null) - (b.due_date === null) || String(a.due_date).localeCompare(String(b.due_date));
+
+async function patientMedIds(patientId) {
+  return (await find('medications', { patient_id: patientId }, { select: 'id' })).map((m) => m.id);
 }
 
 // Computes the brief's warning flags from real data, ordered by severity.
 // Shared by the full brief and the doctor's "today" list.
 async function buildFlags(patientId, doctorId, intake, patient) {
+  const today = todayStr();
   const flags = [];
 
   if (patient && patient.allergies) {
@@ -54,49 +60,35 @@ async function buildFlags(patientId, doctorId, intake, patient) {
     flags.push({ level: 'danger', text: `Patient-reported severity ${intake.severity}/5` });
   }
 
-  const [[missed]] = await pool.query(
-    `SELECT COUNT(*) AS n FROM medication_logs ml JOIN medications m ON m.id = ml.medication_id
-     WHERE m.patient_id = ? AND ml.status = 'missed' AND ml.log_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)`,
-    [patientId]
-  );
-  if (missed.n >= 2) {
-    flags.push({ level: missed.n >= 4 ? 'danger' : 'warning', text: `Missed ${missed.n} doses in last 7 days` });
+  const missed = await count('medication_logs', {
+    medication_id: { $in: await patientMedIds(patientId) }, status: 'missed', log_date: { $gte: shiftDate(today, -7) },
+  });
+  if (missed >= 2) {
+    flags.push({ level: missed >= 4 ? 'danger' : 'warning', text: `Missed ${missed} doses in last 7 days` });
   }
 
-  const [overdueFollowUps] = await pool.query(
-    `SELECT DATEDIFF(CURDATE(), mr.follow_up_date) AS days_overdue
-     FROM medical_records mr
-     WHERE mr.patient_id = ? AND mr.follow_up_date IS NOT NULL AND mr.follow_up_date < CURDATE()
-       AND NOT EXISTS (
-         SELECT 1 FROM appointments a2 WHERE a2.patient_id = mr.patient_id AND a2.doctor_id = mr.doctor_id
-           AND a2.status = 'completed' AND a2.appointment_date >= mr.follow_up_date)
-     ORDER BY mr.follow_up_date DESC LIMIT 1`,
-    [patientId]
-  );
-  if (overdueFollowUps.length) {
-    flags.push({ level: 'warning', text: `Follow-up overdue by ${overdueFollowUps[0].days_overdue} days` });
+  // Latest follow-up date that has passed without a later completed visit with the same doctor.
+  const pastDue = await find('medical_records', { patient_id: patientId, follow_up_date: { $ne: null, $lt: today } }, { sort: { follow_up_date: -1 } });
+  if (pastDue.length) {
+    const visits = await find('appointments', { patient_id: patientId, status: 'completed' }, { select: 'doctor_id appointment_date' });
+    const open = pastDue.find((r) => !visits.some((a) => a.doctor_id === r.doctor_id && a.appointment_date >= r.follow_up_date));
+    if (open) flags.push({ level: 'warning', text: `Follow-up overdue by ${daysBetween(open.follow_up_date, today)} days` });
   }
 
-  const [[overdueCommitments]] = await pool.query(
-    `SELECT COUNT(*) AS n FROM commitments WHERE patient_id = ? AND status = 'open' AND due_date < CURDATE()`,
-    [patientId]
-  );
-  if (overdueCommitments.n > 0) {
-    flags.push({ level: 'warning', text: `${overdueCommitments.n} care-plan item${overdueCommitments.n > 1 ? 's' : ''} overdue` });
+  const overdueCommitments = await count('commitments', { patient_id: patientId, status: 'open', due_date: { $lt: today } });
+  if (overdueCommitments > 0) {
+    flags.push({ level: 'warning', text: `${overdueCommitments} care-plan item${overdueCommitments > 1 ? 's' : ''} overdue` });
   }
 
-  const [stays] = await pool.query(
-    `SELECT status, DATEDIFF(CURDATE(), DATE(COALESCE(discharged_at, admitted_at))) AS days
-     FROM admissions WHERE patient_id = ?
-       AND (status IN ('admitted', 'cleared') OR discharged_at >= DATE_SUB(NOW(), INTERVAL 30 DAY))
-     ORDER BY admitted_at DESC LIMIT 1`,
-    [patientId]
-  );
-  if (stays.length) {
-    const s = stays[0];
+  const monthAgo = new Date(Date.now() - 30 * 86400000);
+  const stay = await findOne('admissions', {
+    patient_id: patientId, $or: [{ status: { $in: ['admitted', 'cleared'] } }, { discharged_at: { $gte: monthAgo } }],
+  }, { sort: { admitted_at: -1 } });
+  if (stay) {
+    const days = daysBetween(fmtDate(stay.discharged_at || stay.admitted_at), today);
     flags.push({
       level: 'info',
-      text: s.status === 'discharged' ? `Discharged from hospital ${s.days} days ago` : 'Currently admitted in hospital',
+      text: stay.status === 'discharged' ? `Discharged from hospital ${days} days ago` : 'Currently admitted in hospital',
     });
   }
 
@@ -104,11 +96,8 @@ async function buildFlags(patientId, doctorId, intake, patient) {
     flags.push({ level: 'info', text: `Medication change reported: ${intake.medication_changes}` });
   }
 
-  const [[seen]] = await pool.query(
-    `SELECT COUNT(*) AS n FROM appointments WHERE patient_id = ? AND doctor_id = ? AND status = 'completed'`,
-    [patientId, doctorId]
-  );
-  if (seen.n === 0) flags.push({ level: 'info', text: 'First visit with you' });
+  const seen = await count('appointments', { patient_id: patientId, doctor_id: doctorId, status: 'completed' });
+  if (seen === 0) flags.push({ level: 'info', text: 'First visit with you' });
   if (!intake) flags.push({ level: 'info', text: 'No pre-visit intake submitted' });
 
   const rank = { danger: 0, warning: 1, info: 2 };
@@ -129,26 +118,22 @@ const saveIntake = asyncHandler(async (req, res) => {
   }
 
   const symptomList = Array.isArray(symptoms) ? symptoms.map((s) => String(s).trim()).filter(Boolean).join(',') : String(symptoms || '');
-  const [existing] = await pool.query('SELECT id FROM intake_forms WHERE appointment_id = ?', [appointmentId]);
-  await pool.query(
-    `INSERT INTO intake_forms (appointment_id, patient_id, chief_complaint, symptoms, symptom_duration, severity,
-        medication_changes, new_allergies, questions_for_doctor)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE chief_complaint = VALUES(chief_complaint), symptoms = VALUES(symptoms),
-        symptom_duration = VALUES(symptom_duration), severity = VALUES(severity),
-        medication_changes = VALUES(medication_changes), new_allergies = VALUES(new_allergies),
-        questions_for_doctor = VALUES(questions_for_doctor)`,
-    [appointmentId, req.user.id, chiefComplaint, symptomList.slice(0, 255) || null, symptomDuration || null,
-      severity || null, medicationChanges || null, newAllergies || null, questionsForDoctor || null]
-  );
+  const fields = {
+    chief_complaint: chiefComplaint, symptoms: symptomList.slice(0, 255) || null, symptom_duration: symptomDuration || null,
+    severity: severity || null, medication_changes: medicationChanges || null, new_allergies: newAllergies || null,
+    questions_for_doctor: questionsForDoctor || null,
+  };
+  const existing = await findOne('intake_forms', { appointment_id: appt.id }, { select: 'id' });
+  if (existing) await update('intake_forms', { appointment_id: appt.id }, fields);
+  else await insert('intake_forms', { appointment_id: appt.id, patient_id: req.user.id, ...fields });
 
-  if (!existing.length) {
-    await notify(pool, appt.doctor_id, 'intake', 'Pre-visit info received',
+  if (!existing) {
+    await notify(appt.doctor_id, 'intake', 'Pre-visit info received',
       `Your patient shared their reason for the ${appt.appointment_date} visit. The Smart Brief is ready.`, 'appointment', appt.id);
   }
-  await audit(pool, req.user.id, existing.length ? 'intake.updated' : 'intake.submitted', 'appointment', appt.id,
+  await audit(req.user.id, existing ? 'intake.updated' : 'intake.submitted', 'appointment', appt.id,
     `Pre-visit intake for appointment on ${appt.appointment_date}`);
-  res.status(existing.length ? 200 : 201).json({ message: 'Thanks - your doctor will see this before your visit.' });
+  res.status(existing ? 200 : 201).json({ message: 'Thanks - your doctor will see this before your visit.' });
 });
 
 // GET /api/visit-loop/intake/:appointmentId
@@ -157,154 +142,145 @@ const getIntake = asyncHandler(async (req, res) => {
   if (req.user.role === 'patient' && appt.patient_id !== req.user.id) throw new ApiError(403, 'Not your appointment.');
   if (req.user.role === 'doctor' && appt.doctor_id !== req.user.id) throw new ApiError(403, 'Not your appointment.');
   if (req.user.role === 'staff') throw new ApiError(403, 'You do not have permission to perform this action.');
-  const [rows] = await pool.query('SELECT * FROM intake_forms WHERE appointment_id = ?', [appt.id]);
-  res.json({ intake: rows[0] || null });
+  res.json({ intake: (await findOne('intake_forms', { appointment_id: appt.id })) || null });
 });
 
 // GET /api/visit-loop/pending-intakes - upcoming visits still missing an intake.
 const pendingIntakes = asyncHandler(async (req, res) => {
-  const [rows] = await pool.query(
-    `SELECT a.id, a.appointment_date, a.start_time, du.full_name AS doctor_name, s.name AS specialization
-     FROM appointments a
-     JOIN users du ON du.id = a.doctor_id
-     JOIN doctors d ON d.user_id = a.doctor_id
-     JOIN specializations s ON s.id = d.specialization_id
-     LEFT JOIN intake_forms i ON i.appointment_id = a.id
-     WHERE a.patient_id = ? AND a.status IN ('pending', 'confirmed') AND a.appointment_date >= CURDATE() AND i.id IS NULL
-     ORDER BY a.appointment_date, a.start_time`,
-    [req.user.id]
-  );
-  res.json({ appointments: rows });
+  const appts = await find('appointments', {
+    patient_id: req.user.id, status: { $in: ['pending', 'confirmed'] }, appointment_date: { $gte: todayStr() },
+  }, { sort: { appointment_date: 1, start_time: 1 } });
+  const done = new Set((await find('intake_forms', { appointment_id: { $in: appts.map((a) => a.id) } }, { select: 'appointment_id' })).map((i) => i.appointment_id));
+  const open = appts.filter((a) => !done.has(a.id));
+  await withUsers(open, { doctor_id: 'doctor_name' });
+  const doctors = await byIds('doctors', open.map((a) => a.doctor_id), 'user_id', 'user_id specialization_id');
+  const specs = await byIds('specializations', [...doctors.values()].map((d) => d.specialization_id));
+  res.json({
+    appointments: open.map((a) => {
+      const d = doctors.get(a.doctor_id);
+      return {
+        id: a.id, appointment_date: a.appointment_date, start_time: a.start_time, doctor_name: a.doctor_name,
+        specialization: d && specs.get(d.specialization_id) ? specs.get(d.specialization_id).name : null,
+      };
+    }),
+  });
 });
 
 // GET /api/visit-loop/intake-status - ids of the caller's appointments that already have an intake
 // (used to show "Intake sent" / "Intake received" badges on appointment lists).
 const intakeStatus = asyncHandler(async (req, res) => {
-  const column = req.user.role === 'doctor' ? 'a.doctor_id' : 'a.patient_id';
-  const [rows] = await pool.query(
-    `SELECT i.appointment_id FROM intake_forms i JOIN appointments a ON a.id = i.appointment_id WHERE ${column} = ?`,
-    [req.user.id]
-  );
-  res.json({ appointmentIds: rows.map((r) => r.appointment_id) });
+  const field = req.user.role === 'doctor' ? 'doctor_id' : 'patient_id';
+  const appts = await find('appointments', { [field]: req.user.id }, { select: 'id' });
+  const forms = await find('intake_forms', { appointment_id: { $in: appts.map((a) => a.id) } }, { select: 'appointment_id' });
+  res.json({ appointmentIds: forms.map((f) => f.appointment_id) });
 });
 
 // ---------------------------------------------------------------------------
 // Smart Brief (doctor, before the visit)
 // ---------------------------------------------------------------------------
 
+function ageFrom(dob) {
+  if (!dob) return null;
+  const [y, m, d] = String(dob).slice(0, 10).split('-').map(Number);
+  const now = new Date();
+  let age = now.getFullYear() - y;
+  if (now.getMonth() + 1 < m || (now.getMonth() + 1 === m && now.getDate() < d)) age -= 1;
+  return age;
+}
+
 // GET /api/visit-loop/brief/:appointmentId - everything the doctor needs, compiled.
 const getBrief = asyncHandler(async (req, res) => {
   const appt = await getAppointment(req.params.appointmentId);
   if (req.user.role === 'doctor' && appt.doctor_id !== req.user.id) throw new ApiError(403, 'Not your appointment.');
   const patientId = appt.patient_id;
+  const today = todayStr();
 
-  const [[patient]] = await pool.query(
-    `SELECT u.id, u.full_name, u.phone, p.gender, p.blood_group, p.height_cm, p.weight_kg, p.city,
-            p.allergies, p.chronic_conditions, p.emergency_contact_name, p.emergency_contact_phone,
-            TIMESTAMPDIFF(YEAR, p.date_of_birth, CURDATE()) AS age
-     FROM users u JOIN patients p ON p.user_id = u.id WHERE u.id = ?`,
-    [patientId]
-  );
+  const user = await findOne('users', { id: patientId }, { select: 'id full_name phone' });
+  const p = await findOne('patients', { user_id: patientId });
+  const patient = {
+    id: user.id, full_name: user.full_name, phone: user.phone, gender: p.gender, blood_group: p.blood_group, height_cm: p.height_cm,
+    weight_kg: p.weight_kg, city: p.city, allergies: p.allergies, chronic_conditions: p.chronic_conditions,
+    emergency_contact_name: p.emergency_contact_name, emergency_contact_phone: p.emergency_contact_phone, age: ageFrom(p.date_of_birth),
+  };
   const h = Number(patient.height_cm);
   const w = Number(patient.weight_kg);
   patient.bmi = h > 0 && w > 0 ? Math.round((w / ((h / 100) ** 2)) * 10) / 10 : null;
 
-  const [intakeRows] = await pool.query('SELECT * FROM intake_forms WHERE appointment_id = ?', [appt.id]);
-  const intake = intakeRows[0] || null;
+  const intake = (await findOne('intake_forms', { appointment_id: appt.id })) || null;
 
-  const [medications] = await pool.query(
-    `SELECT m.id, m.medicine_name AS name, m.dosage, m.frequency,
-            ROUND(100 * SUM(ml.status = 'taken') / NULLIF(COUNT(ml.id), 0)) AS adherence_pct_7d
-     FROM medications m
-     LEFT JOIN medication_logs ml ON ml.medication_id = m.id AND ml.log_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-     WHERE m.patient_id = ? AND m.is_active = 1 AND (m.end_date IS NULL OR m.end_date >= CURDATE())
-     GROUP BY m.id ORDER BY m.start_date DESC`,
-    [patientId]
-  );
-  medications.forEach((m) => { m.adherence_pct_7d = m.adherence_pct_7d === null ? null : Number(m.adherence_pct_7d); });
+  const medIds = await patientMedIds(patientId);
+  const logs30 = await find('medication_logs', { medication_id: { $in: medIds }, log_date: { $gte: shiftDate(today, -30) } }, { select: 'medication_id log_date status' });
+  const weekStart = shiftDate(today, -7);
+  const activeMeds = await find('medications', {
+    patient_id: patientId, is_active: 1, $or: [{ end_date: null }, { end_date: { $gte: today } }],
+  }, { sort: { start_date: -1 } });
+  const medications = activeMeds.map((m) => {
+    const week = logs30.filter((l) => l.medication_id === m.id && l.log_date >= weekStart);
+    return {
+      id: m.id, name: m.medicine_name, dosage: m.dosage, frequency: m.frequency,
+      adherence_pct_7d: week.length ? Math.round((100 * week.filter((l) => l.status === 'taken').length) / week.length) : null,
+    };
+  });
 
-  const [[adh]] = await pool.query(
-    `SELECT ROUND(100 * SUM(ml.status = 'taken') / NULLIF(COUNT(*), 0)) AS pct30,
-            SUM(ml.status = 'missed' AND ml.log_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) AS missed7
-     FROM medication_logs ml JOIN medications m ON m.id = ml.medication_id
-     WHERE m.patient_id = ? AND ml.log_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)`,
-    [patientId]
-  );
+  const taken30 = logs30.filter((l) => l.status === 'taken').length;
+  const adherence = {
+    pct30: logs30.length ? Math.round((100 * taken30) / logs30.length) : null,
+    missedLast7: logs30.filter((l) => l.status === 'missed' && l.log_date >= weekStart).length,
+  };
 
-  const [recentRecords] = await pool.query(
-    `SELECT mr.id, mr.record_date, mr.diagnosis, mr.follow_up_date, mr.vitals_bp, mr.vitals_pulse, du.full_name AS doctor_name
-     FROM medical_records mr JOIN users du ON du.id = mr.doctor_id
-     WHERE mr.patient_id = ? ORDER BY mr.record_date DESC LIMIT 5`,
-    [patientId]
-  );
+  const recent = await find('medical_records', { patient_id: patientId }, { sort: { record_date: -1, id: -1 }, limit: 5 });
+  await withUsers(recent, { doctor_id: 'doctor_name' });
+  const recentRecords = recent.map((r) => ({
+    id: r.id, record_date: r.record_date, diagnosis: r.diagnosis, follow_up_date: r.follow_up_date, vitals_bp: r.vitals_bp,
+    vitals_pulse: r.vitals_pulse, doctor_name: r.doctor_name,
+  }));
 
-  const [openCommitments] = await pool.query(
-    `SELECT title, kind, due_date, (due_date IS NOT NULL AND due_date < CURDATE()) AS overdue
-     FROM commitments WHERE patient_id = ? AND status = 'open' ORDER BY due_date IS NULL, due_date`,
-    [patientId]
-  );
-  openCommitments.forEach((c) => { c.overdue = !!c.overdue; });
+  const openCommitments = (await find('commitments', { patient_id: patientId, status: 'open' })).sort(byDueDate)
+    .map((c) => ({ title: c.title, kind: c.kind, due_date: c.due_date, overdue: isOverdue(c, today) }));
 
-  const [[visits]] = await pool.query(
-    `SELECT COUNT(*) AS total, SUM(doctor_id = ?) AS withThisDoctor, MAX(appointment_date) AS lastVisit
-     FROM appointments WHERE patient_id = ? AND status = 'completed'`,
-    [appt.doctor_id, patientId]
-  );
+  const completedVisits = await find('appointments', { patient_id: patientId, status: 'completed' }, { select: 'doctor_id appointment_date' });
+  const visitHistory = {
+    total: completedVisits.length,
+    withThisDoctor: completedVisits.filter((a) => a.doctor_id === appt.doctor_id).length,
+    lastVisit: completedVisits.length ? completedVisits.map((a) => a.appointment_date).sort().pop() : null,
+  };
 
   const flags = await buildFlags(patientId, appt.doctor_id, intake, patient);
-  const careScore = await computeCareScore(pool, patientId);
+  const careScore = await computeCareScore(patientId);
 
-  await audit(pool, req.user.id, 'brief.viewed', 'appointment', appt.id, `Smart Brief opened for ${patient.full_name}`);
+  await audit(req.user.id, 'brief.viewed', 'appointment', appt.id, `Smart Brief opened for ${patient.full_name}`);
 
   res.json({
     appointment: {
       id: appt.id, appointment_date: appt.appointment_date, start_time: appt.start_time,
       consultation_mode: appt.consultation_mode, status: appt.status, reason: appt.reason,
     },
-    patient,
-    intake,
-    medications,
-    adherence: { pct30: adh.pct30 === null ? null : Number(adh.pct30), missedLast7: Number(adh.missed7 || 0) },
-    recentRecords,
-    openCommitments,
-    visitHistory: { total: visits.total, withThisDoctor: Number(visits.withThisDoctor || 0), lastVisit: visits.lastVisit },
-    flags,
-    careScore,
+    patient, intake, medications, adherence, recentRecords, openCommitments, visitHistory, flags, careScore,
   });
 });
 
 // GET /api/visit-loop/briefs/today - the doctor's next ~3 days of visits with brief readiness.
 const briefsToday = asyncHandler(async (req, res) => {
-  const [appts] = await pool.query(
-    `SELECT a.id AS appointment_id, a.patient_id, pu.full_name AS patient_name, a.appointment_date, a.start_time,
-            p.allergies, i.id AS intake_id
-     FROM appointments a
-     JOIN users pu ON pu.id = a.patient_id
-     JOIN patients p ON p.user_id = a.patient_id
-     LEFT JOIN intake_forms i ON i.appointment_id = a.id
-     WHERE a.doctor_id = ? AND a.status != 'cancelled'
-       AND a.appointment_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 6 DAY)
-     ORDER BY a.appointment_date, a.start_time`,
-    [req.user.id]
-  );
+  const today = todayStr();
+  const appts = await find('appointments', {
+    doctor_id: req.user.id, status: { $ne: 'cancelled' }, appointment_date: { $gte: today, $lte: shiftDate(today, 6) },
+  }, { sort: { appointment_date: 1, start_time: 1 } });
+  await withUsers(appts, { patient_id: 'patient_name' });
+  const profiles = await byIds('patients', appts.map((a) => a.patient_id), 'user_id', 'user_id allergies');
+  const intakes = await byIds('intake_forms', appts.map((a) => a.id), 'appointment_id');
 
   const items = [];
   for (const a of appts) {
-    let intake = null;
-    if (a.intake_id) {
-      const [rows] = await pool.query('SELECT * FROM intake_forms WHERE id = ?', [a.intake_id]);
-      intake = rows[0] || null;
-    }
-    const flags = await buildFlags(a.patient_id, req.user.id, intake, { allergies: a.allergies });
-    const meaningful = flags.filter((f) => f.level !== 'info');
+    const intake = intakes.get(a.id) || null;
+    const flags = await buildFlags(a.patient_id, req.user.id, intake, { allergies: profiles.get(a.patient_id)?.allergies || null });
     items.push({
-      appointment_id: a.appointment_id,
+      appointment_id: a.id,
       patient_id: a.patient_id,
       patient_name: a.patient_name,
       appointment_date: a.appointment_date,
       start_time: a.start_time,
       intake_done: !!intake,
-      flag_count: meaningful.length,
+      flag_count: flags.filter((f) => f.level !== 'info').length,
       top_flag: flags[0] || null,
     });
   }
@@ -323,15 +299,15 @@ const createCarePlan = asyncHandler(async (req, res) => {
   const { patientId, medicalRecordId, admissionId, plainSummary, commitments = [] } = req.body;
 
   if (medicalRecordId) {
-    const [rows] = await pool.query('SELECT doctor_id, patient_id FROM medical_records WHERE id = ?', [medicalRecordId]);
-    if (!rows.length) throw new ApiError(404, 'Medical record not found.');
-    if (rows[0].doctor_id !== req.user.id || rows[0].patient_id !== Number(patientId)) {
+    const rec = await findOne('medical_records', { id: Number(medicalRecordId) }, { select: 'doctor_id patient_id' });
+    if (!rec) throw new ApiError(404, 'Medical record not found.');
+    if (rec.doctor_id !== req.user.id || rec.patient_id !== Number(patientId)) {
       throw new ApiError(403, 'That medical record is not yours for this patient.');
     }
   } else if (admissionId) {
-    const [rows] = await pool.query('SELECT doctor_id, patient_id FROM admissions WHERE id = ?', [admissionId]);
-    if (!rows.length) throw new ApiError(404, 'Admission not found.');
-    if (rows[0].doctor_id !== req.user.id || rows[0].patient_id !== Number(patientId)) {
+    const adm = await findOne('admissions', { id: Number(admissionId) }, { select: 'doctor_id patient_id' });
+    if (!adm) throw new ApiError(404, 'Admission not found.');
+    if (adm.doctor_id !== req.user.id || adm.patient_id !== Number(patientId)) {
       throw new ApiError(403, 'You are not the attending doctor for this admission.');
     }
   } else if (!(await doctorHasRelationship(req.user.id, patientId))) {
@@ -347,43 +323,29 @@ const createCarePlan = asyncHandler(async (req, res) => {
       dueDate: c.dueDate || null,
     }));
 
-  const conn = await pool.getConnection();
-  try {
-    await conn.beginTransaction();
-    const [result] = await conn.query(
-      `INSERT INTO care_plans (patient_id, doctor_id, medical_record_id, admission_id, plain_summary) VALUES (?, ?, ?, ?, ?)`,
-      [patientId, req.user.id, medicalRecordId || null, admissionId || null, plainSummary]
-    );
-    const planId = result.insertId;
-    for (const c of items) {
-      await conn.query(
-        `INSERT INTO commitments (care_plan_id, patient_id, owner_role, kind, title, due_date) VALUES (?, ?, ?, ?, ?, ?)`,
-        [planId, patientId, c.ownerRole, c.kind, c.title, c.dueDate]
-      );
-    }
-    await notify(conn, patientId, 'care_plan', 'Your care plan is ready',
-      `Your doctor shared a plain-language plan${items.length ? ` with ${items.length} next step${items.length > 1 ? 's' : ''}` : ''}.`, 'care_plan', planId);
-    await audit(conn, req.user.id, 'care_plan.created', 'care_plan', planId, `Care plan with ${items.length} commitments`);
-    await conn.commit();
-    res.status(201).json({ id: planId });
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
+  const plan = await insert('care_plans', {
+    patient_id: Number(patientId), doctor_id: req.user.id, medical_record_id: medicalRecordId ? Number(medicalRecordId) : null,
+    admission_id: admissionId ? Number(admissionId) : null, plain_summary: plainSummary,
+  });
+  await insertMany('commitments', items.map((c) => ({
+    care_plan_id: plan.id, patient_id: Number(patientId), owner_role: c.ownerRole, kind: c.kind, title: c.title, due_date: c.dueDate,
+  })));
+  await notify(Number(patientId), 'care_plan', 'Your care plan is ready',
+    `Your doctor shared a plain-language plan${items.length ? ` with ${items.length} next step${items.length > 1 ? 's' : ''}` : ''}.`, 'care_plan', plan.id);
+  await audit(req.user.id, 'care_plan.created', 'care_plan', plan.id, `Care plan with ${items.length} commitments`);
+  res.status(201).json({ id: plan.id });
 });
 
 async function attachCommitments(plans) {
   if (!plans.length) return plans;
-  const [rows] = await pool.query(
-    `SELECT id, care_plan_id, title, kind, owner_role, due_date, status, completed_at,
-            (status = 'open' AND due_date IS NOT NULL AND due_date < CURDATE()) AS overdue
-     FROM commitments WHERE care_plan_id IN (?) ORDER BY due_date IS NULL, due_date`,
-    [plans.map((p) => p.id)]
-  );
+  const today = todayStr();
+  const rows = await find('commitments', { care_plan_id: { $in: plans.map((p) => p.id) } });
+  rows.sort(byDueDate);
   for (const p of plans) {
-    p.commitments = rows.filter((r) => r.care_plan_id === p.id).map((r) => ({ ...r, overdue: !!r.overdue }));
+    p.commitments = rows.filter((r) => r.care_plan_id === p.id).map((r) => ({
+      id: r.id, care_plan_id: r.care_plan_id, title: r.title, kind: r.kind, owner_role: r.owner_role, due_date: r.due_date,
+      status: r.status, completed_at: r.completed_at, overdue: isOverdue(r, today),
+    }));
   }
   return plans;
 }
@@ -391,38 +353,30 @@ async function attachCommitments(plans) {
 // GET /api/visit-loop/care-plans - patient: own; doctor: ?patientId= (or own authored); admin: ?patientId=.
 const listCarePlans = asyncHandler(async (req, res) => {
   const { patientId } = req.query;
-  const where = [];
-  const params = [];
+  const filter = {};
   if (req.user.role === 'patient') {
-    where.push('cp.patient_id = ?');
-    params.push(req.user.id);
+    filter.patient_id = req.user.id;
   } else if (req.user.role === 'doctor') {
     if (patientId) {
       if (!(await doctorHasRelationship(req.user.id, patientId))) {
         throw new ApiError(403, "You can only view care plans for patients you've had an appointment with.");
       }
-      where.push('cp.patient_id = ?');
-      params.push(patientId);
+      filter.patient_id = Number(patientId);
     } else {
-      where.push('cp.doctor_id = ?');
-      params.push(req.user.id);
+      filter.doctor_id = req.user.id;
     }
   } else if (patientId) {
-    where.push('cp.patient_id = ?');
-    params.push(patientId);
+    filter.patient_id = Number(patientId);
   }
 
-  const [plans] = await pool.query(
-    `SELECT cp.id, cp.patient_id, cp.doctor_id, cp.medical_record_id, cp.admission_id, cp.plain_summary, cp.created_at,
-            du.full_name AS doctor_name, pu.full_name AS patient_name, mr.diagnosis
-     FROM care_plans cp
-     JOIN users du ON du.id = cp.doctor_id
-     JOIN users pu ON pu.id = cp.patient_id
-     LEFT JOIN medical_records mr ON mr.id = cp.medical_record_id
-     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-     ORDER BY cp.created_at DESC LIMIT 50`,
-    params
-  );
+  const rows = await find('care_plans', filter, { sort: { created_at: -1, id: -1 }, limit: 50 });
+  await withUsers(rows, { doctor_id: 'doctor_name', patient_id: 'patient_name' });
+  const records = await byIds('medical_records', rows.map((p) => p.medical_record_id), 'id', 'id diagnosis');
+  const plans = rows.map((cp) => ({
+    id: cp.id, patient_id: cp.patient_id, doctor_id: cp.doctor_id, medical_record_id: cp.medical_record_id, admission_id: cp.admission_id,
+    plain_summary: cp.plain_summary, created_at: cp.created_at, doctor_name: cp.doctor_name, patient_name: cp.patient_name,
+    diagnosis: records.get(cp.medical_record_id)?.diagnosis || null,
+  }));
   res.json({ plans: await attachCommitments(plans) });
 });
 
@@ -430,30 +384,28 @@ const listCarePlans = asyncHandler(async (req, res) => {
 const listCommitments = asyncHandler(async (req, res) => {
   let patientId = req.user.id;
   if (req.user.role !== 'patient') {
-    patientId = req.query.patientId;
+    patientId = Number(req.query.patientId);
     if (!patientId) throw new ApiError(400, 'patientId is required.');
     if (req.user.role === 'doctor' && !(await doctorHasRelationship(req.user.id, patientId))) {
       throw new ApiError(403, "You can only view commitments for patients you've had an appointment with.");
     }
   }
-  const [rows] = await pool.query(
-    `SELECT c.id, c.title, c.kind, c.owner_role, c.due_date, c.status, c.completed_at, c.care_plan_id,
-            du.full_name AS doctor_name
-     FROM commitments c
-     JOIN care_plans cp ON cp.id = c.care_plan_id
-     JOIN users du ON du.id = cp.doctor_id
-     WHERE c.patient_id = ?
-     ORDER BY c.due_date IS NULL, c.due_date`,
-    [patientId]
-  );
-  const today = new Date();
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const rows = (await find('commitments', { patient_id: patientId })).sort(byDueDate);
+  const plans = await byIds('care_plans', rows.map((c) => c.care_plan_id), 'id', 'id doctor_id');
+  const doctors = await byIds('users', [...plans.values()].map((p) => p.doctor_id), 'id', 'id full_name');
+  const shaped = rows.map((c) => ({
+    id: c.id, title: c.title, kind: c.kind, owner_role: c.owner_role, due_date: c.due_date, status: c.status,
+    completed_at: c.completed_at, care_plan_id: c.care_plan_id,
+    doctor_name: doctors.get(plans.get(c.care_plan_id)?.doctor_id)?.full_name || null,
+  }));
+
+  const today = todayStr();
   const open = [];
   const overdue = [];
   const done = [];
-  for (const r of rows) {
+  for (const r of shaped) {
     if (r.status !== 'open') done.push(r);
-    else if (r.due_date && r.due_date < todayStr) overdue.push(r);
+    else if (r.due_date && r.due_date < today) overdue.push(r);
     else open.push(r);
   }
   done.sort((a, b) => String(b.completed_at || '').localeCompare(String(a.completed_at || '')));
@@ -463,60 +415,49 @@ const listCommitments = asyncHandler(async (req, res) => {
 // PATCH /api/visit-loop/commitments/:id - check off / reopen / skip.
 const updateCommitment = asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const [rows] = await pool.query(
-    `SELECT c.*, cp.doctor_id FROM commitments c JOIN care_plans cp ON cp.id = c.care_plan_id WHERE c.id = ?`,
-    [req.params.id]
-  );
-  if (!rows.length) throw new ApiError(404, 'Commitment not found.');
-  const c = rows[0];
+  const c = await findOne('commitments', { id: Number(req.params.id) });
+  if (!c) throw new ApiError(404, 'Commitment not found.');
+  const plan = await findOne('care_plans', { id: c.care_plan_id }, { select: 'doctor_id' });
 
   const isPatientOwner = req.user.role === 'patient' && c.patient_id === req.user.id;
-  const isDoctorOwner = req.user.role === 'doctor' && c.doctor_id === req.user.id && c.owner_role === 'doctor';
+  const isDoctorOwner = req.user.role === 'doctor' && plan && plan.doctor_id === req.user.id && c.owner_role === 'doctor';
   if (!isPatientOwner && !isDoctorOwner && req.user.role !== 'admin') {
     throw new ApiError(403, 'You cannot update this item.');
   }
 
-  await pool.query(
-    `UPDATE commitments SET status = ?, completed_at = ? WHERE id = ?`,
-    [status, status === 'open' ? null : new Date(), c.id]
-  );
-  if (status === 'done' && req.user.role === 'patient') {
-    await notify(pool, c.doctor_id, 'care_plan', 'Care-plan step completed', `Your patient marked "${c.title}" as done.`, 'commitment', c.id);
+  await update('commitments', { id: c.id }, { status, completed_at: status === 'open' ? null : new Date() });
+  if (status === 'done' && req.user.role === 'patient' && plan) {
+    await notify(plan.doctor_id, 'care_plan', 'Care-plan step completed', `Your patient marked "${c.title}" as done.`, 'commitment', c.id);
   }
-  await audit(pool, req.user.id, `commitment.${status}`, 'commitment', c.id, c.title);
+  await audit(req.user.id, `commitment.${status}`, 'commitment', c.id, c.title);
   res.json({ message: status === 'done' ? 'Marked as done.' : status === 'skipped' ? 'Marked as skipped.' : 'Reopened.' });
 });
 
 // GET /api/visit-loop/analytics - admin view of where care loops are breaking.
 const analytics = asyncHandler(async (req, res) => {
-  const [[counts]] = await pool.query(
-    `SELECT SUM(status = 'open') AS openCount,
-            SUM(status = 'open' AND due_date < CURDATE()) AS overdueCount,
-            SUM(status = 'done') AS doneCount,
-            SUM(status = 'skipped') AS skippedCount
-     FROM commitments`
-  );
-  const done = Number(counts.doneCount || 0);
-  const settled = done + Number(counts.skippedCount || 0) + Number(counts.overdueCount || 0);
+  const today = todayStr();
+  const all = await find('commitments');
+  const openCount = all.filter((c) => c.status === 'open').length;
+  const overdueRows = all.filter((c) => isOverdue(c, today));
+  const done = all.filter((c) => c.status === 'done').length;
+  const skipped = all.filter((c) => c.status === 'skipped').length;
+  const settled = done + skipped + overdueRows.length;
 
-  const [overdueByKind] = await pool.query(
-    `SELECT kind, COUNT(*) AS count FROM commitments
-     WHERE status = 'open' AND due_date < CURDATE() GROUP BY kind ORDER BY count DESC`
-  );
-  const [overdueList] = await pool.query(
-    `SELECT c.id, pu.full_name AS patient_name, c.title, c.kind, c.due_date, du.full_name AS doctor_name,
-            DATEDIFF(CURDATE(), c.due_date) AS days_overdue
-     FROM commitments c
-     JOIN care_plans cp ON cp.id = c.care_plan_id
-     JOIN users pu ON pu.id = c.patient_id
-     JOIN users du ON du.id = cp.doctor_id
-     WHERE c.status = 'open' AND c.due_date < CURDATE()
-     ORDER BY c.due_date LIMIT 10`
-  );
+  const kinds = new Map();
+  for (const c of overdueRows) kinds.set(c.kind, (kinds.get(c.kind) || 0) + 1);
+  const overdueByKind = [...kinds.entries()].map(([kind, n]) => ({ kind, count: n })).sort((a, b) => b.count - a.count);
+
+  const top = [...overdueRows].sort((a, b) => a.due_date.localeCompare(b.due_date)).slice(0, 10);
+  const plans = await byIds('care_plans', top.map((c) => c.care_plan_id), 'id', 'id doctor_id');
+  const names = await byIds('users', [...top.map((c) => c.patient_id), ...[...plans.values()].map((p) => p.doctor_id)], 'id', 'id full_name');
+  const overdueList = top.map((c) => ({
+    id: c.id, patient_name: names.get(c.patient_id)?.full_name || null, title: c.title, kind: c.kind, due_date: c.due_date,
+    doctor_name: names.get(plans.get(c.care_plan_id)?.doctor_id)?.full_name || null, days_overdue: daysBetween(c.due_date, today),
+  }));
 
   res.json({
-    openCount: Number(counts.openCount || 0),
-    overdueCount: Number(counts.overdueCount || 0),
+    openCount,
+    overdueCount: overdueRows.length,
     completionRate: settled ? Math.round((done / settled) * 100) : null,
     overdueByKind,
     overdueList,

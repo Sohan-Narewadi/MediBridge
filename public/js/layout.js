@@ -103,6 +103,7 @@ const MB_LAYOUT = (() => {
         ['/patient/hospital-stay.html', 'Hospital Stay', 'hospital'],
         ['/patient/appointments.html', 'Appointments', 'calendar'],
         ['/patient/doctors.html', 'Find Doctors', 'search'],
+        ['/patient/emergency.html', 'Emergency', 'siren'],
       ]],
       ['Records', [
         ['/patient/medical-records.html', 'Medical Records', 'clipboard'],
@@ -254,6 +255,29 @@ const MB_LAYOUT = (() => {
     } catch (e) { /* keep the generic label */ }
   }
 
+  // Shared doctor card used by the homepage and the doctor directory.
+  function doctorCard(d) {
+    const fee = Number(d.consultation_fee);
+    const video = String(d.consultation_modes || '').includes('video');
+    const rated = Number(d.rating_count) > 0;
+    return `
+      <a href="/doctor.html?id=${d.id}" class="card doctor-card card-interactive">
+        <div class="dc-top">
+          <div class="photo">${esc(initials(d.full_name))}</div>
+          <div class="min-w-0"><h4>${esc(d.full_name)}</h4><div class="spec">${esc(d.specialization)}</div></div>
+        </div>
+        <div class="dc-meta">
+          <span>${icon('clock', 14)}${d.experience_years} yrs experience</span>
+          ${d.clinic_name || d.city ? `<span>${icon('mapPin', 14)}${esc(d.clinic_name || d.city)}</span>` : ''}
+        </div>
+        <div class="dc-foot">
+          ${rated ? `<span class="rating">${icon('star', 13)} ${Number(d.rating_avg).toFixed(1)} <small>(${d.rating_count})</small></span>` : '<span class="text-muted text-xs">New</span>'}
+          ${video ? `<span class="badge badge-plain badge-info">${icon('video', 12)} Video</span>` : ''}
+          <span class="fee">&#8377;${fee.toFixed(0)} </span>
+        </div>
+      </a>`;
+  }
+
   const ROLE_DASHBOARD = { patient: '/patient/dashboard.html', doctor: '/doctor/dashboard.html', admin: '/admin/dashboard.html', staff: '/staff/dashboard.html' };
   function DASHBOARD_FOR(role) { return ROLE_DASHBOARD[role] || '/index.html'; }
 
@@ -297,7 +321,7 @@ const MB_LAYOUT = (() => {
     }
   }
 
-  return { renderHeader, renderFooter, renderDashboardShell, renderUserMenu, onAuthReady, icon, hydrate, esc, fmtMinutes, initials, SIDEBAR_LINKS, ROLE_DASHBOARD };
+  return { renderHeader, renderFooter, renderDashboardShell, renderUserMenu, onAuthReady, doctorCard, icon, hydrate, esc, fmtMinutes, initials, SIDEBAR_LINKS, ROLE_DASHBOARD };
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
